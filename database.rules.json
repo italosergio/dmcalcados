@@ -1,0 +1,26 @@
+{
+  "rules": {
+    "users": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
+      "$uid": {
+        ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin'"
+      }
+    },
+    "produtos": {
+      ".read": "auth != null",
+      ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "clientes": {
+      ".read": "auth != null",
+      ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "vendas": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "despesas": {
+      ".read": "root.child('users').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin'"
+    }
+  }
+}
