@@ -2,9 +2,11 @@ import { Outlet, Navigate } from 'react-router';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useAuth } from '~/contexts/AuthContext';
+import { useState } from 'react';
 
 export default function Layout() {
   const { user, loading } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (loading) {
     return <div className="flex h-screen items-center justify-center">Carregando...</div>;
@@ -16,10 +18,10 @@ export default function Layout() {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-      <Sidebar />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-6">
+        <Header onMenuClick={() => setSidebarOpen(true)} />
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           <Outlet />
         </main>
       </div>

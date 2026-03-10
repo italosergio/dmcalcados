@@ -10,23 +10,31 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType>({ theme: 'light', toggleTheme: () => {} });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light');
-
-  useEffect(() => {
+  const [theme, setTheme] = useState<Theme>(() => {
+    // Verifica se está no browser (não SSR)
+    if (typeof window === 'undefined') return 'light';
+    
+    // Inicializa do cookie ou localStorage
     const saved = document.cookie.match(/theme=(light|dark)/)?.[1] as Theme;
-    if (saved) setTheme(saved);
-  }, []);
+    const stored = saved || (localStorage.getItem('theme') as Theme) || 'light';
+    return stored;
+  });
+
+  // Aplica o tema no cliente após montagem
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  }, [theme]);
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
-    document.cookie = `theme=${newTheme};path=/;max-age=31536000`;
-    document.documentElement.classList.toggle('dark', newTheme === 'dark');
+    
+    if (typeof window !== 'undefined') {
+      document.cookie = `theme=${newTheme};path=/;max-age=31536000`;
+      localStorage.setItem('theme', newTheme);
+      document.documentElement.classList.toggle('dark', newTheme === 'dark');
+    }
   };
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
-  }, [theme]);
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
