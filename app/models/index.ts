@@ -41,6 +41,8 @@ export interface Venda {
   valorTotal: number;
   data: Date;
   createdAt: Date;
+  deletedAt?: Date;
+  deletedBy?: string;
 }
 
 export interface Despesa {
@@ -48,6 +50,9 @@ export interface Despesa {
   tipo: string;
   valor: number;
   data: Date;
+  usuarioId: string;
   usuarioNome: string;
   createdAt: Date;
+  deletedAt?: Date;
+  deletedBy?: string;
 }
