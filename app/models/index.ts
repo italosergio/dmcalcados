@@ -1,9 +1,11 @@
 export interface User {
   id: string;
+  uid?: string; // Firebase UID
   username: string;
   nome: string;
-  role: 'admin' | 'vendedor';
+  role: 'admin' | 'vendedor' | 'superadmin';
   createdAt: Date;
+  deletedAt?: Date;
 }
 
 export interface Produto {
