@@ -1,26 +1,31 @@
 {
   "rules": {
     "users": {
-      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
+      ".read": "auth != null",
       "$uid": {
         ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin'"
-      }
+      },
+      ".indexOn": ["deletedAt", "roleUpdatedAt"]
     },
     "produtos": {
       ".read": "auth != null",
-      ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin'"
+      ".write": "auth != null",
+      ".indexOn": ["nome", "deletedAt"]
     },
     "clientes": {
       ".read": "auth != null",
-      ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin'"
+      ".write": "auth != null",
+      ".indexOn": ["nome", "deletedAt"]
     },
     "vendas": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      ".write": "auth != null",
+      ".indexOn": ["vendedorId", "createdAt", "deletedAt", "clienteId"]
     },
     "despesas": {
-      ".read": "root.child('users').child(auth.uid).child('role').val() === 'admin'",
-      ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin'"
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["usuarioId", "createdAt", "deletedAt"]
     }
   }
 }
