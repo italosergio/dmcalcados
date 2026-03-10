@@ -9,22 +9,21 @@ export async function getDespesas(): Promise<Despesa[]> {
   const userData = await get(ref(db, `users/${user.uid}`));
   const isAdmin = userData.val()?.role === 'admin';
 
+  const snapshot = await get(ref(db, 'despesas'));
+  if (!snapshot.exists()) return [];
+  
+  const data = snapshot.val();
+  const allDespesas = Object.keys(data)
+    .map(key => ({ id: key, ...data[key] }))
+    .filter(d => !d.deletedAt);
+
   if (isAdmin) {
-    const snapshot = await get(ref(db, 'despesas'));
-    if (!snapshot.exists()) return [];
-    const data = snapshot.val();
-    return Object.keys(data)
-      .map(key => ({ id: key, ...data[key] }))
-      .filter(d => !d.deletedAt)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return allDespesas.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   } else {
-    const snapshot = await get(ref(db, 'despesas'));
-    if (!snapshot.exists()) return [];
-    const data = snapshot.val();
-    const filtered = Object.keys(data)
-      .map(key => ({ id: key, ...data[key] }))
-      .filter(despesa => despesa.usuarioId === user.uid && !despesa.deletedAt);
-    return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    // Vendedor vê apenas suas despesas
+    const minhasDespesas = allDespesas.filter(despesa => despesa.usuarioId === user.uid);
+    console.log('Despesas do vendedor:', minhasDespesas.length, 'de', allDespesas.length);
+    return minhasDespesas.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 }
 
@@ -39,11 +38,30 @@ export async function deleteDespesa(despesaId: string): Promise<void> {
 }
 
 export async function createDespesa(data: Omit<Despesa, 'id' | 'createdAt'>): Promise<string> {
-  const newRef = push(ref(db, 'despesas'));
-  await set(newRef, {
-    ...data,
-    data: data.data.toISOString(),
-    createdAt: new Date().toISOString()
-  });
-  return newRef.key!;
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error('Usuário não autenticado');
+
+    console.log('createDespesa - dados recebidos:', data);
+    
+    const despesaData = {
+      tipo: data.tipo,
+      valor: data.valor,
+      data: data.data instanceof Date ? data.data.toISOString() : data.data,
+      usuarioId: data.usuarioId,
+      usuarioNome: data.usuarioNome,
+      createdAt: new Date().toISOString()
+    };
+
+    console.log('createDespesa - dados a salvar:', despesaData);
+    
+    const newRef = push(ref(db, 'despesas'));
+    await set(newRef, despesaData);
+    
+    console.log('createDespesa - sucesso, ID:', newRef.key);
+    return newRef.key!;
+  } catch (error) {
+    console.error('createDespesa - erro:', error);
+    throw error;
+  }
 }

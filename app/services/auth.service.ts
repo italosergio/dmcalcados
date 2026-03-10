@@ -9,7 +9,7 @@ export async function login(username: string, password: string) {
   return userCredential.user;
 }
 
-export async function register(username: string, password: string, nome: string, role: 'admin' | 'vendedor' = 'vendedor') {
+export async function register(username: string, password: string, nome: string, role: 'admin' | 'vendedor' | 'superadmin' = 'vendedor') {
   const email = `${username}@dmcalcados.local`;
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
   
@@ -31,7 +31,11 @@ export async function getUserData(uid: string): Promise<User | null> {
   const snapshot = await get(ref(db, `users/${uid}`));
   
   if (snapshot.exists()) {
-    return { id: uid, ...snapshot.val() } as User;
+    return { 
+      id: uid, 
+      uid: uid, // Adiciona o Firebase UID
+      ...snapshot.val() 
+    } as User;
   }
   return null;
 }
