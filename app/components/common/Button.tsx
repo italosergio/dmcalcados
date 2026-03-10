@@ -13,7 +13,7 @@ export function Button({ variant = 'primary', className = '', children, ...props
 
   return (
     <button
-      className={`rounded px-4 py-2 font-medium transition ${variants[variant]} ${className}`}
+      className={`rounded px-3 sm:px-4 py-2 text-sm sm:text-base font-medium transition ${variants[variant]} ${className} disabled:opacity-50 disabled:cursor-not-allowed`}
       {...props}
     >
       {children}
