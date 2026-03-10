@@ -110,15 +110,15 @@ export default function HistoricoPage() {
 
   const getIcon = (type: string, action: string) => {
     if (action === 'deleted') {
-      return <Trash2 size={18} className="text-red-600" />;
+      return <Trash2 size={18} className="text-red-600 flex-shrink-0" />;
     }
     switch(type) {
-      case 'venda': return <ShoppingBag size={18} className="text-green-600" />;
-      case 'despesa': return <DollarSign size={18} className="text-red-600" />;
-      case 'produto': return <Package size={18} className="text-blue-600" />;
-      case 'cliente': return <UserPlus size={18} className="text-purple-600" />;
-      case 'usuario': return <UserPlus size={18} className="text-green-600" />;
-      case 'role_change': return <UserCog size={18} className="text-blue-600" />;
+      case 'venda': return <ShoppingBag size={18} className="text-green-600 flex-shrink-0" />;
+      case 'despesa': return <DollarSign size={18} className="text-red-600 flex-shrink-0" />;
+      case 'produto': return <Package size={18} className="text-blue-600 flex-shrink-0" />;
+      case 'cliente': return <UserPlus size={18} className="text-purple-600 flex-shrink-0" />;
+      case 'usuario': return <UserPlus size={18} className="text-green-600 flex-shrink-0" />;
+      case 'role_change': return <UserCog size={18} className="text-blue-600 flex-shrink-0" />;
       default: return null;
     }
   };
@@ -139,9 +139,9 @@ export default function HistoricoPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold">Histórico de Atividades</h1>
+      <h1 className="mb-4 sm:mb-6 text-xl sm:text-2xl font-bold">Histórico de Atividades</h1>
       {loading ? (
-        <p>Carregando...</p>
+        <p className="text-sm">Carregando...</p>
       ) : (
         <div className="space-y-2">
           {history.map((item) => {
@@ -153,39 +153,39 @@ export default function HistoricoPage() {
             return (
               <div 
                 key={item.id} 
-                className={`rounded border bg-white p-3 text-sm dark:border-gray-700 dark:bg-gray-800 ${
+                className={`rounded border bg-white p-2 sm:p-3 text-xs sm:text-sm dark:border-gray-700 dark:bg-gray-800 ${
                   isExpandable ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900' : ''
                 }`}
                 onClick={() => isExpandable && setExpandedItem(isExpanded ? null : item.id)}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-start gap-2 sm:gap-3">
                   {getIcon(item.type, item.action)}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-1 sm:gap-2">
                       <span className="font-medium">{item.type.toUpperCase()}</span>
-                      {' - '}
+                      <span>-</span>
                       <span className={getActionColor(item.action)}>
                         {getActionText(item)}
                       </span>
                       {isVenda && item.data.clienteNome && (
                         <>
-                          {' - '}
-                          <span className="text-gray-700 dark:text-gray-300">para {item.data.clienteNome}</span>
+                          <span>-</span>
+                          <span className="text-gray-700 dark:text-gray-300 truncate">para {item.data.clienteNome}</span>
                         </>
                       )}
                       {isExpandable && (
-                        <span className="ml-2">
+                        <span className="ml-auto flex-shrink-0">
                           {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                         </span>
                       )}
                     </div>
                     <div className="mt-1 text-xs text-gray-500">
                       {item.userName && (
-                        <span>Por: {item.userName} - </span>
+                        <span className="block sm:inline">Por: {item.userName} - </span>
                       )}
-                      <span>{item.timestamp.toLocaleString('pt-BR')}</span>
+                      <span className="block sm:inline">{item.timestamp.toLocaleString('pt-BR')}</span>
                       {item.action === 'deleted' && item.data.deletedByName && (
-                        <span className="ml-2 text-red-600">Deletado por: {item.data.deletedByName}</span>
+                        <span className="block sm:inline sm:ml-2 text-red-600">Deletado por: {item.data.deletedByName}</span>
                       )}
                     </div>
                   </div>
@@ -195,9 +195,9 @@ export default function HistoricoPage() {
                   <div className="mt-3 space-y-1 border-t pt-3 dark:border-gray-700">
                     <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">Produtos:</p>
                     {item.data.produtos.map((p: any, i: number) => (
-                      <div key={i} className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
-                        <span>{p.quantidade}x {p.nome}</span>
-                        <span>{formatCurrency(p.valorTotal)}</span>
+                      <div key={i} className="flex justify-between gap-2 text-xs text-gray-600 dark:text-gray-400">
+                        <span className="truncate">{p.quantidade}x {p.nome}</span>
+                        <span className="flex-shrink-0">{formatCurrency(p.valorTotal)}</span>
                       </div>
                     ))}
                   </div>
