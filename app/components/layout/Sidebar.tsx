@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router';
-import { LayoutDashboard, ShoppingBag, Package, Users, DollarSign, UserCog, LogOut } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Package, Users, DollarSign, UserCog, History, LogOut } from 'lucide-react';
 import { logout } from '~/services/auth.service';
 import { useNavigate } from 'react-router';
 import { useAuth } from '~/contexts/AuthContext';
@@ -18,12 +18,17 @@ export function Sidebar() {
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/vendas', icon: ShoppingBag, label: 'Vendas' },
     { to: '/produtos', icon: Package, label: 'Produtos' },
-    { to: '/clientes', icon: Users, label: 'Clientes' },
     { to: '/despesas', icon: DollarSign, label: 'Despesas' },
   ];
 
+  if (user?.role === 'vendedor') {
+    links.push({ to: '/meus-clientes', icon: Users, label: 'Meus Clientes' });
+  }
+
   if (user?.role === 'admin') {
+    links.push({ to: '/clientes', icon: Users, label: 'Clientes' });
     links.push({ to: '/usuarios', icon: UserCog, label: 'Usuários' });
+    links.push({ to: '/historico', icon: History, label: 'Histórico' });
   }
 
   const isActive = (path: string) => location.pathname.startsWith(path);
@@ -48,7 +53,7 @@ export function Sidebar() {
               <Icon size={20} />
               <span>{label}</span>
             </div>
-            {to === '/usuarios' && (
+            {(to === '/clientes' || to === '/usuarios' || to === '/historico') && (
               <span className="rounded bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
                 ADMIN
               </span>
