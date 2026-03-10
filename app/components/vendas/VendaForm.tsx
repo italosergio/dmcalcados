@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
-import { createVenda } from '~/services/vendas.service';
+import { createVenda, getVendas } from '~/services/vendas.service';
 import { getClientes } from '~/services/clientes.service';
 import { getProdutos } from '~/services/produtos.service';
 import { useAuth } from '~/contexts/AuthContext';
@@ -21,9 +21,25 @@ export function VendaForm() {
   const { user } = useAuth();
 
   useEffect(() => {
-    getClientes().then(setClientes);
-    getProdutos().then(setProdutos);
-  }, []);
+    if (!user) return;
+
+    Promise.all([getClientes(), getProdutos(), getVendas()]).then(([clientesData, produtosData, vendasData]) => {
+      // Se for vendedor, filtrar apenas clientes que já atendeu
+      if (user.role === 'vendedor') {
+        const meusClientesIds = new Set(
+          vendasData
+            .filter(v => !v.deletedAt && (v.vendedorId === user.uid || v.vendedorId === user.id))
+            .map(v => v.clienteId)
+        );
+        const meusClientes = clientesData.filter(c => meusClientesIds.has(c.id));
+        setClientes(meusClientes);
+      } else {
+        setClientes(clientesData);
+      }
+      
+      setProdutos(produtosData);
+    });
+  }, [user]);
 
   const adicionarProduto = () => {
     const produto = produtos.find(p => p.id === produtoId);
@@ -78,11 +94,11 @@ export function VendaForm() {
     <Card>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
-          <label className="text-sm font-medium">Cliente</label>
+          <label className="text-xs sm:text-sm font-medium block mb-1">Cliente</label>
           <select
             value={clienteId}
             onChange={(e) => setClienteId(e.target.value)}
-            className="w-full rounded border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-800"
+            className="w-full rounded border border-gray-300 px-3 py-2 text-sm sm:text-base dark:border-gray-600 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
           >
             <option value="">Selecione um cliente</option>
@@ -92,13 +108,13 @@ export function VendaForm() {
           </select>
         </div>
 
-        <div className="rounded border p-4 dark:border-gray-700">
-          <h3 className="mb-3 font-semibold">Adicionar Produtos</h3>
-          <div className="flex gap-2">
+        <div className="rounded border p-3 sm:p-4 dark:border-gray-700">
+          <h3 className="mb-3 text-sm sm:text-base font-semibold">Adicionar Produtos</h3>
+          <div className="flex flex-col sm:flex-row gap-2">
             <select
               value={produtoId}
               onChange={(e) => setProdutoId(e.target.value)}
-              className="flex-1 rounded border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-800"
+              className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm sm:text-base dark:border-gray-600 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Selecione um produto</option>
               {produtos.map(p => (
@@ -110,32 +126,33 @@ export function VendaForm() {
               min="1"
               value={quantidade}
               onChange={(e) => setQuantidade(e.target.value)}
-              className="w-20 rounded border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-800"
+              className="w-full sm:w-20 rounded border border-gray-300 px-3 py-2 text-sm sm:text-base dark:border-gray-600 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Qtd"
             />
-            <Button type="button" onClick={adicionarProduto} disabled={!produtoId}>
+            <Button type="button" onClick={adicionarProduto} disabled={!produtoId} className="w-full sm:w-auto">
               Adicionar
             </Button>
           </div>
         </div>
 
         {produtosSelecionados.length > 0 && (
-          <div className="rounded border p-4 dark:border-gray-700">
-            <h3 className="mb-3 font-semibold">Produtos Selecionados</h3>
+          <div className="rounded border p-3 sm:p-4 dark:border-gray-700">
+            <h3 className="mb-3 text-sm sm:text-base font-semibold">Produtos Selecionados</h3>
             <div className="space-y-2">
               {produtosSelecionados.map((p, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <div>
-                    <span className="font-medium">{p.nome}</span>
-                    <span className="ml-2 text-sm text-gray-600">
+                <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b dark:border-gray-700 last:border-0">
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-sm sm:text-base block truncate">{p.nome}</span>
+                    <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                       {p.quantidade}x {formatCurrency(p.valorUnitario)}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold">{formatCurrency(p.valorTotal)}</span>
+                  <div className="flex items-center justify-between sm:justify-end gap-3">
+                    <span className="font-bold text-sm sm:text-base">{formatCurrency(p.valorTotal)}</span>
                     <button
                       type="button"
                       onClick={() => removerProduto(i)}
-                      className="text-red-600 hover:underline"
+                      className="text-xs sm:text-sm text-red-600 hover:underline whitespace-nowrap"
                     >
                       Remover
                     </button>
@@ -144,19 +161,19 @@ export function VendaForm() {
               ))}
             </div>
             <div className="mt-4 border-t pt-4 dark:border-gray-700">
-              <div className="flex justify-between text-lg font-bold">
+              <div className="flex justify-between text-base sm:text-lg font-bold">
                 <span>Total:</span>
-                <span>{formatCurrency(total)}</span>
+                <span className="text-green-600 dark:text-green-400">{formatCurrency(total)}</span>
               </div>
             </div>
           </div>
         )}
 
-        <div className="flex gap-2">
-          <Button type="submit" disabled={loading || produtosSelecionados.length === 0}>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button type="submit" disabled={loading || produtosSelecionados.length === 0} className="w-full sm:w-auto">
             {loading ? 'Salvando...' : 'Registrar Venda'}
           </Button>
-          <Button type="button" variant="secondary" onClick={() => navigate('/vendas')}>
+          <Button type="button" variant="secondary" onClick={() => navigate('/vendas')} className="w-full sm:w-auto">
             Cancelar
           </Button>
         </div>

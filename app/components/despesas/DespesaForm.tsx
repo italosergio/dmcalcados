@@ -16,19 +16,29 @@ export function DespesaForm() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user) {
+      alert('Usuário não autenticado');
+      return;
+    }
+    
     setLoading(true);
 
     try {
+      console.log('Criando despesa:', { tipo, valor, data, usuarioId: user.uid, usuarioNome: user.nome });
+      
       await createDespesa({
         tipo,
         valor: parseFloat(valor),
         data: new Date(data),
+        usuarioId: user.uid,
         usuarioNome: user.nome
       });
+      
+      console.log('Despesa criada com sucesso');
       navigate('/despesas');
     } catch (error) {
-      alert('Erro ao cadastrar despesa');
+      console.error('Erro ao cadastrar despesa:', error);
+      alert(`Erro ao cadastrar despesa: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setLoading(false);
     }
