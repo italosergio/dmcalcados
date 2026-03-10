@@ -3,7 +3,7 @@
     "users": {
       ".read": "auth != null",
       "$uid": {
-        ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin'"
+        ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin'"
       },
       ".indexOn": ["deletedAt", "roleUpdatedAt"]
     },
