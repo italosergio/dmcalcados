@@ -1,5 +1,5 @@
-import { ref, push, get, set } from 'firebase/database';
-import { db } from './firebase';
+import { ref, push, get, set, update } from 'firebase/database';
+import { db, auth } from './firebase';
 import type { Cliente } from '~/models';
 
 export async function getClientes(): Promise<Cliente[]> {
@@ -7,7 +7,19 @@ export async function getClientes(): Promise<Cliente[]> {
   if (!snapshot.exists()) return [];
   
   const data = snapshot.val();
-  return Object.keys(data).map(key => ({ id: key, ...data[key] }));
+  return Object.keys(data)
+    .map(key => ({ id: key, ...data[key] }))
+    .filter(c => !c.deletedAt);
+}
+
+export async function deleteCliente(clienteId: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Usuário não autenticado');
+
+  await update(ref(db, `clientes/${clienteId}`), {
+    deletedAt: new Date().toISOString(),
+    deletedBy: user.uid
+  });
 }
 
 export async function createCliente(data: Omit<Cliente, 'id' | 'createdAt'>): Promise<string> {
