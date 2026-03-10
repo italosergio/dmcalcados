@@ -1,87 +1,84 @@
-# Welcome to React Router!
+# 🏪 DM Calçados - Sistema de Gestão
 
-A modern, production-ready template for building full-stack React applications using React Router.
+Sistema de gestão de vendas e estoque com dashboard analítico.
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/remix-run/react-router-templates/tree/main/default)
+## 🚀 Setup Rápido
 
-## Features
-
-- 🚀 Server-side rendering
-- ⚡️ Hot Module Replacement (HMR)
-- 📦 Asset bundling and optimization
-- 🔄 Data loading and mutations
-- 🔒 TypeScript by default
-- 🎉 TailwindCSS for styling
-- 📖 [React Router docs](https://reactrouter.com/)
-
-## Getting Started
-
-### Installation
-
-Install the dependencies:
-
+### 1. Instalar Dependências
 ```bash
 npm install
 ```
 
-### Development
+### 2. Configurar Firebase
 
-Start the development server with HMR:
+1. Crie um projeto no [Firebase Console](https://console.firebase.google.com/)
+2. Habilite **Authentication** (Email/Password)
+3. Habilite **Firestore Database**
+4. Copie as credenciais do projeto
+
+### 3. Configurar Variáveis de Ambiente
+
+```bash
+cp .env.example .env
+```
+
+Edite `.env` com suas credenciais do Firebase.
+
+### 4. Criar Primeiro Usuário Admin
+
+**Opção 1: Via Tela de Registro (Recomendado)**
+1. Acesse: http://localhost:5173/register
+2. Preencha: Nome, Usuário, Senha
+3. Clique em "Criar Conta"
+4. No Firebase Console > Firestore > users > [seu_uid]
+5. Edite o campo `role` para `"admin"`
+
+**Opção 2: Manual no Firebase Console**
+1. Firebase Console > Authentication > Add user
+   - Email: `admin@dmcalcados.local`
+   - Password: (sua senha)
+2. Copie o UID gerado
+3. Firestore > Create collection `users`
+   - Document ID: (cole o UID)
+   - Fields:
+     - username: "admin"
+     - nome: "Administrador"
+     - role: "admin"
+     - createdAt: (timestamp atual)
+
+### 5. Configurar Firestore Rules
+
+No Firebase Console > Firestore Database > Rules, copie o conteúdo de `firestore.rules`.
+
+### 6. Rodar o Projeto
 
 ```bash
 npm run dev
 ```
 
-Your application will be available at `http://localhost:5173`.
+Acesse: http://localhost:5173
 
-## Building for Production
-
-Create a production build:
-
-```bash
-npm run build
-```
-
-## Deployment
-
-### Docker Deployment
-
-To build and run using Docker:
-
-```bash
-docker build -t my-app .
-
-# Run the container
-docker run -p 3000:3000 my-app
-```
-
-The containerized application can be deployed to any platform that supports Docker, including:
-
-- AWS ECS
-- Google Cloud Run
-- Azure Container Apps
-- Digital Ocean App Platform
-- Fly.io
-- Railway
-
-### DIY Deployment
-
-If you're familiar with deploying Node applications, the built-in app server is production-ready.
-
-Make sure to deploy the output of `npm run build`
+## 📁 Estrutura
 
 ```
-├── package.json
-├── package-lock.json (or pnpm-lock.yaml, or bun.lockb)
-├── build/
-│   ├── client/    # Static assets
-│   └── server/    # Server-side code
+app/
+├── components/     # Componentes React
+├── contexts/       # Context API (Auth, Theme)
+├── models/         # TypeScript types
+├── routes/         # Páginas
+├── services/       # Firebase services
+└── utils/          # Utilitários
 ```
 
-## Styling
+## 🎯 Próximos Passos
 
-This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever CSS framework you prefer.
+- [ ] Implementar CRUD de Produtos
+- [ ] Implementar CRUD de Clientes
+- [ ] Implementar Registro de Vendas
+- [ ] Implementar Registro de Despesas
+- [ ] Adicionar gráficos no Dashboard
+- [ ] Adicionar filtros por data
 
----
+## 📚 Documentação
 
-Built with ❤️ using React Router.
+Veja `.amazonq/prompts/dm-calcados-architecture.md` para arquitetura completa.
