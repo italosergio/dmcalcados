@@ -12,18 +12,24 @@ export default function DashboardPage() {
   useEffect(() => {
     Promise.all([getVendas(), getDespesas()])
       .then(([vendas, despesas]) => {
+        console.log('Dashboard - Vendas:', vendas.length, 'Despesas:', despesas.length);
         const now = new Date();
         const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
         const vendasRecentes = vendas.filter(v => new Date(v.data) >= thirtyDaysAgo);
         const despesasRecentes = despesas.filter(d => new Date(d.data) >= thirtyDaysAgo);
 
+        console.log('Vendas recentes:', vendasRecentes.length, 'Despesas recentes:', despesasRecentes.length);
+
         const somaVendas = vendasRecentes.reduce((sum, v) => sum + v.valorTotal, 0);
         const somaDespesas = despesasRecentes.reduce((sum, d) => sum + d.valor, 0);
+
+        console.log('Soma vendas:', somaVendas, 'Soma despesas:', somaDespesas);
 
         setTotalVendas(somaVendas);
         setTotalDespesas(somaDespesas);
       })
+      .catch(err => console.error('Erro dashboard:', err))
       .finally(() => setLoading(false));
   }, []);
 

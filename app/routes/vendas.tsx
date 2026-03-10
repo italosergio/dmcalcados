@@ -50,7 +50,14 @@ export default function VendasPage() {
                     <span>{venda.vendedorNome}</span>
                   </div>
                 </div>
-                <p className="text-sm text-gray-500">{new Date(venda.data).toLocaleDateString('pt-BR')}</p>
+                <div className="text-right">
+                  <p className="text-sm text-gray-500">{new Date(venda.data).toLocaleDateString('pt-BR')}</p>
+                  <Button onClick={() => {
+                    if (confirm('Deseja apagar esta venda?')) {
+                      import('~/services/vendas.service').then(m => m.deleteVenda(venda.id)).then(() => window.location.reload());
+                    }
+                  }} className="mt-2 text-xs">Apagar</Button>
+                </div>
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 {venda.produtos.map((p, i) => (

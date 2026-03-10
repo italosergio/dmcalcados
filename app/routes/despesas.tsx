@@ -46,9 +46,16 @@ export default function DespesasPage() {
                       {despesa.usuarioNome}
                     </p>
                   </div>
-                  <p className="text-lg font-bold text-red-600">
-                    {formatCurrency(despesa.valor)}
-                  </p>
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-red-600">
+                      {formatCurrency(despesa.valor)}
+                    </p>
+                    <Button onClick={() => {
+                      if (confirm('Deseja apagar esta despesa?')) {
+                        import('~/services/despesas.service').then(m => m.deleteDespesa(despesa.id)).then(() => window.location.reload());
+                      }
+                    }} className="mt-2 text-xs">Apagar</Button>
+                  </div>
                 </div>
               </Card>
             ))}
