@@ -153,8 +153,8 @@ export default function HistoricoPage() {
             return (
               <div 
                 key={item.id} 
-                className={`rounded border bg-white p-2 sm:p-3 text-xs sm:text-sm dark:border-gray-700 dark:bg-gray-800 ${
-                  isExpandable ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900' : ''
+                className={`rounded border border-gray-700 bg-gray-800 p-2 sm:p-3 text-xs sm:text-sm ${
+                  isExpandable ? 'cursor-pointer hover:bg-gray-900' : ''
                 }`}
                 onClick={() => isExpandable && setExpandedItem(isExpanded ? null : item.id)}
               >
@@ -170,7 +170,7 @@ export default function HistoricoPage() {
                       {isVenda && item.data.clienteNome && (
                         <>
                           <span>-</span>
-                          <span className="text-gray-700 dark:text-gray-300 truncate">para {item.data.clienteNome}</span>
+                          <span className="text-gray-300 truncate">para {item.data.clienteNome}</span>
                         </>
                       )}
                       {isExpandable && (
@@ -192,10 +192,10 @@ export default function HistoricoPage() {
                 </div>
                 
                 {isExpanded && isVenda && item.data.produtos && (
-                  <div className="mt-3 space-y-1 border-t pt-3 dark:border-gray-700">
-                    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">Produtos:</p>
+                  <div className="mt-3 space-y-1 border-t pt-3 border-gray-700">
+                    <p className="text-xs font-semibold text-gray-400">Produtos:</p>
                     {item.data.produtos.map((p: any, i: number) => (
-                      <div key={i} className="flex justify-between gap-2 text-xs text-gray-600 dark:text-gray-400">
+                      <div key={i} className="flex justify-between gap-2 text-xs text-gray-400">
                         <span className="truncate">{p.quantidade}x {p.nome}</span>
                         <span className="flex-shrink-0">{formatCurrency(p.valorTotal)}</span>
                       </div>
@@ -204,7 +204,7 @@ export default function HistoricoPage() {
                 )}
                 
                 {isExpanded && isDespesa && (
-                  <div className="mt-3 border-t pt-3 text-xs text-gray-600 dark:border-gray-700 dark:text-gray-400">
+                  <div className="mt-3 border-t pt-3 text-xs text-gray-400 border-gray-700">
                     <p><span className="font-semibold">Tipo:</span> {item.data.tipo}</p>
                     <p><span className="font-semibold">Valor:</span> {formatCurrency(item.data.valor)}</p>
                     <p><span className="font-semibold">Data:</span> {new Date(item.data.data).toLocaleDateString('pt-BR')}</p>

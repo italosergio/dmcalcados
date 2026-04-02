@@ -54,24 +54,24 @@ export default function UsuariosPage() {
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-sm sm:text-base truncate">{user.nome}</h3>
                       {user.role === 'superadmin' && (
-                        <span className="text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 px-2 py-0.5 rounded font-bold">
+                        <span className="text-xs bg-purple-900 text-purple-200 px-2 py-0.5 rounded font-bold">
                           SUPER ADMIN
                         </span>
                       )}
                     </div>
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Username: {user.username}</p>
+                    <p className="text-xs sm:text-sm text-gray-400 truncate">Username: {user.username}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {user.role === 'superadmin' ? (
-                    <div className="flex-1 sm:flex-none px-3 py-2 text-sm text-purple-600 dark:text-purple-400 font-semibold">
+                    <div className="flex-1 sm:flex-none px-3 py-2 text-sm text-purple-400 font-semibold">
                       Super Admin
                     </div>
                   ) : (
                     <select
                       value={user.role}
                       onChange={(e) => handleRoleChange(user.id, e.target.value as 'admin' | 'vendedor' | 'superadmin')}
-                      className="flex-1 sm:flex-none rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 sm:flex-none rounded border border-gray-600 bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="vendedor">Vendedor</option>
                       <option value="admin">Admin</option>

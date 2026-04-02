@@ -66,7 +66,7 @@ export default function MeusClientesPage() {
       <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold">Meus Clientes</h1>
-          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Clientes que você já atendeu</p>
+          <p className="text-xs sm:text-sm text-gray-400">Clientes que você já atendeu</p>
         </div>
         <Link to="/clientes/novo" className="w-full sm:w-auto">
           <Button className="w-full sm:w-auto flex items-center justify-center">
@@ -122,15 +122,15 @@ export default function MeusClientesPage() {
                 </div>
                 
                 {isExpanded && (
-                  <div className="mt-4 space-y-2 border-t pt-4 dark:border-gray-700">
+                  <div className="mt-4 space-y-2 border-t pt-4 border-gray-700">
                     <h4 className="font-semibold text-xs sm:text-sm">Histórico de Vendas</h4>
                     {cliente.vendas.map(venda => (
-                      <div key={venda.id} className="rounded bg-gray-50 p-2 sm:p-3 text-xs sm:text-sm dark:bg-gray-900">
+                      <div key={venda.id} className="rounded bg-gray-900 p-2 sm:p-3 text-xs sm:text-sm">
                         <div className="flex justify-between mb-2">
                           <span className="font-medium">{new Date(venda.data).toLocaleDateString('pt-BR')}</span>
                           <span className="font-bold text-green-600">{formatCurrency(venda.valorTotal)}</span>
                         </div>
-                        <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                        <div className="space-y-1 text-xs text-gray-400">
                           {venda.produtos.map((p, i) => (
                             <div key={i} className="flex justify-between gap-2">
                               <span className="truncate">{p.quantidade}x {p.nome}</span>

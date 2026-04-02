@@ -68,7 +68,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 flex h-screen w-64 flex-col border-r bg-white dark:border-gray-700 dark:bg-gray-800 transition-transform duration-300 lg:translate-x-0 ${
+        className={`fixed lg:static inset-y-0 left-0 z-50 flex h-screen w-64 flex-col border-r border-gray-700 bg-gray-800 transition-transform duration-300 lg:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -76,7 +76,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <h1 className="text-xl font-bold">DM Calçados</h1>
           <button
             onClick={onClose}
-            className="lg:hidden rounded p-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="lg:hidden rounded p-1 hover:bg-gray-700"
             aria-label="Fechar menu"
           >
             <X size={24} />
@@ -89,8 +89,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             to={to}
             className={`flex items-center justify-between gap-3 rounded px-3 py-2 ${
               isActive(to)
-                ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300'
-                : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                ? 'bg-blue-900 text-blue-300'
+                : 'hover:bg-gray-700'
             }`}
           >
             <div className="flex items-center gap-3">
@@ -107,7 +107,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </nav>
         <button
           onClick={handleLogout}
-          className="m-3 flex items-center gap-3 rounded px-3 py-2 hover:bg-red-50 dark:hover:bg-red-900"
+          className="m-3 flex items-center gap-3 rounded px-3 py-2 hover:bg-red-900"
         >
           <LogOut size={20} />
           <span>Sair</span>

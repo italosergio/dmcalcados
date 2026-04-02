@@ -7,13 +7,10 @@ import { TrendingUp, TrendingDown, DollarSign, ShoppingBag, Receipt } from 'luci
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { useAuth } from '~/contexts/AuthContext';
-import { useTheme } from '~/contexts/ThemeContext';
 import type { Venda } from '~/models';
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
   const isAdmin = user?.role === 'admin';
   const [totalVendas, setTotalVendas] = useState(0);
   const [totalDespesas, setTotalDespesas] = useState(0);
@@ -163,9 +160,9 @@ export default function DashboardPage() {
   const chartClienteData = chartDataByCliente();
 
   const chartTheme = {
-    backgroundColor: isDark ? '#1f2937' : '#ffffff',
-    textColor: isDark ? '#e5e7eb' : '#374151',
-    gridColor: isDark ? '#374151' : '#e5e7eb'
+    backgroundColor: '#1f2937',
+    textColor: '#e5e7eb',
+    gridColor: '#374151'
   };
 
   const options30Days: Highcharts.Options = {
@@ -267,55 +264,55 @@ export default function DashboardPage() {
     <div>
       <div className="mb-4 sm:mb-6">
         <h1 className="text-xl sm:text-2xl font-bold">Dashboard</h1>
-        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">Últimos 30 dias</p>
+        <p className="text-xs sm:text-sm text-gray-400 mt-1">Últimos 30 dias</p>
       </div>
       
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <p className="text-gray-600 dark:text-gray-400">Carregando...</p>
+          <p className="text-gray-400">Carregando...</p>
         </div>
       ) : (
         <>
           {/* Cards Principais */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
             {/* Card Vendas */}
-            <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
+            <Card className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border-green-800">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <ShoppingBag size={16} className="text-green-600 dark:text-green-400" />
-                    <h3 className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">Vendas</h3>
+                    <ShoppingBag size={16} className="text-green-400" />
+                    <h3 className="text-xs sm:text-sm font-medium text-gray-300">Vendas</h3>
                   </div>
-                  <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400 mb-1">
+                  <p className="text-2xl sm:text-3xl font-bold text-green-400 mb-1">
                     {formatCurrency(totalVendas)}
                   </p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                  <p className="text-xs text-gray-400">
                     {quantidadeVendas} {quantidadeVendas === 1 ? 'venda' : 'vendas'}
                   </p>
                 </div>
-                <div className="bg-green-100 dark:bg-green-900/30 p-2 sm:p-3 rounded-full">
-                  <TrendingUp size={20} className="text-green-600 dark:text-green-400" />
+                <div className="bg-green-900/30 p-2 sm:p-3 rounded-full">
+                  <TrendingUp size={20} className="text-green-400" />
                 </div>
               </div>
             </Card>
 
             {/* Card Despesas */}
-            <Card className="bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border-red-200 dark:border-red-800">
+            <Card className="bg-gradient-to-br from-red-900/20 to-rose-900/20 border-red-800">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <Receipt size={16} className="text-red-600 dark:text-red-400" />
-                    <h3 className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">Despesas</h3>
+                    <Receipt size={16} className="text-red-400" />
+                    <h3 className="text-xs sm:text-sm font-medium text-gray-300">Despesas</h3>
                   </div>
-                  <p className="text-2xl sm:text-3xl font-bold text-red-600 dark:text-red-400 mb-1">
+                  <p className="text-2xl sm:text-3xl font-bold text-red-400 mb-1">
                     {formatCurrency(totalDespesas)}
                   </p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                  <p className="text-xs text-gray-400">
                     {quantidadeDespesas} {quantidadeDespesas === 1 ? 'despesa' : 'despesas'}
                   </p>
                 </div>
-                <div className="bg-red-100 dark:bg-red-900/30 p-2 sm:p-3 rounded-full">
-                  <TrendingDown size={20} className="text-red-600 dark:text-red-400" />
+                <div className="bg-red-900/30 p-2 sm:p-3 rounded-full">
+                  <TrendingDown size={20} className="text-red-400" />
                 </div>
               </div>
             </Card>
@@ -323,30 +320,30 @@ export default function DashboardPage() {
             {/* Card Saldo */}
             <Card className={`sm:col-span-2 lg:col-span-1 ${
               saldo >= 0 
-                ? 'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800'
-                : 'bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 border-orange-200 dark:border-orange-800'
+                ? 'bg-gradient-to-br from-blue-900/20 to-indigo-900/20 border-blue-800'
+                : 'bg-gradient-to-br from-orange-900/20 to-amber-900/20 border-orange-800'
             }`}>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <DollarSign size={16} className={saldo >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'} />
-                    <h3 className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">Saldo</h3>
+                    <DollarSign size={16} className={saldo >= 0 ? 'text-blue-400' : 'text-orange-400'} />
+                    <h3 className="text-xs sm:text-sm font-medium text-gray-300">Saldo</h3>
                   </div>
                   <p className={`text-2xl sm:text-3xl font-bold mb-1 ${
-                    saldo >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'
+                    saldo >= 0 ? 'text-blue-400' : 'text-orange-400'
                   }`}>
                     {formatCurrency(saldo)}
                   </p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                  <p className="text-xs text-gray-400">
                     {saldo >= 0 ? 'Lucro no período' : 'Prejuízo no período'}
                   </p>
                 </div>
                 <div className={`p-2 sm:p-3 rounded-full ${
                   saldo >= 0 
-                    ? 'bg-blue-100 dark:bg-blue-900/30' 
-                    : 'bg-orange-100 dark:bg-orange-900/30'
+                    ? 'bg-blue-900/30' 
+                    : 'bg-orange-900/30'
                 }`}>
-                  <DollarSign size={20} className={saldo >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'} />
+                  <DollarSign size={20} className={saldo >= 0 ? 'text-blue-400' : 'text-orange-400'} />
                 </div>
               </div>
             </Card>
@@ -357,15 +354,15 @@ export default function DashboardPage() {
             <h3 className="text-sm sm:text-base font-semibold mb-3">Resumo do Período</h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Ticket Médio</p>
-                <p className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">
+                <p className="text-xs text-gray-400">Ticket Médio</p>
+                <p className="text-base sm:text-lg font-bold text-gray-100">
                   {quantidadeVendas > 0 ? formatCurrency(totalVendas / quantidadeVendas) : formatCurrency(0)}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Margem</p>
+                <p className="text-xs text-gray-400">Margem</p>
                 <p className={`text-base sm:text-lg font-bold ${
-                  saldo >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                  saldo >= 0 ? 'text-green-400' : 'text-red-400'
                 }`}>
                   {totalVendas > 0 ? `${((saldo / totalVendas) * 100).toFixed(1)}%` : '0%'}
                 </p>

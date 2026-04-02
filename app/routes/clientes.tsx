@@ -83,7 +83,7 @@ export default function ClientesPage() {
                     {isExpanded ? <ChevronUp size={20} className="flex-shrink-0 mt-1 sm:mt-0" /> : <ChevronDown size={20} className="flex-shrink-0 mt-1 sm:mt-0" />}
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-sm sm:text-base truncate">{cliente.nome}</h3>
-                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">{cliente.endereco}</p>
+                      <p className="text-xs sm:text-sm text-gray-400 truncate">{cliente.endereco}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
@@ -107,18 +107,18 @@ export default function ClientesPage() {
                 </div>
                 
                 {isExpanded && (
-                  <div className="mt-4 space-y-2 border-t pt-4 dark:border-gray-700">
+                  <div className="mt-4 space-y-2 border-t pt-4 border-gray-700">
                     <h4 className="font-semibold text-xs sm:text-sm">Histórico de Compras</h4>
                     {clienteVendas.length === 0 ? (
                       <p className="text-xs sm:text-sm text-gray-500">Nenhuma compra registrada</p>
                     ) : (
                       clienteVendas.map(venda => (
-                        <div key={venda.id} className="rounded bg-gray-50 p-2 sm:p-3 text-xs sm:text-sm dark:bg-gray-900">
+                        <div key={venda.id} className="rounded bg-gray-900 p-2 sm:p-3 text-xs sm:text-sm">
                           <div className="flex justify-between mb-2">
                             <span className="font-medium">{new Date(venda.data).toLocaleDateString('pt-BR')}</span>
                             <span className="font-bold text-green-600">{formatCurrency(venda.valorTotal)}</span>
                           </div>
-                          <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                          <div className="space-y-1 text-xs text-gray-400">
                             {venda.produtos.map((p, i) => (
                               <div key={i} className="flex justify-between gap-2">
                                 <span className="truncate">{p.quantidade}x {p.nome}</span>

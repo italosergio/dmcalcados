@@ -38,10 +38,10 @@ export default function DespesasPage() {
                 <div className="flex items-start sm:items-center justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-sm sm:text-base truncate">{despesa.tipo}</h3>
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-xs sm:text-sm text-gray-400">
                       {formatDate(new Date(despesa.data))}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-500 truncate">
+                    <p className="text-xs text-gray-500 truncate">
                       {despesa.usuarioNome}
                     </p>
                   </div>

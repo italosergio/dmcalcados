@@ -22,7 +22,7 @@ interface TableProps {
 
 export function Table({ children }: TableProps) {
   return (
-    <table className="min-w-full divide-y divide-gray-300 dark:divide-gray-700">
+    <table className="min-w-full divide-y divide-gray-700">
       {children}
     </table>
   );
@@ -34,7 +34,7 @@ interface TableHeadProps {
 
 export function TableHead({ children }: TableHeadProps) {
   return (
-    <thead className="bg-gray-50 dark:bg-gray-800">
+    <thead className="bg-gray-800">
       {children}
     </thead>
   );
@@ -46,7 +46,7 @@ interface TableBodyProps {
 
 export function TableBody({ children }: TableBodyProps) {
   return (
-    <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+    <tbody className="divide-y divide-gray-700 bg-gray-900">
       {children}
     </tbody>
   );
@@ -61,7 +61,7 @@ export function TableRow({ children, onClick }: TableRowProps) {
   return (
     <tr
       onClick={onClick}
-      className={onClick ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800' : ''}
+      className={onClick ? 'cursor-pointer hover:bg-gray-800' : ''}
     >
       {children}
     </tr>
@@ -77,7 +77,7 @@ export function TableHeader({ children, className = '' }: TableHeaderProps) {
   return (
     <th
       scope="col"
-      className={`px-3 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 ${className}`}
+      className={`px-3 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-400 ${className}`}
     >
       {children}
     </th>
@@ -91,7 +91,7 @@ interface TableCellProps {
 
 export function TableCell({ children, className = '' }: TableCellProps) {
   return (
-    <td className={`whitespace-nowrap px-3 py-4 text-sm text-gray-900 dark:text-gray-100 ${className}`}>
+    <td className={`whitespace-nowrap px-3 py-4 text-sm text-gray-100 ${className}`}>
       {children}
     </td>
   );

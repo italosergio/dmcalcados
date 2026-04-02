@@ -98,7 +98,7 @@ export function VendaForm() {
           <select
             value={clienteId}
             onChange={(e) => setClienteId(e.target.value)}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm sm:text-base dark:border-gray-600 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded border border-gray-600 bg-gray-800 px-3 py-2 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
           >
             <option value="">Selecione um cliente</option>
@@ -108,13 +108,13 @@ export function VendaForm() {
           </select>
         </div>
 
-        <div className="rounded border p-3 sm:p-4 dark:border-gray-700">
+        <div className="rounded border p-3 sm:p-4 border-gray-700">
           <h3 className="mb-3 text-sm sm:text-base font-semibold">Adicionar Produtos</h3>
           <div className="flex flex-col sm:flex-row gap-2">
             <select
               value={produtoId}
               onChange={(e) => setProdutoId(e.target.value)}
-              className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm sm:text-base dark:border-gray-600 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 rounded border border-gray-600 bg-gray-800 px-3 py-2 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Selecione um produto</option>
               {produtos.map(p => (
@@ -126,7 +126,7 @@ export function VendaForm() {
               min="1"
               value={quantidade}
               onChange={(e) => setQuantidade(e.target.value)}
-              className="w-full sm:w-20 rounded border border-gray-300 px-3 py-2 text-sm sm:text-base dark:border-gray-600 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full sm:w-20 rounded border border-gray-600 bg-gray-800 px-3 py-2 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Qtd"
             />
             <Button type="button" onClick={adicionarProduto} disabled={!produtoId} className="w-full sm:w-auto">
@@ -136,14 +136,14 @@ export function VendaForm() {
         </div>
 
         {produtosSelecionados.length > 0 && (
-          <div className="rounded border p-3 sm:p-4 dark:border-gray-700">
+          <div className="rounded border p-3 sm:p-4 border-gray-700">
             <h3 className="mb-3 text-sm sm:text-base font-semibold">Produtos Selecionados</h3>
             <div className="space-y-2">
               {produtosSelecionados.map((p, i) => (
-                <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b dark:border-gray-700 last:border-0">
+                <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-700 last:border-0">
                   <div className="flex-1 min-w-0">
                     <span className="font-medium text-sm sm:text-base block truncate">{p.nome}</span>
-                    <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                    <span className="text-xs sm:text-sm text-gray-400">
                       {p.quantidade}x {formatCurrency(p.valorUnitario)}
                     </span>
                   </div>
@@ -160,10 +160,10 @@ export function VendaForm() {
                 </div>
               ))}
             </div>
-            <div className="mt-4 border-t pt-4 dark:border-gray-700">
+            <div className="mt-4 border-t pt-4 border-gray-700">
               <div className="flex justify-between text-base sm:text-lg font-bold">
                 <span>Total:</span>
-                <span className="text-green-600 dark:text-green-400">{formatCurrency(total)}</span>
+                <span className="text-green-400">{formatCurrency(total)}</span>
               </div>
             </div>
           </div>
