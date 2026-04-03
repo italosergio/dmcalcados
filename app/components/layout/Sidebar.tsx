@@ -41,7 +41,6 @@ export function Sidebar({ isOpen, onClose, tickerVisible, onTickerToggle }: Side
   const links = [
     { to: '/vendas', icon: ShoppingBag, label: 'Vendas' },
     { to: '/despesas', icon: DollarSign, label: 'Despesas' },
-    { to: '/produtos', icon: Warehouse, label: 'Estoque' },
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   ];
 
@@ -49,7 +48,8 @@ export function Sidebar({ isOpen, onClose, tickerVisible, onTickerToggle }: Side
     links.push({ to: '/meus-clientes', icon: Users, label: 'Meus Clientes' });
   }
 
-  if (user?.role === 'admin') {
+  if (user?.role === 'admin' || user?.role === 'superadmin') {
+    links.splice(2, 0, { to: '/produtos', icon: Warehouse, label: 'Estoque' });
     links.push({ to: '/clientes', icon: Users, label: 'Clientes' });
     links.push({ to: '/usuarios', icon: UserCog, label: 'Usuários' });
     links.push({ to: '/historico', icon: History, label: 'Histórico' });
@@ -102,7 +102,7 @@ export function Sidebar({ isOpen, onClose, tickerVisible, onTickerToggle }: Side
                 <Icon size={18} />
                 <span>{label}</span>
               </div>
-              {(to === '/clientes' || to === '/usuarios' || to === '/historico') && (
+              {(to === '/produtos' || to === '/clientes' || to === '/usuarios' || to === '/historico') && (
                 <span className="rounded-md bg-gold/10 px-2 py-0.5 text-xs font-medium text-gold">
                   ADMIN
                 </span>

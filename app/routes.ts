@@ -9,7 +9,7 @@ export default [
     route("dashboard", "routes/dashboard.tsx"),
     route("vendas", "routes/vendas.tsx"),
     route("vendas/nova", "routes/vendas.nova.tsx"),
-    route("produtos", "routes/produtos.tsx"),
+    route("produtos", "routes/estoque.tsx"),
     route("produtos/novo", "routes/produtos.novo.tsx"),
     route("produtos/:id/editar", "routes/produtos.editar.tsx"),
     route("clientes", "routes/clientes.tsx"),

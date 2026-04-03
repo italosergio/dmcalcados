@@ -10,10 +10,12 @@ import { getEntradas, migrarEntradasExistentes } from '~/services/entradas.servi
 import { ResponsiveTable, Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from '~/components/common/ResponsiveTable';
 import type { Produto, Venda, EntradaProduto } from '~/models';
 import { formatCurrency } from '~/utils/format';
+import { useAuth } from '~/contexts/AuthContext';
 
 type Periodo = '7d' | '30d' | '90d' | '12m';
 
 export default function ProdutosPage() {
+  const { user } = useAuth();
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [entradas, setEntradas] = useState<EntradaProduto[]>([]);
@@ -27,6 +29,10 @@ export default function ProdutosPage() {
   const [painelModo, setPainelModo] = useState<'saida' | 'entrada'>('saida');
   const [migrando, setMigrando] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user && user.role === 'vendedor') { navigate('/vendas'); }
+  }, [user]);
 
   const loadProdutos = () => {
     setLoading(true);

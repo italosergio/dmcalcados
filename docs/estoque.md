@@ -1,12 +1,12 @@
 # 📦 Estoque (Produtos)
 
-**Arquivos:** `app/routes/produtos.tsx` · `app/routes/produtos.novo.tsx` · `app/routes/produtos.editar.tsx` · `app/components/produtos/ProdutoForm.tsx` · `app/components/produtos/ProdutoCard.tsx`
+**Arquivos:** `app/routes/estoque.tsx` · `app/routes/produtos.novo.tsx` · `app/routes/produtos.editar.tsx` · `app/components/produtos/ProdutoForm.tsx` · `app/components/produtos/ProdutoCard.tsx`
 
 ---
 
 ## Listagem de Produtos
 
-**Rota:** `/produtos` · **Acesso:** Autenticado
+**Rota:** `/produtos` · **Acesso:** Admin / Super Admin
 
 ### Funcionalidades
 
@@ -59,13 +59,14 @@ Ao clicar em um produto:
 ### Regras
 - Zoom de 80% aplicado na página (`style={{ zoom: 0.8 }}`)
 - Exclusão de produto é permanente (não é soft delete)
-- Todos os usuários autenticados podem gerenciar produtos
+- Apenas admin e superadmin têm acesso às páginas de estoque
+- Vendedores são redirecionados para `/vendas` ao tentar acessar qualquer rota de produtos
 
 ---
 
 ## Novo Produto
 
-**Rota:** `/produtos/novo` · **Acesso:** Autenticado
+**Rota:** `/produtos/novo` · **Acesso:** Admin / Super Admin
 
 ### Funcionalidades
 - **Modelo:** Nome do modelo (obrigatório, verificação de duplicata em tempo real)
@@ -88,7 +89,7 @@ Ao clicar em um produto:
 
 ## Editar Produto
 
-**Rota:** `/produtos/:id/editar` · **Acesso:** Autenticado
+**Rota:** `/produtos/:id/editar` · **Acesso:** Admin / Super Admin
 
 ### Funcionalidades
 - Mesmo formulário do cadastro, pré-preenchido com dados do produto

@@ -157,9 +157,9 @@ O Dockerfile usa multi-stage build com Node 20 Alpine para imagem otimizada.
 | `/register` | Registro | Público | [autenticacao.md](docs/autenticacao.md) |
 | `/vendas` | Lista de vendas | Autenticado | [vendas.md](docs/vendas.md) |
 | `/vendas/nova` | Registrar venda | Autenticado | [vendas.md](docs/vendas.md) |
-| `/produtos` | Estoque / Produtos | Autenticado | [estoque.md](docs/estoque.md) |
-| `/produtos/novo` | Cadastrar produto | Autenticado | [estoque.md](docs/estoque.md) |
-| `/produtos/:id/editar` | Editar produto | Autenticado | [estoque.md](docs/estoque.md) |
+| `/produtos` | Estoque / Produtos | Admin | [estoque.md](docs/estoque.md) |
+| `/produtos/novo` | Cadastrar produto | Admin | [estoque.md](docs/estoque.md) |
+| `/produtos/:id/editar` | Editar produto | Admin | [estoque.md](docs/estoque.md) |
 | `/clientes` | Lista de clientes (todos) | Admin | [clientes.md](docs/clientes.md) |
 | `/clientes/novo` | Cadastrar cliente | Autenticado | [clientes.md](docs/clientes.md) |
 | `/meus-clientes` | Clientes do vendedor | Vendedor | [clientes.md](docs/clientes.md) |
@@ -185,7 +185,7 @@ O Dockerfile usa multi-stage build com Node 20 Alpine para imagem otimizada.
 | Todos os Clientes | — | ✅ | ✅ |
 | Registrar despesas | ✅ | ✅ | ✅ |
 | Ver todas as despesas | — | ✅ | ✅ |
-| Gerenciar produtos | ✅ | ✅ | ✅ |
+| Gerenciar produtos | — | ✅ | ✅ |
 | Gerenciar usuários | — | ✅ | ✅ |
 | Promover a Super Admin | — | — | ✅ |
 | Histórico de atividades | — | ✅ | ✅ |

@@ -52,12 +52,12 @@ Todas as páginas autenticadas usam o layout com Sidebar + Header + Conteúdo.
 |---|---|---|---|
 | 1 | Vendas | ShoppingBag | Todos |
 | 2 | Despesas | DollarSign | Todos |
-| 3 | Estoque | Warehouse | Todos |
+| 3 | Estoque | Warehouse | Admin / Super Admin (badge "ADMIN") |
 | 4 | Dashboard | LayoutDashboard | Todos |
 | 5 | Meus Clientes | Users | Vendedor |
-| 6 | Clientes | Users | Admin (badge "ADMIN") |
-| 7 | Usuários | UserCog | Admin (badge "ADMIN") |
-| 8 | Histórico | History | Admin (badge "ADMIN") |
+| 6 | Clientes | Users | Admin / Super Admin (badge "ADMIN") |
+| 7 | Usuários | UserCog | Admin / Super Admin (badge "ADMIN") |
+| 8 | Histórico | History | Admin / Super Admin (badge "ADMIN") |
 
 ### Seção Inferior
 - **Toggle "Loop de estatísticas":** Switch para ativar/desativar o HeaderTicker
@@ -87,15 +87,32 @@ Todas as páginas autenticadas usam o layout com Sidebar + Header + Conteúdo.
 
 Componente de ticker rotativo com estatísticas em tempo real.
 
-### Estatísticas Exibidas (rotação a cada 5s)
-1. **Vendas hoje:** Quantidade + valor total
-2. **Vendas no mês:** Quantidade + valor total
-3. **Ticket médio:** Valor médio por venda (mês)
-4. **Total de clientes:** Quantidade de clientes ativos
+### Estatísticas Exibidas
+
+**Admin / Super Admin:**
+1. **Top vendedor:** Nome + valor vendido no mês
+2. **Vendas hoje:** Valor + quantidade
+3. **Vendas mês:** Valor + quantidade
+4. **Vendas ano:** Valor + quantidade
+5. **Despesas:** Total geral
+6. **Estoque:** Valor total em estoque
+7. **Clientes:** Total de clientes ativos
+8. **Novos no mês:** Clientes cadastrados no mês
+
+**Vendedor:**
+1. **Vendas hoje:** Suas vendas do dia (valor + quantidade)
+2. **Vendas mês:** Suas vendas do mês (valor + quantidade)
+3. **Vendas ano:** Suas vendas do ano (valor + quantidade)
+4. **Ranking mês:** Sua posição entre os vendedores (ex: "2º de 5")
+5. **Meus clientes:** Total de clientes únicos que já vendeu
+6. **Clientes novos:** Clientes que compraram pela primeira vez no mês
+7. **Despesas hoje:** Suas despesas do dia
+8. **Despesas mês:** Suas despesas do mês
+9. **Despesas ano:** Suas despesas do ano
 
 ### Comportamento
 - Animação de slide vertical (fade in/out)
 - Dados carregados do Firebase ao montar
-- Vendedor vê apenas suas próprias vendas
-- Admin vê todas as vendas
+- Vendedor vê apenas suas próprias estatísticas (vendas, despesas, clientes, ranking)
+- Admin/Super Admin vê estatísticas globais
 - Pode ser desativado via toggle na Sidebar
