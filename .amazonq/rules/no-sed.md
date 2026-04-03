@@ -1,0 +1,2 @@
+- Nunca use `sed` para ler ou modificar arquivos. Use sempre as ferramentas fsRead e fsReplace.
+- Para verificar conteúdo de linhas específicas, use fsRead para ler o arquivo inteiro.
