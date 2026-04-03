@@ -1,7 +1,8 @@
 import { type RouteConfig, index, route, layout } from "@react-router/dev/routes";
 
 export default [
-  index("routes/login.tsx"),
+  index("routes/landing.tsx"),
+  route("login", "routes/login.tsx"),
   route("register", "routes/register.tsx"),
   route("teste", "routes/teste.tsx"),
   layout("components/layout/Layout.tsx", [
@@ -10,6 +11,7 @@ export default [
     route("vendas/nova", "routes/vendas.nova.tsx"),
     route("produtos", "routes/produtos.tsx"),
     route("produtos/novo", "routes/produtos.novo.tsx"),
+    route("produtos/:id/editar", "routes/produtos.editar.tsx"),
     route("clientes", "routes/clientes.tsx"),
     route("clientes/novo", "routes/clientes.novo.tsx"),
     route("meus-clientes", "routes/meus-clientes.tsx"),
@@ -17,5 +19,6 @@ export default [
     route("despesas/nova", "routes/despesas.nova.tsx"),
     route("usuarios", "routes/usuarios.tsx"),
     route("historico", "routes/historico.tsx"),
+    route("conta", "routes/conta.tsx"),
   ]),
 ] satisfies RouteConfig;
