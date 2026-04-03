@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 interface ResponsiveTableProps {
   children: ReactNode;
@@ -8,7 +8,7 @@ export function ResponsiveTable({ children }: ResponsiveTableProps) {
   return (
     <div className="overflow-x-auto -mx-4 sm:mx-0">
       <div className="inline-block min-w-full align-middle">
-        <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+        <div className="overflow-hidden sm:rounded-xl border border-border-subtle">
           {children}
         </div>
       </div>
@@ -22,7 +22,7 @@ interface TableProps {
 
 export function Table({ children }: TableProps) {
   return (
-    <table className="min-w-full divide-y divide-gray-700">
+    <table className="min-w-full divide-y divide-border-subtle">
       {children}
     </table>
   );
@@ -34,7 +34,7 @@ interface TableHeadProps {
 
 export function TableHead({ children }: TableHeadProps) {
   return (
-    <thead className="bg-gray-800">
+    <thead className="bg-surface">
       {children}
     </thead>
   );
@@ -46,7 +46,7 @@ interface TableBodyProps {
 
 export function TableBody({ children }: TableBodyProps) {
   return (
-    <tbody className="divide-y divide-gray-700 bg-gray-900">
+    <tbody className="divide-y divide-border-subtle bg-bg-base">
       {children}
     </tbody>
   );
@@ -61,7 +61,7 @@ export function TableRow({ children, onClick }: TableRowProps) {
   return (
     <tr
       onClick={onClick}
-      className={onClick ? 'cursor-pointer hover:bg-gray-800' : ''}
+      className={onClick ? 'cursor-pointer hover:bg-surface-hover transition-colors' : ''}
     >
       {children}
     </tr>
@@ -77,7 +77,7 @@ export function TableHeader({ children, className = '' }: TableHeaderProps) {
   return (
     <th
       scope="col"
-      className={`px-3 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-400 ${className}`}
+      className={`px-3 py-3 text-left text-xs font-medium uppercase tracking-wide text-content-secondary ${className}`}
     >
       {children}
     </th>
@@ -91,7 +91,7 @@ interface TableCellProps {
 
 export function TableCell({ children, className = '' }: TableCellProps) {
   return (
-    <td className={`whitespace-nowrap px-3 py-4 text-sm text-gray-100 ${className}`}>
+    <td className={`whitespace-nowrap px-3 py-4 text-sm text-content ${className}`}>
       {children}
     </td>
   );
