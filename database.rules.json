@@ -26,6 +26,15 @@
       ".read": "auth != null",
       ".write": "auth != null",
       ".indexOn": ["usuarioId", "createdAt", "deletedAt"]
+    },
+    "despesas-tipos": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "entradas": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["produtoId", "createdAt"]
     }
   }
 }
