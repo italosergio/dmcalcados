@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router';
-import { LayoutDashboard, ShoppingBag, Package, Users, DollarSign, UserCog, History, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, History, LogOut, X, UserCircle, Home } from 'lucide-react';
 import { logout } from '~/services/auth.service';
 import { useNavigate } from 'react-router';
 import { useAuth } from '~/contexts/AuthContext';
@@ -8,19 +8,19 @@ import { useEffect } from 'react';
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  tickerVisible: boolean;
+  onTickerToggle: (v: boolean) => void;
 }
 
-export function Sidebar({ isOpen, onClose }: SidebarProps) {
+export function Sidebar({ isOpen, onClose, tickerVisible, onTickerToggle }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
 
-  // Fecha sidebar ao mudar de rota (mobile)
   useEffect(() => {
     onClose();
   }, [location.pathname]);
 
-  // Previne scroll do body quando sidebar está aberta (mobile)
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -33,15 +33,16 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   }, [isOpen]);
 
   const handleLogout = async () => {
+    onClose();
     await logout();
-    navigate('/');
+    window.location.href = '/';
   };
 
   const links = [
-    { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/vendas', icon: ShoppingBag, label: 'Vendas' },
-    { to: '/produtos', icon: Package, label: 'Produtos' },
     { to: '/despesas', icon: DollarSign, label: 'Despesas' },
+    { to: '/produtos', icon: Warehouse, label: 'Estoque' },
+    { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   ];
 
   if (user?.role === 'vendedor') {
@@ -58,60 +59,104 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   return (
     <>
-      {/* Overlay para mobile */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
           onClick={onClose}
         />
       )}
 
-      {/* Sidebar */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 flex h-screen w-64 flex-col border-r border-gray-700 bg-gray-800 transition-transform duration-300 lg:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed lg:static inset-y-0 right-0 z-50 flex h-screen w-64 flex-col border-l border-border-subtle bg-surface transition-transform duration-300 lg:translate-x-0 lg:border-l-0 lg:border-r lg:left-0 lg:right-auto ${
+          isOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
         }`}
       >
         <div className="flex items-center justify-between p-6">
-          <h1 className="text-xl font-bold">DM Calçados</h1>
+          <div className="flex items-center gap-3">
+            <img src="/logo-dmcalcados.png" alt="DM Calçados" className="h-8 w-8 object-contain" />
+          <div className="flex flex-col">
+            <h1 className="text-lg font-semibold">DM Calçados</h1>
+            <span className="text-xs text-content-muted">Painel administrativo</span>
+          </div>
+          </div>
           <button
             onClick={onClose}
-            className="lg:hidden rounded p-1 hover:bg-gray-700"
+            className="lg:hidden rounded-lg p-1 hover:bg-surface-hover text-content-secondary transition-colors"
             aria-label="Fechar menu"
           >
             <X size={24} />
           </button>
         </div>
         <nav className="flex-1 space-y-1 px-3 overflow-y-auto">
-        {links.map(({ to, icon: Icon, label }) => (
+          {links.map(({ to, icon: Icon, label }) => (
+            <Link
+              key={to}
+              to={to}
+              className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                isActive(to)
+                  ? 'bg-blue-600/10 text-blue-400'
+                  : 'text-content-secondary hover:bg-surface-hover hover:text-content'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Icon size={18} />
+                <span>{label}</span>
+              </div>
+              {(to === '/clientes' || to === '/usuarios' || to === '/historico') && (
+                <span className="rounded-md bg-gold/10 px-2 py-0.5 text-xs font-medium text-gold">
+                  ADMIN
+                </span>
+              )}
+            </Link>
+          ))}
+        </nav>
+        <div className="mx-3 mb-2 px-3">
+          <label className="flex items-center justify-between gap-2 text-xs text-content-secondary cursor-pointer group">
+            <span className="group-hover:text-content transition-colors">Loop de estatísticas</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={tickerVisible}
+              onClick={() => onTickerToggle(!tickerVisible)}
+              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 ${
+                tickerVisible ? 'bg-blue-500' : 'bg-white/10'
+              }`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                  tickerVisible ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                }`}
+              />
+            </button>
+          </label>
+        </div>
+        <div className="m-3 space-y-1">
           <Link
-            key={to}
-            to={to}
-            className={`flex items-center justify-between gap-3 rounded px-3 py-2 ${
-              isActive(to)
-                ? 'bg-blue-900 text-blue-300'
-                : 'hover:bg-gray-700'
+            to="/conta"
+            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+              isActive('/conta')
+                ? 'bg-blue-600/10 text-blue-400'
+                : 'text-content-secondary hover:bg-surface-hover hover:text-content'
             }`}
           >
-            <div className="flex items-center gap-3">
-              <Icon size={20} />
-              <span>{label}</span>
-            </div>
-            {(to === '/clientes' || to === '/usuarios' || to === '/historico') && (
-              <span className="rounded bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
-                ADMIN
-              </span>
-            )}
+            <UserCircle size={18} />
+            <span>Conta</span>
           </Link>
-        ))}
-        </nav>
-        <button
-          onClick={handleLogout}
-          className="m-3 flex items-center gap-3 rounded px-3 py-2 hover:bg-red-900"
-        >
-          <LogOut size={20} />
-          <span>Sair</span>
-        </button>
+          <Link
+            to="/"
+            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-content-secondary hover:bg-surface-hover hover:text-content transition-colors"
+          >
+            <Home size={18} />
+            <span>Página Inicial</span>
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-content-secondary hover:bg-red-600/10 hover:text-red-400 transition-colors"
+          >
+            <LogOut size={18} />
+            <span>Sair</span>
+          </button>
+        </div>
       </aside>
     </>
   );
