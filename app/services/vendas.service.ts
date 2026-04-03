@@ -1,43 +1,34 @@
-import { ref, push, get, set, query, orderByChild, equalTo, update } from 'firebase/database';
+import { ref, push, get, set, update } from 'firebase/database';
 import { db, auth } from './firebase';
 import type { Venda } from '~/models';
 
+async function getNextPedidoNumero(): Promise<number> {
+  const snapshot = await get(ref(db, 'vendas'));
+  if (!snapshot.exists()) return 1;
+  const data = snapshot.val();
+  const maxNum = Object.values(data)
+    .map((v: any) => v.pedidoNumero || 0)
+    .reduce((max: number, n: number) => Math.max(max, n), 0);
+  return maxNum + 1;
+}
+
 export async function getVendas(): Promise<Venda[]> {
   const user = auth.currentUser;
-  if (!user) {
-    console.log('Nenhum usuário logado');
-    return [];
-  }
+  if (!user) return [];
 
   const userData = await get(ref(db, `users/${user.uid}`));
   const isAdmin = userData.val()?.role === 'admin';
-  console.log('User role:', userData.val()?.role, 'isAdmin:', isAdmin);
 
-  if (isAdmin) {
-    const snapshot = await get(ref(db, 'vendas'));
-    if (!snapshot.exists()) {
-      console.log('Nenhuma venda no banco');
-      return [];
-    }
-    const data = snapshot.val();
-    console.log('Vendas (admin):', Object.keys(data).length);
-    return Object.keys(data)
-      .map(key => ({ id: key, ...data[key] }))
-      .filter(v => !v.deletedAt)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  } else {
-    const snapshot = await get(ref(db, 'vendas'));
-    if (!snapshot.exists()) {
-      console.log('Nenhuma venda no banco');
-      return [];
-    }
-    const data = snapshot.val();
-    const filtered = Object.keys(data)
-      .map(key => ({ id: key, ...data[key] }))
-      .filter(venda => venda.vendedorId === user.uid && !venda.deletedAt);
-    console.log('Vendas totais:', Object.keys(data).length, 'Vendas do vendedor:', filtered.length, 'UID:', user.uid);
-    return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }
+  const snapshot = await get(ref(db, 'vendas'));
+  if (!snapshot.exists()) return [];
+
+  const data = snapshot.val();
+  const all = Object.keys(data)
+    .map(key => ({ id: key, ...data[key] }))
+    .filter((v: any) => !v.deletedAt);
+
+  const filtered = isAdmin ? all : all.filter((v: any) => v.vendedorId === user.uid);
+  return filtered.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export async function deleteVenda(vendaId: string): Promise<void> {
@@ -50,11 +41,13 @@ export async function deleteVenda(vendaId: string): Promise<void> {
   });
 }
 
-export async function createVenda(data: Omit<Venda, 'id' | 'createdAt'>): Promise<string> {
+export async function createVenda(data: Omit<Venda, 'id' | 'createdAt' | 'pedidoNumero'>): Promise<string> {
+  const pedidoNumero = await getNextPedidoNumero();
   const newRef = push(ref(db, 'vendas'));
   await set(newRef, {
     ...data,
-    data: data.data.toISOString(),
+    pedidoNumero,
+    data: data.data instanceof Date ? data.data.toISOString() : data.data,
     createdAt: new Date().toISOString()
   });
   return newRef.key!;

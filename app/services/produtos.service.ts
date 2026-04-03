@@ -1,4 +1,4 @@
-import { ref, push, get, set } from 'firebase/database';
+import { ref, push, get, set, update, remove } from 'firebase/database';
 import { db } from './firebase';
 import type { Produto } from '~/models';
 
@@ -18,4 +18,12 @@ export async function createProduto(data: Omit<Produto, 'id' | 'createdAt' | 'up
     updatedAt: new Date().toISOString()
   });
   return newRef.key!;
+}
+
+export async function updateProduto(id: string, data: Partial<Omit<Produto, 'id' | 'createdAt'>>): Promise<void> {
+  await update(ref(db, `produtos/${id}`), { ...data, updatedAt: new Date().toISOString() });
+}
+
+export async function deleteProduto(id: string): Promise<void> {
+  await remove(ref(db, `produtos/${id}`));
 }

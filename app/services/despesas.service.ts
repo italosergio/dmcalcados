@@ -1,4 +1,4 @@
-import { ref, push, get, set, query, orderByChild, equalTo, update } from 'firebase/database';
+import { ref, push, get, set, query, orderByChild, equalTo, update, remove } from 'firebase/database';
 import { db, auth } from './firebase';
 import type { Despesa } from '~/models';
 
@@ -37,6 +37,31 @@ export async function deleteDespesa(despesaId: string): Promise<void> {
   });
 }
 
+export async function getTiposDespesa(): Promise<{ key: string; nome: string; icone?: string }[]> {
+  const snapshot = await get(ref(db, 'despesas-tipos'));
+  if (!snapshot.exists()) return [];
+  const data = snapshot.val();
+  return Object.entries(data).map(([key, val]) => {
+    if (typeof val === 'string') return { key, nome: val };
+    const v = val as { nome: string; icone?: string };
+    return { key, nome: v.nome, icone: v.icone };
+  });
+}
+
+export async function addTipoDespesa(tipo: string, icone?: string): Promise<void> {
+  const existentes = await getTiposDespesa();
+  if (existentes.some(t => t.nome === tipo)) return;
+  await push(ref(db, 'despesas-tipos'), icone ? { nome: tipo, icone } : tipo);
+}
+
+export async function updateTipoDespesa(key: string, novoNome: string, icone?: string): Promise<void> {
+  await set(ref(db, `despesas-tipos/${key}`), icone ? { nome: novoNome, icone } : novoNome);
+}
+
+export async function deleteTipoDespesa(key: string): Promise<void> {
+  await remove(ref(db, `despesas-tipos/${key}`));
+}
+
 export async function createDespesa(data: Omit<Despesa, 'id' | 'createdAt'>): Promise<string> {
   try {
     const user = auth.currentUser;
@@ -44,14 +69,18 @@ export async function createDespesa(data: Omit<Despesa, 'id' | 'createdAt'>): Pr
 
     console.log('createDespesa - dados recebidos:', data);
     
-    const despesaData = {
+    const despesaData: Record<string, any> = {
       tipo: data.tipo,
       valor: data.valor,
-      data: data.data instanceof Date ? data.data.toISOString() : data.data,
+      data: data.data instanceof Date
+        ? `${data.data.getFullYear()}-${String(data.data.getMonth() + 1).padStart(2, '0')}-${String(data.data.getDate()).padStart(2, '0')}T12:00:00.000Z`
+        : data.data,
       usuarioId: data.usuarioId,
       usuarioNome: data.usuarioNome,
       createdAt: new Date().toISOString()
     };
+
+    if ((data as any).imagemUrl) despesaData.imagemUrl = (data as any).imagemUrl;
 
     console.log('createDespesa - dados a salvar:', despesaData);
     

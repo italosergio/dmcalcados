@@ -9,7 +9,7 @@ export async function getClientes(): Promise<Cliente[]> {
   const data = snapshot.val();
   return Object.keys(data)
     .map(key => ({ id: key, ...data[key] }))
-    .filter(c => !c.deletedAt);
+    .filter((c: any) => !c.deletedAt);
 }
 
 export async function deleteCliente(clienteId: string): Promise<void> {
@@ -29,4 +29,8 @@ export async function createCliente(data: Omit<Cliente, 'id' | 'createdAt'>): Pr
     createdAt: new Date().toISOString()
   });
   return newRef.key!;
+}
+
+export async function updateCliente(clienteId: string, data: Partial<Omit<Cliente, 'id' | 'createdAt'>>): Promise<void> {
+  await update(ref(db, `clientes/${clienteId}`), data);
 }
