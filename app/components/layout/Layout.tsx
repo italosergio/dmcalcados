@@ -11,7 +11,7 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [tickerVisible, setTickerVisible] = useState(true);
 
-  if (!isServer && loading) {
+  if (isServer || loading) {
     return (
       <div className="flex h-screen items-center justify-center text-content-secondary">
         Carregando...
@@ -19,12 +19,12 @@ export default function Layout() {
     );
   }
 
-  if (!isServer && !loading && !user) {
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
 
   return (
-    <div className="flex h-screen relative bg-cover bg-center bg-no-repeat" style={{ backgroundImage: 'url(/home-background.png)' }}>
+    <div className="flex relative bg-cover bg-center bg-no-repeat" style={{ backgroundImage: 'url(/home-background.png)', minHeight: '100dvh', height: '100dvh' }}>
       <div className="absolute inset-0 bg-[#1a1a1e]/85" />
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} tickerVisible={tickerVisible} onTickerToggle={setTickerVisible} />
       <div className="relative z-10 flex flex-1 flex-col overflow-hidden">
