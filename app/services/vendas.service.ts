@@ -2,6 +2,22 @@ import { ref, push, get, set, update } from 'firebase/database';
 import { db, auth } from './firebase';
 import type { Venda } from '~/models';
 
+function calcPares(p: { tipo?: string; quantidade: number }): number {
+  return p.tipo === 'pacote' ? p.quantidade * 15 : p.quantidade;
+}
+
+async function ajustarEstoque(produtos: { produtoId: string; tipo?: string; quantidade: number }[], direcao: 1 | -1): Promise<void> {
+  for (const p of produtos) {
+    const snap = await get(ref(db, `produtos/${p.produtoId}/estoque`));
+    const atual = snap.val() || 0;
+    const delta = calcPares(p) * direcao;
+    await update(ref(db, `produtos/${p.produtoId}`), {
+      estoque: Math.max(0, atual + delta),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+}
+
 async function getNextPedidoNumero(): Promise<number> {
   const snapshot = await get(ref(db, 'vendas'));
   if (!snapshot.exists()) return 1;
@@ -17,15 +33,25 @@ export async function getVendas(): Promise<Venda[]> {
   if (!user) return [];
 
   const userData = await get(ref(db, `users/${user.uid}`));
-  const isAdmin = userData.val()?.role === 'admin';
+  const uData = userData.val();
+  const roles: string[] = uData?.roles?.length ? uData.roles : [uData?.role];
+  const isAdmin = roles.some(r => r === 'admin' || r === 'superadmin');
 
-  const snapshot = await get(ref(db, 'vendas'));
-  if (!snapshot.exists()) return [];
+  const [vendasSnap, usersSnap] = await Promise.all([
+    get(ref(db, 'vendas')),
+    get(ref(db, 'users')),
+  ]);
+  if (!vendasSnap.exists()) return [];
 
-  const data = snapshot.val();
-  const all = Object.keys(data)
-    .map(key => ({ id: key, ...data[key] }))
-    .filter((v: any) => !v.deletedAt);
+  const usersData = usersSnap.val() || {};
+  const data = vendasSnap.val();
+  const all = Object.keys(data).map(key => {
+    const v = { id: key, ...data[key] };
+    if (v.deletedBy && usersData[v.deletedBy]) {
+      v.deletedByNome = usersData[v.deletedBy].nome || usersData[v.deletedBy].username;
+    }
+    return v;
+  });
 
   const filtered = isAdmin ? all : all.filter((v: any) => v.vendedorId === user.uid);
   return filtered.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -35,9 +61,28 @@ export async function deleteVenda(vendaId: string): Promise<void> {
   const user = auth.currentUser;
   if (!user) throw new Error('Usuário não autenticado');
 
+  const snap = await get(ref(db, `vendas/${vendaId}`));
+  const venda = snap.val();
+  if (venda?.produtos && !venda.deletedAt) {
+    await ajustarEstoque(venda.produtos, 1);
+  }
+
   await update(ref(db, `vendas/${vendaId}`), {
     deletedAt: new Date().toISOString(),
     deletedBy: user.uid
+  });
+}
+
+export async function restoreVenda(vendaId: string): Promise<void> {
+  const snap = await get(ref(db, `vendas/${vendaId}`));
+  const venda = snap.val();
+  if (venda?.produtos && venda.deletedAt) {
+    await ajustarEstoque(venda.produtos, -1);
+  }
+
+  await update(ref(db, `vendas/${vendaId}`), {
+    deletedAt: null,
+    deletedBy: null
   });
 }
 
@@ -50,5 +95,8 @@ export async function createVenda(data: Omit<Venda, 'id' | 'createdAt' | 'pedido
     data: data.data instanceof Date ? data.data.toISOString() : data.data,
     createdAt: new Date().toISOString()
   });
+
+  await ajustarEstoque(data.produtos, -1);
+
   return newRef.key!;
 }
