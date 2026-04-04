@@ -4,10 +4,11 @@ import { createVenda } from '~/services/vendas.service';
 import { getClientes, createCliente } from '~/services/clientes.service';
 import { getProdutos, createProduto } from '~/services/produtos.service';
 import { getUsers } from '~/services/users.service';
+import { getCicloAtivo } from '~/services/ciclos.service';
 import { uploadImage } from '~/services/cloudinary.service';
 import { useAuth } from '~/contexts/AuthContext';
 import { useCachedState, clearFormCache } from '~/hooks/useFormCache';
-import type { Cliente, Produto, VendaProduto, CondicaoPagamento, User } from '~/models';
+import type { Cliente, Produto, VendaProduto, CondicaoPagamento, User, Ciclo } from '~/models';
 import { isVendedor, userIsAdmin, userIsVendedor } from '~/models';
 import { formatCurrency } from '~/utils/format';
 import { Pencil, Trash2, Plus, Minus, ShoppingBag, X, Check, Package, ImagePlus } from 'lucide-react';
@@ -63,9 +64,12 @@ export function VendaForm() {
   const [descricao, setDescricao] = useState('');
   const [imagem, setImagem] = useState<File | null>(null);
   const [imagemPreview, setImagemPreview] = useState<string | null>(null);
+  const [cicloAtivo, setCicloAtivo] = useState<Ciclo | null>(null);
+  const [cicloChecked, setCicloChecked] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user ? userIsAdmin(user) : false;
+  const isVendedorUser = user ? userIsVendedor(user) && !isAdmin : false;
 
   useEffect(() => {
     if (isAdmin) getUsers().then(u => setVendedores(u.filter(x => userIsVendedor(x))));
@@ -73,7 +77,7 @@ export function VendaForm() {
 
   useEffect(() => {
     if (!user) return;
-    Promise.all([getClientes(), getProdutos()]).then(([clientesData, produtosData]) => {
+    Promise.all([getClientes(), getProdutos()]).then(async ([clientesData, produtosData]) => {
       if (user && userIsVendedor(user)) {
         const uid = user.uid || user.id;
         setClientes(clientesData.filter(c =>
@@ -81,6 +85,19 @@ export function VendaForm() {
           !c.donoId ||
           (c.compartilhadoCom && c.compartilhadoCom.includes(uid))
         ));
+        // Carregar ciclo ativo do vendedor
+        if (!userIsAdmin(user)) {
+          const ciclo = await getCicloAtivo(uid);
+          setCicloAtivo(ciclo);
+          setCicloChecked(true);
+          // Limpar produtos cacheados que não pertencem ao ciclo
+          if (ciclo) {
+            const idsNoCiclo = new Set(ciclo.produtos.map(p => p.produtoId));
+            setProdutosSelecionados(prev => prev.filter(p => idsNoCiclo.has(p.produtoId)));
+          } else {
+            setProdutosSelecionados([]);
+          }
+        }
       } else {
         setClientes(clientesData);
       }
@@ -187,7 +204,16 @@ export function VendaForm() {
     } finally { setNcSaving(false); }
   };
 
-  const produtosSorted = [...produtos].sort((a, b) => a.modelo.localeCompare(b.modelo));
+  const produtosSorted = [...(isVendedorUser && cicloAtivo
+    ? (cicloAtivo.produtos || [])
+        .filter(cp => cp.pecasAtual > 0)
+        .map(cp => {
+          const prod = produtos.find(p => p.id === cp.produtoId);
+          return prod ? { ...prod, estoque: cp.pecasAtual } : null;
+        })
+        .filter(Boolean) as Produto[]
+    : produtos
+  )].sort((a, b) => a.modelo.localeCompare(b.modelo));
   const produtosFiltrados = produtoBusca
     ? produtosSorted.filter(p => p.modelo.toLowerCase().includes(produtoBusca.toLowerCase()) || (p.referencia || '').toLowerCase().includes(produtoBusca.toLowerCase()))
     : produtosSorted;
@@ -214,12 +240,37 @@ export function VendaForm() {
     } finally { setNpSaving(false); }
   };
 
+  // Peças disponíveis no ciclo para um produto (descontando já adicionados)
+  const pecasDisponivelCiclo = (prodId: string) => {
+    if (!isVendedorUser || !cicloAtivo) return Infinity;
+    const cp = (cicloAtivo.produtos || []).find(p => p.produtoId === prodId);
+    if (!cp) return 0;
+    const jaAdicionado = produtosSelecionados
+      .filter(p => p.produtoId === prodId)
+      .reduce((s, p) => s + (p.tipo === 'pacote' ? p.quantidade * PECAS_POR_PACOTE : p.quantidade), 0);
+    return cp.pecasAtual - jaAdicionado;
+  };
+
+  // Máximo que pode adicionar do produto selecionado (na unidade do tipo atual)
+  const maxQuantidade = () => {
+    if (!produtoId) return 99;
+    const disp = pecasDisponivelCiclo(produtoId);
+    if (disp === Infinity) return 99;
+    return tipoProduto === 'pacote' ? Math.floor(disp / PECAS_POR_PACOTE) : disp;
+  };
+
   const adicionarProduto = () => {
     const produto = produtos.find(p => p.id === produtoId);
     if (!produto || !precoUnitario) return;
     const qtd = parseInt(quantidade);
     const preco = parseFloat(precoUnitario);
     const totalPecas = tipoProduto === 'pacote' ? qtd * PECAS_POR_PACOTE : qtd;
+    const disp = pecasDisponivelCiclo(produto.id);
+    if (totalPecas > disp) {
+      setErro(`Estoque insuficiente no carro. Disponível: ${Math.floor(disp / 15)} pct (${disp} pçs)`);
+      return;
+    }
+    setErro('');
     setProdutosSelecionados([...produtosSelecionados, {
       produtoId: produto.id, modelo: produto.modelo, referencia: produto.referencia || '',
       quantidade: qtd, tipo: tipoProduto, valorSugerido: produto.valor, valorUnitario: preco, valorTotal: preco * totalPecas
@@ -245,6 +296,17 @@ export function VendaForm() {
     setProdutosSelecionados(prev => prev.map((p, i) => {
       if (i !== index) return p;
       const updated = { ...p, [field]: value };
+      // Validar limite do ciclo ao alterar quantidade
+      if (field === 'quantidade' && isVendedorUser && cicloAtivo) {
+        const cp = (cicloAtivo.produtos || []).find(cp => cp.produtoId === p.produtoId);
+        if (cp) {
+          const outrosAdicionados = prev
+            .filter((op, oi) => op.produtoId === p.produtoId && oi !== index)
+            .reduce((s, op) => s + (op.tipo === 'pacote' ? op.quantidade * PECAS_POR_PACOTE : op.quantidade), 0);
+          const novoPecas = updated.tipo === 'pacote' ? updated.quantidade * PECAS_POR_PACOTE : updated.quantidade;
+          if (novoPecas + outrosAdicionados > cp.pecasAtual) return p;
+        }
+      }
       const pecas = updated.tipo === 'pacote' ? updated.quantidade * PECAS_POR_PACOTE : updated.quantidade;
       updated.valorTotal = pecas * updated.valorUnitario;
       return updated;
@@ -326,6 +388,20 @@ export function VendaForm() {
       setErro(`Firebase write error: ${msg}`);
     } finally { setLoading(false); }
   };
+
+  // Vendedor sem ciclo ativo: bloqueia
+  if (isVendedorUser && cicloChecked && !cicloAtivo) {
+    return (
+      <div className="max-w-3xl mx-auto rounded-lg border border-dashed border-red-500/30 py-12 text-center space-y-3">
+        <Package size={32} className="mx-auto text-red-400 opacity-50" />
+        <p className="text-sm text-red-400 font-medium">Você não possui um ciclo de estoque ativo</p>
+        <p className="text-xs text-content-muted">Para registrar vendas, é necessário que o administrador abra um ciclo para você.</p>
+        <button onClick={() => navigate('/meu-estoque')} className="rounded-lg bg-elevated px-4 py-2 text-xs text-content-secondary hover:bg-border-medium transition">
+          Ver Meu Estoque
+        </button>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-3xl mx-auto">
@@ -518,14 +594,16 @@ export function VendaForm() {
                 <Minus size={16} />
               </button>
               <span className="border-y border-border-subtle bg-elevated px-4 py-2.5 text-sm font-semibold text-center min-w-[3rem]">{quantidade}</span>
-              <button type="button" onClick={() => setQuantidade(String(parseInt(quantidade) + 1))}
-                className="rounded-r-lg border border-border-subtle bg-elevated px-3 py-2.5 text-content-secondary hover:bg-border-medium transition-colors">
+              <button type="button" onClick={() => { const max = maxQuantidade(); setQuantidade(String(Math.min(max, parseInt(quantidade) + 1))); }}
+                disabled={parseInt(quantidade) >= maxQuantidade()}
+                className="rounded-r-lg border border-border-subtle bg-elevated px-3 py-2.5 text-content-secondary hover:bg-border-medium transition-colors disabled:opacity-30">
                 <Plus size={16} />
               </button>
             </div>
+            {isVendedorUser && produtoId && <span className="text-[10px] text-content-muted self-end">máx {maxQuantidade()} {tipoProduto === 'pacote' ? 'pct' : 'un'}</span>}
           </div>
           <div className="flex items-end">
-            <button type="button" onClick={adicionarProduto} disabled={!produtoId || !precoUnitario}
+            <button type="button" onClick={adicionarProduto} disabled={!produtoId || !precoUnitario || maxQuantidade() <= 0}
               className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-white text-sm font-medium transition hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
               <Plus size={16} /> Adicionar
             </button>

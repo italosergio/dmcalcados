@@ -160,7 +160,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col relative overflow-hidden bg-cover bg-center bg-no-repeat" style={{ backgroundImage: 'url(/home-background.png)' }}>
+    <div className="flex flex-col relative overflow-hidden bg-cover bg-center bg-no-repeat" style={{ backgroundImage: 'url(/home-background.png)', height: '100dvh' }}>
       <div className="absolute inset-0 bg-black/60" />
 
       {/* Header */}

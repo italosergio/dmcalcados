@@ -20,6 +20,8 @@ export default [
     route("despesas/nova", "routes/despesas.nova.tsx"),
     route("usuarios", "routes/usuarios.tsx"),
     route("historico", "routes/historico.tsx"),
+    route("ciclos", "routes/ciclos.tsx"),
+    route("meu-estoque", "routes/meu-estoque.tsx"),
     route("conta", "routes/conta.tsx"),
   ]),
 ] satisfies RouteConfig;

@@ -121,3 +121,28 @@ export interface EntradaProduto {
   createdAt: string;
 }
 
+export interface CicloProduto {
+  produtoId: string;
+  modelo: string;
+  referencia: string;
+  pacotesInicial: number;
+  pecasInicial: number;
+  pacotesAtual: number;
+  pecasAtual: number;
+  valorUnitario: number;
+}
+
+export interface Ciclo {
+  id: string;
+  vendedorId: string;
+  vendedorNome: string;
+  produtos: CicloProduto[];
+  status: 'ativo' | 'fechado';
+  criadoPorId: string;
+  criadoPorNome: string;
+  fechadoPorId?: string;
+  fechadoPorNome?: string;
+  createdAt: string;
+  closedAt?: string;
+}
+

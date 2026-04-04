@@ -1,6 +1,8 @@
 import { ref, push, get, set, update } from 'firebase/database';
 import { db, auth } from './firebase';
+import { descontarDoCiclo } from './ciclos.service';
 import type { Venda } from '~/models';
+import { isVendedor } from '~/models';
 
 function calcPares(p: { tipo?: string; quantidade: number }): number {
   return p.tipo === 'pacote' ? p.quantidade * 15 : p.quantidade;
@@ -96,7 +98,20 @@ export async function createVenda(data: Omit<Venda, 'id' | 'createdAt' | 'pedido
     createdAt: new Date().toISOString()
   });
 
-  await ajustarEstoque(data.produtos, -1);
+  // Verificar se o vendedor tem ciclo ativo
+  const vendedorSnap = await get(ref(db, `users/${data.vendedorId}`));
+  const vendedorData = vendedorSnap.val();
+  const roles: string[] = vendedorData?.roles?.length ? vendedorData.roles : [vendedorData?.role];
+  const vendedorIsVendedor = roles.some(r => isVendedor(r as any));
+  const vendedorIsAdmin = roles.some(r => r === 'admin' || r === 'superadmin');
+
+  if (vendedorIsVendedor && !vendedorIsAdmin) {
+    // Desconta do ciclo do vendedor
+    await descontarDoCiclo(data.vendedorId, data.produtos);
+  } else {
+    // Admin vendendo direto: desconta do estoque geral
+    await ajustarEstoque(data.produtos, -1);
+  }
 
   return newRef.key!;
 }

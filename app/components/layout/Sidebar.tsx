@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router';
-import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, History, LogOut, X, UserCircle, Home, Package } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, History, LogOut, X, UserCircle, Home, Package, RefreshCw } from 'lucide-react';
 import { logout } from '~/services/auth.service';
 import { useNavigate } from 'react-router';
 import { useAuth } from '~/contexts/AuthContext';
@@ -46,6 +46,7 @@ export function Sidebar({ isOpen, onClose, tickerVisible, onTickerToggle }: Side
   ];
 
   if (user && userIsVendedor(user)) {
+    links.push({ to: '/meu-estoque', icon: Package, label: 'Meu Estoque' });
     links.push({ to: '/meus-clientes', icon: Users, label: 'Meus Clientes' });
   }
 
@@ -53,6 +54,7 @@ export function Sidebar({ isOpen, onClose, tickerVisible, onTickerToggle }: Side
     links.splice(2, 0, { to: '/produtos', icon: Package, label: 'Produtos' });
     links.splice(3, 0, { to: '/estoque', icon: Warehouse, label: 'Estoque' });
     links.push({ to: '/clientes', icon: Users, label: 'Clientes' });
+    links.push({ to: '/ciclos', icon: RefreshCw, label: 'Ciclos' });
     links.push({ to: '/usuarios', icon: UserCog, label: 'Usuários' });
     links.push({ to: '/historico', icon: History, label: 'Histórico' });
   }
@@ -69,7 +71,7 @@ export function Sidebar({ isOpen, onClose, tickerVisible, onTickerToggle }: Side
       )}
 
       <aside
-        className={`fixed lg:static inset-y-0 right-0 z-50 flex h-screen w-64 flex-col border-l border-border-subtle bg-surface transition-transform duration-300 lg:translate-x-0 lg:border-l-0 lg:border-r lg:left-0 lg:right-auto ${
+        className={`fixed lg:static inset-y-0 right-0 z-50 flex w-64 flex-col border-l border-border-subtle bg-surface transition-transform duration-300 lg:translate-x-0 lg:border-l-0 lg:border-r lg:left-0 lg:right-auto ${
           isOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
         }`}
       >
