@@ -1,8 +1,11 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import { Plus, Trash2, Receipt, UserCircle, Fuel, UtensilsCrossed, BedDouble, ImageIcon, X, Wrench, HelpCircle, Calendar, type LucideIcon } from 'lucide-react';
+import { Plus, Trash2, Undo2, Receipt, UserCircle, Fuel, UtensilsCrossed, BedDouble, ImageIcon, X, Wrench, HelpCircle, Calendar, LayoutGrid, List, type LucideIcon } from 'lucide-react';
+import { auth } from '~/services/firebase';
+import { ImageLightbox } from '~/components/common/ImageLightbox';
 import { Card } from '~/components/common/Card';
-import { getDespesas, getTiposDespesa } from '~/services/despesas.service';
+import { useDespesas } from '~/hooks/useRealtime';
+import { getTiposDespesa } from '~/services/despesas.service';
 import { getIconeForTipo } from '~/components/despesas/DespesaForm';
 import { formatCurrency, formatDate } from '~/utils/format';
 import type { Despesa } from '~/models';
@@ -10,10 +13,11 @@ import type { Despesa } from '~/models';
 type Periodo = 'hoje' | '7dias' | '30dias' | 'ano' | 'tudo';
 
 export default function DespesasPage() {
-  const [despesas, setDespesas] = useState<Despesa[]>([]);
+  const { despesas, loading: despesasLoading } = useDespesas();
   const [tiposMeta, setTiposMeta] = useState<{ nome: string; icone?: string }[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [periodo, setPeriodo] = useState<Periodo>('hoje');
+  const [tiposLoading, setTiposLoading] = useState(true);
+  const loading = despesasLoading || tiposLoading;
+  const [periodo, setPeriodo] = useState<Periodo>('30dias');
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
   const [filtroTipos, setFiltroTipos] = useState<string[]>([]);
@@ -21,30 +25,42 @@ export default function DespesasPage() {
   const deleteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [imagemAberta, setImagemAberta] = useState<string | null>(null);
   const [despesaSelecionada, setDespesaSelecionada] = useState<Despesa | null>(null);
+  const [viewMode, setViewMode] = useState<'cards' | 'tabela'>(() => {
+    if (typeof window !== 'undefined') return (localStorage.getItem('despesas-view') as 'cards' | 'tabela') || 'cards';
+    return 'cards';
+  });
   const navigate = useNavigate();
 
+  const changeViewMode = (mode: 'cards' | 'tabela') => {
+    setViewMode(mode);
+    localStorage.setItem('despesas-view', mode);
+  };
+
   useEffect(() => {
-    Promise.all([getDespesas(), getTiposDespesa()]).then(([d, t]) => {
-      setDespesas(d);
+    getTiposDespesa().then(t => {
       setTiposMeta(t.map(x => ({ nome: x.nome, icone: x.icone })));
-    }).finally(() => setLoading(false));
+    }).finally(() => setTiposLoading(false));
+    import('~/services/auth.service').then(m => {
+      const uid = auth.currentUser?.uid;
+      if (uid) m.getUserData(uid).then(u => { if (u) setCurrentUserNome(u.nome); });
+    });
   }, []);
+
+  const [currentUserNome, setCurrentUserNome] = useState('');
 
   const handleDelete = useCallback((id: string) => {
     const clicks = (deleteClicks[id] || 0) + 1;
     clearTimeout(deleteTimers.current[id]);
     if (clicks >= 3) {
       setDeleteClicks(prev => { const n = { ...prev }; delete n[id]; return n; });
-      import('~/services/despesas.service').then(m => m.deleteDespesa(id)).then(() => {
-        setDespesas(prev => prev.filter(d => d.id !== id));
-      });
+      import('~/services/despesas.service').then(m => m.deleteDespesa(id));
     } else {
       setDeleteClicks(prev => ({ ...prev, [id]: clicks }));
       deleteTimers.current[id] = setTimeout(() => {
         setDeleteClicks(prev => { const n = { ...prev }; delete n[id]; return n; });
       }, 3000);
     }
-  }, [deleteClicks]);
+  }, [deleteClicks, currentUserNome]);
 
   const deleteLabel = (id: string) => {
     const clicks = deleteClicks[id] || 0;
@@ -52,6 +68,10 @@ export default function DespesasPage() {
     if (clicks === 1) return 'Tem certeza?';
     return 'Confirmar!';
   };
+
+  const handleRestore = useCallback((id: string) => {
+    import('~/services/despesas.service').then(m => m.restoreDespesa(id));
+  }, []);
 
   // Filtro
   const filtered = despesas.filter(d => {
@@ -71,14 +91,18 @@ export default function DespesasPage() {
     return true;
   });
 
-  const totalDespesas = filtered.reduce((sum, d) => sum + d.valor, 0);
-  const totalCombustivel = filtered.filter(d => d.tipo === 'Combustível').reduce((s, d) => s + d.valor, 0);
-  const totalAlimentacao = filtered.filter(d => d.tipo === 'Alimentação').reduce((s, d) => s + d.valor, 0);
-  const totalHospedagem = filtered.filter(d => d.tipo === 'Hospedagem').reduce((s, d) => s + d.valor, 0);
-  const totalManutencao = filtered.filter(d => d.tipo === 'Manutenção').reduce((s, d) => s + d.valor, 0);
+  const totalDespesas = filtered.filter((d: any) => !d.deletedAt).reduce((sum, d) => sum + d.valor, 0);
+  const activeFiltered = filtered.filter((d: any) => !d.deletedAt);
+  const totalCombustivel = activeFiltered.filter(d => d.tipo === 'Combustível').reduce((s, d) => s + d.valor, 0);
+  const totalAlimentacao = activeFiltered.filter(d => d.tipo === 'Alimentação').reduce((s, d) => s + d.valor, 0);
+  const totalHospedagem = activeFiltered.filter(d => d.tipo === 'Hospedagem').reduce((s, d) => s + d.valor, 0);
+  const totalManutencao = activeFiltered.filter(d => d.tipo === 'Manutenção').reduce((s, d) => s + d.valor, 0);
 
-  // Tipos únicos para filtro
-  const tiposUnicos = Array.from(new Set(despesas.map(d => d.tipo).filter(Boolean))).sort();
+  // Tipos para filtro: usa apenas os tipos cadastrados (ativos)
+  const tiposCadastrados = tiposMeta.map(t => t.nome);
+  const tiposUnicos = tiposCadastrados.length > 0
+    ? tiposCadastrados.sort()
+    : Array.from(new Set(despesas.map(d => d.tipo).filter(Boolean))).sort();
 
   const toggleTipo = (t: string) => {
     setFiltroTipos(prev => prev.includes(t) ? prev.filter(v => v !== t) : [...prev, t]);
@@ -99,7 +123,7 @@ export default function DespesasPage() {
         : { hoje: 'hoje', '7dias': 'últimos 7 dias', '30dias': 'últimos 30 dias', ano: 'do ano', tudo: '' }[periodo];
 
   return (
-    <div>
+    <div className={viewMode === 'tabela' ? 'flex flex-col h-[calc(100vh-4rem)] overflow-hidden' : ''}>
       {/* Header: Botão + Cards */}
       <div className="mb-4 space-y-3 sm:space-y-0 sm:flex sm:flex-wrap sm:items-stretch sm:gap-3">
         <div className="flex items-center justify-between sm:contents">
@@ -142,7 +166,7 @@ export default function DespesasPage() {
       </div>
 
       {/* Filtros */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="mb-3 flex flex-wrap lg:flex-nowrap items-center gap-2">
         {([
           { value: 'hoje', label: 'Hoje' },
           { value: '7dias', label: '7 dias' },
@@ -151,7 +175,7 @@ export default function DespesasPage() {
           { value: 'tudo', label: 'Tudo' },
         ] as { value: Periodo; label: string }[]).map(opt => (
           <button key={opt.value} onClick={() => { setPeriodo(opt.value); setFiltroDataInicio(''); setFiltroDataFim(''); }}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+            className={`rounded-md px-2.5 py-1 text-[10px] font-medium transition whitespace-nowrap ${
               periodo === opt.value && !filtroDataInicio && !filtroDataFim
                 ? 'bg-green-600 text-white shadow-sm'
                 : 'bg-elevated text-content-secondary hover:bg-border-medium'
@@ -161,18 +185,18 @@ export default function DespesasPage() {
         ))}
         <span className="hidden lg:inline text-content-muted/30">│</span>
         <input type="date" value={filtroDataInicio} onChange={(e) => { setFiltroDataInicio(e.target.value); if (e.target.value) setPeriodo('tudo'); }}
-          className={`rounded-lg border bg-elevated px-2 py-1.5 text-xs focus:outline-none focus:border-border-medium w-[7.5rem] transition-colors ${filtroDataInicio ? 'border-green-600/30 text-content' : 'border-border-subtle text-content-muted'}`} />
+          className={`rounded-md border bg-elevated px-1.5 py-1 text-[10px] focus:outline-none focus:border-border-medium w-[6.5rem] transition-colors ${filtroDataInicio ? 'border-green-600/30 text-content' : 'border-border-subtle text-content-muted'}`} />
         <span className="text-[10px] text-content-muted">até</span>
         <input type="date" value={filtroDataFim} onChange={(e) => { setFiltroDataFim(e.target.value); if (e.target.value) setPeriodo('tudo'); }}
-          className={`rounded-lg border bg-elevated px-2 py-1.5 text-xs focus:outline-none focus:border-border-medium w-[7.5rem] transition-colors ${filtroDataFim ? 'border-green-600/30 text-content' : 'border-border-subtle text-content-muted'}`} />
+          className={`rounded-md border bg-elevated px-1.5 py-1 text-[10px] focus:outline-none focus:border-border-medium w-[6.5rem] transition-colors ${filtroDataFim ? 'border-green-600/30 text-content' : 'border-border-subtle text-content-muted'}`} />
 
         {tiposUnicos.length > 0 && (
           <>
             <span className="hidden lg:inline text-content-muted/30">│</span>
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1 lg:gap-1 flex-wrap lg:flex-nowrap">
               {tiposUnicos.map(t => (
                 <button key={t} onClick={() => toggleTipo(t)}
-                  className={`rounded-lg px-2.5 py-1.5 text-xs font-medium border transition flex items-center gap-1 ${
+                  className={`rounded-md px-2.5 py-1 text-[10px] font-medium border transition flex items-center gap-1 whitespace-nowrap ${
                     filtroTipos.includes(t) ? 'bg-red-600/10 text-red-400 border-red-600/30' : 'bg-elevated text-content-muted border-transparent hover:bg-border-medium'
                   }`}>
                   {getTipoIcone(t)}
@@ -180,18 +204,30 @@ export default function DespesasPage() {
                 </button>
               ))}
               {filtroTipos.length > 0 && (
-                <button onClick={() => setFiltroTipos([])} className="inline-flex items-center gap-1 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-[10px] font-medium text-red-400 hover:bg-red-500/20 transition">
-                  <Trash2 size={11} /> Limpar
+                <button onClick={() => setFiltroTipos([])} className="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[10px] font-medium text-red-400 hover:bg-red-500/20 transition whitespace-nowrap">
+                  <Trash2 size={10} /> Limpar
                 </button>
               )}
             </div>
           </>
         )}
+        <div className="ml-auto flex items-center bg-elevated rounded-lg p-0.5">
+          <button onClick={() => changeViewMode('cards')}
+            className={`rounded-md p-1.5 transition-colors ${viewMode === 'cards' ? 'bg-surface text-content shadow-sm' : 'text-content-muted hover:text-content'}`}
+            aria-label="Visualizar como cards">
+            <LayoutGrid size={16} />
+          </button>
+          <button onClick={() => changeViewMode('tabela')}
+            className={`rounded-md p-1.5 transition-colors ${viewMode === 'tabela' ? 'bg-surface text-content shadow-sm' : 'text-content-muted hover:text-content'}`}
+            aria-label="Visualizar como tabela">
+            <List size={16} />
+          </button>
+        </div>
       </div>
 
       {loading && <p>Carregando...</p>}
 
-      {!loading && filtered.length === 0 && filtroTipos.length === 0 && !filtroDataInicio && !filtroDataFim && (
+      {!loading && filtered.length === 0 && filtroTipos.length === 0 && !filtroDataInicio && !filtroDataFim && despesas.length === 0 && (
         <div className="rounded-xl border border-dashed border-border-subtle bg-surface p-8 sm:p-12 text-center">
           <Receipt size={48} className="mx-auto mb-4 text-content-muted opacity-40" />
           <p className="mb-1 text-base sm:text-lg font-semibold">Nenhuma despesa registrada</p>
@@ -199,6 +235,17 @@ export default function DespesasPage() {
           <button onClick={() => navigate('/despesas/nova')}
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-400 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:from-blue-400 hover:to-blue-300 active:scale-95">
             <Plus size={20} /> Registrar Primeira Despesa
+          </button>
+        </div>
+      )}
+
+      {!loading && filtered.length === 0 && filtroTipos.length === 0 && !filtroDataInicio && !filtroDataFim && despesas.length > 0 && (
+        <div className="rounded-xl border border-border-subtle bg-surface p-6 sm:p-8 text-center">
+          <Receipt size={40} className="mx-auto mb-3 text-content-muted opacity-40" />
+          <p className="mb-2 text-sm sm:text-base font-medium">Nenhuma despesa registrada {periodo === 'hoje' ? 'hoje' : periodo === '7dias' ? 'nos últimos 7 dias' : periodo === '30dias' ? 'nos últimos 30 dias' : 'no ano'}</p>
+          <button onClick={() => setPeriodo('tudo')}
+            className="rounded-lg border border-border-subtle bg-elevated px-4 py-2 text-sm font-medium text-content-secondary transition hover:bg-border-medium">
+            Ver todas as despesas
           </button>
         </div>
       )}
@@ -213,10 +260,10 @@ export default function DespesasPage() {
         </div>
       )}
 
-      {!loading && filtered.length > 0 && (
+      {!loading && filtered.length > 0 && viewMode === 'cards' && (
         <div className="space-y-3">
           {filtered.map(despesa => (
-            <div key={despesa.id} className="rounded-xl border border-border-subtle bg-surface p-3 sm:p-4 cursor-pointer hover:border-border-medium transition-colors" onClick={() => setDespesaSelecionada(despesa)}>
+            <div key={despesa.id} className={`rounded-xl border p-3 sm:p-4 cursor-pointer transition-colors ${ (despesa as any).deletedAt ? 'border-red-900/50 bg-red-950/20 opacity-70 hover:opacity-90' : 'border-border-subtle bg-surface hover:border-border-medium' }`} onClick={() => setDespesaSelecionada(despesa)}>
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -225,28 +272,27 @@ export default function DespesasPage() {
                       {despesa.tipo}
                     </span>
                     {(despesa as any).imagemUrl && (
-                      <button type="button" onClick={() => setImagemAberta((despesa as any).imagemUrl)}
-                        className="text-content-muted hover:text-blue-400 transition-colors">
-                        <ImageIcon size={14} />
-                      </button>
+                      <ImageIcon size={13} className="text-blue-400 shrink-0" />
                     )}
                   </div>
-                  <p className="text-lg sm:text-xl font-bold text-red-400">{formatCurrency(despesa.valor)}</p>
+                  {(despesa as any).deletedAt && (
+                    <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded font-medium">Apagada</span>
+                  )}
+                  <p className={`text-lg sm:text-xl font-bold ${ (despesa as any).deletedAt ? 'text-red-400 line-through' : 'text-red-400' }`}>{formatCurrency(despesa.valor)}</p>
                   <div className="mt-1 flex items-center gap-1 text-xs text-content-muted">
                     <UserCircle size={14} />
                     <span className="truncate">{despesa.usuarioNome}</span>
+                    {despesa.rateio && despesa.rateio.length > 0 && (
+                      <span className="text-content-muted/60">· inclui {despesa.rateio.map(r => r.usuarioNome).join(', ')}</span>
+                    )}
                   </div>
+                  {despesa.descricao && (
+                    <p className="text-xs text-content-muted mt-0.5 truncate">{despesa.descricao}</p>
+                  )}
                 </div>
                 <div className="text-right flex-shrink-0">
                   <p className="text-xs text-content-muted whitespace-nowrap">{formatDate(new Date(despesa.data))}</p>
                   <p className="text-[10px] text-content-muted/60 whitespace-nowrap">reg. {new Date(despesa.createdAt).toLocaleDateString('pt-BR')}</p>
-                  <button type="button" onClick={(e) => { e.stopPropagation(); handleDelete(despesa.id); }}
-                    className={`mt-2 flex items-center gap-1.5 ml-auto rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                      (deleteClicks[despesa.id] || 0) === 0 ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
-                      : (deleteClicks[despesa.id] || 0) === 1 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-red-600/30 text-red-300 hover:bg-red-600/40'
-                    }`}>
-                    <Trash2 size={16} /> {deleteLabel(despesa.id)}
-                  </button>
                 </div>
               </div>
             </div>
@@ -254,18 +300,38 @@ export default function DespesasPage() {
         </div>
       )}
 
-      {imagemAberta && (
-        <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={() => setImagemAberta(null)}>
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-          <div className="relative max-w-lg max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setImagemAberta(null)}
-              className="absolute -top-2 -right-2 z-10 rounded-full bg-surface border border-border-subtle p-1 text-content-muted hover:text-content shadow-lg transition-colors">
-              <X size={16} />
-            </button>
-            <img src={imagemAberta} alt="Comprovante" className="rounded-xl max-h-[80vh] object-contain" />
+      {!loading && filtered.length > 0 && viewMode === 'tabela' && (
+        <div className="rounded-xl border border-border-subtle bg-surface overflow-hidden flex flex-col min-h-0 flex-1">
+          <div className="overflow-y-auto flex-1">
+            <table className="w-full">
+              <thead className="sticky top-0 z-10 bg-elevated/95 backdrop-blur-sm">
+                <tr className="border-b border-border-subtle">
+                  <th className="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-content-muted">Tipo</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-content-muted hidden sm:table-cell">Usuário</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-content-muted hidden sm:table-cell">Descrição</th>
+                  <th className="px-3 py-2 text-right text-[10px] font-medium uppercase tracking-wide text-content-muted">Valor</th>
+                  <th className="px-3 py-2 text-right text-[10px] font-medium uppercase tracking-wide text-content-muted">Data</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-subtle">
+                {filtered.map(despesa => (
+                  <tr key={despesa.id} onClick={() => setDespesaSelecionada(despesa)} className={`cursor-pointer transition-colors ${ (despesa as any).deletedAt ? 'bg-red-950/20 opacity-70 hover:opacity-90' : 'hover:bg-surface-hover' }`}>
+                    <td className="px-3 py-2">
+                      <span className="inline-flex items-center gap-1 text-xs">{getTipoIcone(despesa.tipo)} {despesa.tipo}</span>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-content-secondary truncate max-w-[120px] hidden sm:table-cell">{despesa.usuarioNome}</td>
+                    <td className="px-3 py-2 text-[11px] text-content-muted truncate max-w-[160px] hidden sm:table-cell">{despesa.descricao || '—'}</td>
+                    <td className={`px-3 py-2 text-xs font-semibold text-right whitespace-nowrap ${ (despesa as any).deletedAt ? 'text-red-400 line-through' : 'text-red-400' }`}>{formatCurrency(despesa.valor)}</td>
+                    <td className="px-3 py-2 text-[11px] text-content-muted text-right whitespace-nowrap">{formatDate(new Date(despesa.data))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
+
+      {imagemAberta && <ImageLightbox src={imagemAberta} onClose={() => setImagemAberta(null)} />}
 
       {despesaSelecionada && (() => {
         const d = despesaSelecionada;
@@ -290,8 +356,19 @@ export default function DespesasPage() {
                   <div className="rounded-lg bg-elevated p-2.5">
                     <div className="flex items-center gap-1.5 text-content-muted mb-0.5"><UserCircle size={12} /><span className="text-[10px]">Registrado por</span></div>
                     <p className="text-xs font-semibold">{d.usuarioNome}</p>
+                    {d.rateio && d.rateio.length > 0 && (
+                      <div className="mt-1">
+                        <p className="text-[10px] text-content-muted">Inclui também: <span className="text-blue-400">{d.rateio.map(r => r.usuarioNome).join(', ')}</span></p>
+                      </div>
+                    )}
                   </div>
                 </div>
+                {d.descricao && (
+                  <div className="rounded-lg bg-elevated p-2.5">
+                    <p className="text-[10px] text-content-muted mb-0.5">Descrição</p>
+                    <p className="text-xs">{d.descricao}</p>
+                  </div>
+                )}
                 {(d as any).imagemUrl && (
                   <div>
                     <p className="text-[10px] text-content-muted mb-1.5">Comprovante</p>
@@ -300,6 +377,40 @@ export default function DespesasPage() {
                   </div>
                 )}
                 <p className="text-[10px] text-content-muted text-center">Registrado em {new Date(d.createdAt).toLocaleString('pt-BR')}</p>
+
+                {(d as any).deletedAt && (
+                  <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-center">
+                    <p className="text-xs text-red-400 font-medium">Despesa apagada</p>
+                    {(d as any).deletedByNome && (
+                      <p className="text-[10px] text-red-400/70 mt-0.5">por {(d as any).deletedByNome} em {new Date((d as any).deletedAt).toLocaleString('pt-BR')}</p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRestore(d.id)}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/20 transition-colors"
+                    >
+                      <Undo2 size={13} />
+                      Desfazer exclusão
+                    </button>
+                  </div>
+                )}
+
+                {!(d as any).deletedAt && (
+                <button
+                  type="button"
+                  onClick={() => handleDelete(d.id)}
+                  className={`w-full flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                    (deleteClicks[d.id] || 0) === 0
+                      ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
+                      : (deleteClicks[d.id] || 0) === 1
+                        ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                        : 'bg-red-600/30 text-red-300 hover:bg-red-600/40'
+                  }`}
+                >
+                  <Trash2 size={14} />
+                  {deleteLabel(d.id)}
+                </button>
+                )}
               </div>
             </div>
           </div>
