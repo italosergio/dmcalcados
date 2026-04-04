@@ -1,12 +1,37 @@
+export type UserRole = 'admin' | 'vendedor' | 'vendedor1' | 'vendedor2' | 'vendedor3' | 'financeiro' | 'desenvolvedor' | 'superadmin';
+
 export interface User {
   id: string;
-  uid?: string; // Firebase UID
+  uid?: string;
   username: string;
   nome: string;
   foto?: string;
-  role: 'admin' | 'vendedor' | 'superadmin';
+  role: UserRole;        // role principal (legado + compatibilidade)
+  roles?: UserRole[];    // todas as roles do usuário
   createdAt: Date;
   deletedAt?: Date;
+}
+
+// Helpers que consideram roles[] ou role
+export function getUserRoles(user: User): UserRole[] {
+  if (user.roles && user.roles.length > 0) return user.roles;
+  return [user.role];
+}
+
+export function isVendedor(role: UserRole | undefined): boolean {
+  return role === 'vendedor' || role === 'vendedor1' || role === 'vendedor2' || role === 'vendedor3';
+}
+
+export function userIsVendedor(user: User): boolean {
+  return getUserRoles(user).some(r => isVendedor(r));
+}
+
+export function userIsAdmin(user: User): boolean {
+  return getUserRoles(user).some(r => r === 'admin' || r === 'superadmin');
+}
+
+export function userCanAccessAdmin(user: User): boolean {
+  return getUserRoles(user).some(r => r === 'admin' || r === 'superadmin' || r === 'financeiro' || r === 'desenvolvedor');
 }
 
 export interface Produto {
@@ -29,6 +54,9 @@ export interface Cliente {
   cpfCnpj: string;
   contato: string;
   contatos?: string[];
+  donoId?: string;
+  donoNome?: string;
+  compartilhadoCom?: string[];
   createdAt: Date;
 }
 
@@ -39,6 +67,7 @@ export interface VendaProduto {
   modelo: string;
   referencia: string;
   quantidade: number;
+  tipo?: 'pacote' | 'unidade';
   valorSugerido: number;
   valorUnitario: number;
   valorTotal: number;
@@ -51,6 +80,7 @@ export interface Venda {
   clienteNome: string;
   vendedorId: string;
   vendedorNome: string;
+  registradoPorNome?: string;
   produtos: VendaProduto[];
   valorTotal: number;
   condicaoPagamento: CondicaoPagamento;
@@ -58,6 +88,8 @@ export interface Venda {
   valorPrazo: number;
   parcelas: number;
   datasParcelas?: string[];
+  descricao?: string;
+  imagemUrl?: string;
   data: Date;
   createdAt: Date;
   deletedAt?: Date;
@@ -71,6 +103,9 @@ export interface Despesa {
   data: Date;
   usuarioId: string;
   usuarioNome: string;
+  descricao?: string;
+  imagemUrl?: string;
+  rateio?: { usuarioId: string; usuarioNome: string; valor: number }[];
   createdAt: Date;
   deletedAt?: Date;
   deletedBy?: string;
@@ -85,3 +120,4 @@ export interface EntradaProduto {
   valorUnitario: number;
   createdAt: string;
 }
+
