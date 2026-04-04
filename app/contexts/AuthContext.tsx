@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { User } from '~/models';
+import { isVendedor, getUserRoles } from '~/models';
 import { onAuthChange, getUserData } from '~/services/auth.service';
 
 interface AuthContextType {
@@ -35,11 +36,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (userData) {
           const loginTime = localStorage.getItem('loginTime');
           const now = Date.now();
-          const maxMs = userData.role === 'vendedor'
-            ? 1 * 24 * 60 * 60 * 1000   // vendedor: 1 dia
-            : userData.role === 'admin'
-              ? 7 * 24 * 60 * 60 * 1000  // admin: 7 dias
-              : 1 * 60 * 60 * 1000;      // outros: 1 hora
+          const maxMs = isVendedor(userData.role) || getUserRoles(userData).some(r => isVendedor(r))
+            ? 1 * 24 * 60 * 60 * 1000
+            : getUserRoles(userData).some(r => r === 'admin' || r === 'superadmin')
+              ? 7 * 24 * 60 * 60 * 1000
+              : 1 * 60 * 60 * 1000;
           if (loginTime && now - parseInt(loginTime) > maxMs) {
             await import('~/services/auth.service').then(m => m.logout());
             localStorage.removeItem('loginTime');
