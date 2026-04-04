@@ -1,4 +1,4 @@
-import { ref, push, get, set, query, orderByChild, equalTo, update, remove } from 'firebase/database';
+import { ref, push, get, set, update, remove } from 'firebase/database';
 import { db, auth } from './firebase';
 import type { Despesa } from '~/models';
 
@@ -7,24 +7,33 @@ export async function getDespesas(): Promise<Despesa[]> {
   if (!user) return [];
 
   const userData = await get(ref(db, `users/${user.uid}`));
-  const isAdmin = userData.val()?.role === 'admin';
+  const uData = userData.val();
+  const roles: string[] = uData?.roles?.length ? uData.roles : [uData?.role];
+  const isAdmin = roles.some(r => r === 'admin' || r === 'superadmin');
 
-  const snapshot = await get(ref(db, 'despesas'));
+  const [snapshot, usersSnap] = await Promise.all([
+    get(ref(db, 'despesas')),
+    get(ref(db, 'users')),
+  ]);
   if (!snapshot.exists()) return [];
-  
-  const data = snapshot.val();
-  const allDespesas = Object.keys(data)
-    .map(key => ({ id: key, ...data[key] }))
-    .filter(d => !d.deletedAt);
 
-  if (isAdmin) {
-    return allDespesas.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  } else {
-    // Vendedor vê apenas suas despesas
-    const minhasDespesas = allDespesas.filter(despesa => despesa.usuarioId === user.uid);
-    console.log('Despesas do vendedor:', minhasDespesas.length, 'de', allDespesas.length);
-    return minhasDespesas.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }
+  const usersData = usersSnap.val() || {};
+  const data = snapshot.val();
+  const allDespesas = Object.keys(data).map(key => {
+    const d = { id: key, ...data[key] };
+    if (d.deletedBy && usersData[d.deletedBy]) {
+      d.deletedByNome = usersData[d.deletedBy].nome || usersData[d.deletedBy].username;
+    }
+    return d;
+  });
+
+  const filtered = isAdmin
+    ? allDespesas
+    : allDespesas.filter(d =>
+        d.usuarioId === user.uid ||
+        (d.rateio && d.rateio.some((r: any) => r.usuarioId === user.uid))
+      );
+  return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export async function deleteDespesa(despesaId: string): Promise<void> {
@@ -34,6 +43,13 @@ export async function deleteDespesa(despesaId: string): Promise<void> {
   await update(ref(db, `despesas/${despesaId}`), {
     deletedAt: new Date().toISOString(),
     deletedBy: user.uid
+  });
+}
+
+export async function restoreDespesa(despesaId: string): Promise<void> {
+  await update(ref(db, `despesas/${despesaId}`), {
+    deletedAt: null,
+    deletedBy: null
   });
 }
 
@@ -66,8 +82,6 @@ export async function createDespesa(data: Omit<Despesa, 'id' | 'createdAt'>): Pr
   try {
     const user = auth.currentUser;
     if (!user) throw new Error('Usuário não autenticado');
-
-    console.log('createDespesa - dados recebidos:', data);
     
     const despesaData: Record<string, any> = {
       tipo: data.tipo,
@@ -80,17 +94,14 @@ export async function createDespesa(data: Omit<Despesa, 'id' | 'createdAt'>): Pr
       createdAt: new Date().toISOString()
     };
 
-    if ((data as any).imagemUrl) despesaData.imagemUrl = (data as any).imagemUrl;
+    if (data.imagemUrl) despesaData.imagemUrl = data.imagemUrl;
+    if (data.descricao) despesaData.descricao = data.descricao;
+    if (data.rateio && data.rateio.length > 0) despesaData.rateio = data.rateio;
 
-    console.log('createDespesa - dados a salvar:', despesaData);
-    
     const newRef = push(ref(db, 'despesas'));
     await set(newRef, despesaData);
-    
-    console.log('createDespesa - sucesso, ID:', newRef.key);
     return newRef.key!;
   } catch (error) {
-    console.error('createDespesa - erro:', error);
     throw error;
   }
 }
