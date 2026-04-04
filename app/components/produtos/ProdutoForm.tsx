@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { createProduto, updateProduto, getProdutos } from '~/services/produtos.service';
 import { createEntrada } from '~/services/entradas.service';
 import { uploadImage } from '~/services/cloudinary.service';
+import { useCachedState, clearFormCache } from '~/hooks/useFormCache';
 import { Upload, X, AlertCircle, CheckCircle2 } from 'lucide-react';
 import type { Produto } from '~/models';
 
@@ -16,11 +17,11 @@ interface ProdutoFormProps {
 
 export function ProdutoForm({ produto }: ProdutoFormProps) {
   const isEdit = !!produto;
-  const [modelo, setModelo] = useState(produto?.modelo || '');
-  const [referencia, setReferencia] = useState(produto?.referencia || '');
-  const [valor, setValor] = useState(produto?.valor?.toString() || '');
-  const [estoquePct, setEstoquePct] = useState(produto ? Math.floor(produto.estoque / 15).toString() : '');
-  const [estoqueUn, setEstoqueUn] = useState(produto?.estoque?.toString() || '');
+  const [modelo, setModelo] = useCachedState('produto', 'modelo', produto?.modelo || '');
+  const [referencia, setReferencia] = useCachedState('produto', 'referencia', produto?.referencia || '');
+  const [valor, setValor] = useCachedState('produto', 'valor', produto?.valor?.toString() || '');
+  const [estoquePct, setEstoquePct] = useCachedState('produto', 'estoquePct', produto ? Math.floor(produto.estoque / 15).toString() : '');
+  const [estoqueUn, setEstoqueUn] = useCachedState('produto', 'estoqueUn', produto?.estoque?.toString() || '');
   const [foto, setFoto] = useState<File | null>(null);
   const [preview, setPreview] = useState(produto?.foto || '');
   const [loading, setLoading] = useState(false);
@@ -66,6 +67,7 @@ export function ProdutoForm({ produto }: ProdutoFormProps) {
           await createEntrada({ produtoId: id, modelo, referencia, quantidade: estoqueNovo, valorUnitario: valorNum });
         }
       }
+      if (!isEdit) clearFormCache('produto');
       navigate('/produtos');
     } catch (error) {
       setErro(error instanceof Error ? error.message : `Erro ao ${isEdit ? 'atualizar' : 'cadastrar'} produto`);
@@ -98,6 +100,7 @@ export function ProdutoForm({ produto }: ProdutoFormProps) {
         <label className="text-xs text-content-muted mb-1 block">Valor sugerido (R$)</label>
         <input type="number" step="0.01" value={valor} onChange={(e) => setValor(e.target.value)} className={inputOk} required />
       </div>
+      {isEdit && (
       <div className="grid grid-cols-3 gap-2">
         <div>
           <label className="text-xs text-content-muted mb-1 block">Estoque (pct)</label>
@@ -114,6 +117,7 @@ export function ProdutoForm({ produto }: ProdutoFormProps) {
           <input value={estoqueUn ? `${Number(estoqueUn) % 15} un` : ''} className={`${inputOk} opacity-60`} disabled />
         </div>
       </div>
+      )}
 
       {preview ? (
         <div className="relative">

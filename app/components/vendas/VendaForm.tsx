@@ -1,36 +1,44 @@
 import { useState, useEffect, useRef, useCallback, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
-import { createVenda, getVendas } from '~/services/vendas.service';
+import { createVenda } from '~/services/vendas.service';
 import { getClientes, createCliente } from '~/services/clientes.service';
 import { getProdutos, createProduto } from '~/services/produtos.service';
+import { getUsers } from '~/services/users.service';
+import { uploadImage } from '~/services/cloudinary.service';
 import { useAuth } from '~/contexts/AuthContext';
-import type { Cliente, Produto, VendaProduto, CondicaoPagamento } from '~/models';
+import { useCachedState, clearFormCache } from '~/hooks/useFormCache';
+import type { Cliente, Produto, VendaProduto, CondicaoPagamento, User } from '~/models';
+import { isVendedor, userIsAdmin, userIsVendedor } from '~/models';
 import { formatCurrency } from '~/utils/format';
-import { Pencil, Trash2, Plus, Minus, ShoppingBag, X, Check } from 'lucide-react';
+import { Pencil, Trash2, Plus, Minus, ShoppingBag, X, Check, Package, ImagePlus } from 'lucide-react';
+
+const PECAS_POR_PACOTE = 15;
 
 const input = "w-full rounded-lg border border-border-subtle bg-elevated px-3 py-2.5 text-sm text-content focus:outline-none focus:border-border-medium focus:ring-1 focus:ring-blue-500/30 transition-colors";
 
 export function VendaForm() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [produtos, setProdutos] = useState<Produto[]>([]);
-  const [clienteId, setClienteId] = useState('');
-  const [clienteBusca, setClienteBusca] = useState('');
+  const FK = 'venda';
+  const [clienteId, setClienteId] = useCachedState(FK, 'clienteId', '');
+  const [clienteBusca, setClienteBusca] = useCachedState(FK, 'clienteBusca', '');
   const [clienteDropdown, setClienteDropdown] = useState(false);
   const clienteRef = useRef<HTMLDivElement>(null);
-  const [produtosSelecionados, setProdutosSelecionados] = useState<VendaProduto[]>([]);
+  const [produtosSelecionados, setProdutosSelecionados] = useCachedState<VendaProduto[]>(FK, 'produtos', []);
   const [produtoId, setProdutoId] = useState('');
   const [produtoBusca, setProdutoBusca] = useState('');
   const [produtoDropdown, setProdutoDropdown] = useState(false);
   const produtoRef = useRef<HTMLDivElement>(null);
   const [quantidade, setQuantidade] = useState('1');
   const [precoUnitario, setPrecoUnitario] = useState('');
-  const [condicao, setCondicao] = useState<CondicaoPagamento>('avista');
-  const [comEntrada, setComEntrada] = useState(false);
-  const [valorAvista, setValorAvista] = useState('');
-  const [valorPrazo, setValorPrazo] = useState('');
-  const [parcelas, setParcelas] = useState(2);
-  const [datasParcelas, setDatasParcelas] = useState<string[]>([]);
-  const [dataVenda, setDataVenda] = useState(new Date().toISOString().slice(0, 10));
+  const [tipoProduto, setTipoProduto] = useState<'pacote' | 'unidade'>('pacote');
+  const [condicao, setCondicao] = useCachedState<CondicaoPagamento>(FK, 'condicao', 'avista');
+  const [comEntrada, setComEntrada] = useCachedState(FK, 'comEntrada', false);
+  const [valorAvista, setValorAvista] = useCachedState(FK, 'valorAvista', '');
+  const [valorPrazo, setValorPrazo] = useCachedState(FK, 'valorPrazo', '');
+  const [parcelas, setParcelas] = useCachedState(FK, 'parcelas', 2);
+  const [datasParcelas, setDatasParcelas] = useCachedState<string[]>(FK, 'datasParcelas', []);
+  const [dataVenda, setDataVenda] = useCachedState(FK, 'dataVenda', new Date().toISOString().slice(0, 10));
   const [novoCliente, setNovoCliente] = useState(false);
   const [ncNome, setNcNome] = useState('');
   const [ncCpfCnpj, setNcCpfCnpj] = useState('');
@@ -50,19 +58,29 @@ export function VendaForm() {
   const [erro, setErro] = useState('');
   const [deleteClicks, setDeleteClicks] = useState<Record<number, number>>({});
   const deleteTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  const [vendedores, setVendedores] = useState<User[]>([]);
+  const [vendedorSelecionadoId, setVendedorSelecionadoId] = useState('');
+  const [descricao, setDescricao] = useState('');
+  const [imagem, setImagem] = useState<File | null>(null);
+  const [imagemPreview, setImagemPreview] = useState<string | null>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isAdmin = user ? userIsAdmin(user) : false;
+
+  useEffect(() => {
+    if (isAdmin) getUsers().then(u => setVendedores(u.filter(x => userIsVendedor(x))));
+  }, [isAdmin]);
 
   useEffect(() => {
     if (!user) return;
-    Promise.all([getClientes(), getProdutos(), getVendas()]).then(([clientesData, produtosData, vendasData]) => {
-      if (user.role === 'vendedor') {
-        const meusClientesIds = new Set(
-          vendasData
-            .filter(v => !v.deletedAt && (v.vendedorId === user.uid || v.vendedorId === user.id))
-            .map(v => v.clienteId)
-        );
-        setClientes(clientesData.filter(c => meusClientesIds.has(c.id)));
+    Promise.all([getClientes(), getProdutos()]).then(([clientesData, produtosData]) => {
+      if (user && userIsVendedor(user)) {
+        const uid = user.uid || user.id;
+        setClientes(clientesData.filter(c =>
+          c.donoId === uid ||
+          !c.donoId ||
+          (c.compartilhadoCom && c.compartilhadoCom.includes(uid))
+        ));
       } else {
         setClientes(clientesData);
       }
@@ -201,11 +219,12 @@ export function VendaForm() {
     if (!produto || !precoUnitario) return;
     const qtd = parseInt(quantidade);
     const preco = parseFloat(precoUnitario);
+    const totalPecas = tipoProduto === 'pacote' ? qtd * PECAS_POR_PACOTE : qtd;
     setProdutosSelecionados([...produtosSelecionados, {
       produtoId: produto.id, modelo: produto.modelo, referencia: produto.referencia || '',
-      quantidade: qtd, valorSugerido: produto.valor, valorUnitario: preco, valorTotal: preco * qtd
+      quantidade: qtd, tipo: tipoProduto, valorSugerido: produto.valor, valorUnitario: preco, valorTotal: preco * totalPecas
     }]);
-    setProdutoId(''); setProdutoBusca(''); setQuantidade('1'); setPrecoUnitario('');
+    setProdutoId(''); setProdutoBusca(''); setQuantidade('1'); setPrecoUnitario(''); setTipoProduto('pacote');
   };
 
   const handleDelete = useCallback((index: number) => {
@@ -226,7 +245,8 @@ export function VendaForm() {
     setProdutosSelecionados(prev => prev.map((p, i) => {
       if (i !== index) return p;
       const updated = { ...p, [field]: value };
-      updated.valorTotal = updated.quantidade * updated.valorUnitario;
+      const pecas = updated.tipo === 'pacote' ? updated.quantidade * PECAS_POR_PACOTE : updated.quantidade;
+      updated.valorTotal = pecas * updated.valorUnitario;
       return updated;
     }));
   };
@@ -274,27 +294,54 @@ export function VendaForm() {
     setErro(''); setLoading(true);
     try {
       const cliente = clientes.find(c => c.id === clienteId);
-      await createVenda({
-        clienteId, clienteNome: cliente?.nome || '', vendedorId: user.id, vendedorNome: user.nome,
-        produtos: produtosSelecionados, valorTotal: total, condicaoPagamento: condicaoFinal,
+      const alvoVendedor = isAdmin && vendedorSelecionadoId
+        ? vendedores.find(v => (v.uid || v.id) === vendedorSelecionadoId)
+        : null;
+      const vendedorId = alvoVendedor ? (alvoVendedor.uid || alvoVendedor.id) : (user.uid || user.id);
+      const vendedorNome = alvoVendedor ? alvoVendedor.nome : user.nome;
+      let imagemUrl: string | undefined;
+      if (imagem) imagemUrl = await uploadImage(imagem, 'vendas');
+      const vendaPayload: any = {
+        clienteId, clienteNome: cliente?.nome || '',
+        vendedorId,
+        vendedorNome,
+        produtos: produtosSelecionados.map(p => {
+          const clean: any = {};
+          Object.entries(p).forEach(([k, v]) => { if (v !== undefined && v !== null) clean[k] = v; });
+          return clean;
+        }),
+        valorTotal: total, condicaoPagamento: condicaoFinal,
         valorAvista: vAvista, valorPrazo: vPrazo, parcelas: condicao === 'avista' ? 0 : parcelas,
         datasParcelas: condicao !== 'avista' ? datasParcelas : [],
+        ...(descricao.trim() ? { descricao: descricao.trim() } : {}),
+        ...(imagemUrl ? { imagemUrl } : {}),
         data: new Date(dataVenda + 'T12:00:00')
-      });
+      };
+      if (alvoVendedor) vendaPayload.registradoPorNome = user.nome;
+      await createVenda(vendaPayload);
+      clearFormCache(FK);
       navigate('/vendas');
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      if (msg.includes('contains undefined') || msg.includes('contains null')) {
-        const match = msg.match(/produtos\.(\d+)/);
-        const p = match ? produtosSelecionados[parseInt(match[1])] : undefined;
-        const info = p ? [p.modelo, p.referencia && `REF: ${p.referencia}`, `${p.quantidade}x`, formatCurrency(p.valorUnitario)].filter(Boolean).join(' · ') : 'produto selecionado';
-        setErro(`Produto precisa ser atualizado pelo administrador: ${info}`);
-      } else { setErro(msg || 'Erro ao registrar venda'); }
+      setErro(`Firebase write error: ${msg}`);
     } finally { setLoading(false); }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-3xl mx-auto">
+      {/* Vendedor (só admin/superadmin) */}
+      {isAdmin && vendedores.length > 0 && (
+        <div>
+          <label className="text-xs text-content-muted mb-1 block">Registrar em nome de (opcional)</label>
+          <select value={vendedorSelecionadoId} onChange={(e) => setVendedorSelecionadoId(e.target.value)} className={input}>
+            <option value="">Meu nome ({user?.nome})</option>
+            {vendedores.map(v => (
+              <option key={v.uid || v.id} value={v.uid || v.id}>{v.nome} (@{v.username})</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Data + Cliente */}
       <div className="grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-3">
         <div>
@@ -444,13 +491,27 @@ export function VendaForm() {
             </div>
           )}
         </div>
+        {/* Toggle pacote/unidade */}
+        <div className="flex items-center gap-1.5">
+          <button type="button" onClick={() => setTipoProduto('pacote')}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${tipoProduto === 'pacote' ? 'bg-blue-600 text-white' : 'bg-elevated text-content-secondary hover:bg-border-medium'}`}>
+            <Package size={14} /> Pacote ({PECAS_POR_PACOTE} pçs)
+          </button>
+          <button type="button" onClick={() => setTipoProduto('unidade')}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${tipoProduto === 'unidade' ? 'bg-blue-600 text-white' : 'bg-elevated text-content-secondary hover:bg-border-medium'}`}>
+            Unidade
+          </button>
+          {tipoProduto === 'pacote' && precoUnitario && (
+            <span className="text-xs text-content-muted">pct = {formatCurrency(parseFloat(precoUnitario) * PECAS_POR_PACOTE)}</span>
+          )}
+        </div>
         <div className="grid grid-cols-[5rem_auto_1fr] gap-2">
           <div>
             <label className="text-xs text-content-muted mb-1 block">un (R$)</label>
             <input type="number" step="0.01" value={precoUnitario} onChange={(e) => setPrecoUnitario(e.target.value)} placeholder="0.00" className={input} />
           </div>
           <div>
-            <label className="text-xs text-content-muted mb-1 block">Qtd</label>
+            <label className="text-xs text-content-muted mb-1 block">{tipoProduto === 'pacote' ? 'Pct' : 'Un'}</label>
             <div className="flex items-center gap-0">
               <button type="button" onClick={() => setQuantidade(String(Math.max(1, parseInt(quantidade) - 1)))}
                 className="rounded-l-lg border border-border-subtle bg-elevated px-3 py-2.5 text-content-secondary hover:bg-border-medium transition-colors">
@@ -510,8 +571,14 @@ export function VendaForm() {
                     {p.referencia && <span className="text-xs text-content-muted">{p.referencia}</span>}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-sm font-bold text-green-400 whitespace-nowrap">
-                      {p.quantidade}x {formatCurrency(p.valorUnitario)} = {formatCurrency(p.valorTotal)}
+                    <span className="shrink-0 flex items-center gap-1">
+                      {p.tipo === 'pacote' && (
+                        <span className="text-[10px] text-content-muted">{formatCurrency(p.valorUnitario)}/un · pct {formatCurrency(p.valorUnitario * PECAS_POR_PACOTE)} × {p.quantidade} =</span>
+                      )}
+                      {p.tipo !== 'pacote' && (
+                        <span className="text-[10px] text-content-muted">{p.quantidade} un × {formatCurrency(p.valorUnitario)} =</span>
+                      )}
+                      <span className="text-sm font-bold text-green-400">{formatCurrency(p.valorTotal)}</span>
                     </span>
                     <button type="button" onClick={() => setEditingIndex(i)} className="text-blue-400 hover:text-blue-300 transition-colors" title="Editar">
                       <Pencil size={16} />
@@ -649,6 +716,32 @@ export function VendaForm() {
           <p className="text-sm text-content-muted">Nenhum produto adicionado</p>
         </div>
       )}
+
+      {/* Descrição e foto */}
+      <div>
+        <label className="text-xs text-content-muted mb-1 block">Observação (opcional)</label>
+        <input value={descricao} onChange={(e) => setDescricao(e.target.value)} className={input}
+          placeholder="Ex: cliente pediu entrega, pagamento combinado..." />
+      </div>
+
+      <div>
+        <label className="text-xs text-content-muted mb-1 block">Foto / Comprovante (opcional)</label>
+        {imagemPreview ? (
+          <div className="relative inline-block">
+            <img src={imagemPreview} alt="Preview" className="h-24 rounded-lg border border-border-subtle object-cover" />
+            <button type="button" onClick={() => { setImagem(null); setImagemPreview(null); }}
+              className="absolute -top-1.5 -right-1.5 rounded-full bg-red-500 p-0.5 text-white shadow-md hover:bg-red-400 transition">
+              <X size={12} />
+            </button>
+          </div>
+        ) : (
+          <label className="flex items-center gap-2 rounded-lg border border-dashed border-border-subtle bg-elevated px-3 py-2.5 text-xs text-content-muted cursor-pointer hover:border-border-medium transition-colors">
+            <ImagePlus size={16} />
+            <span>Anexar imagem</span>
+            <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setImagem(f); setImagemPreview(URL.createObjectURL(f)); } }} className="hidden" />
+          </label>
+        )}
+      </div>
 
       {/* Erro */}
       {erro && (

@@ -1,6 +1,8 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
-import { createCliente } from '~/services/clientes.service';
+import { createCliente, getClientes } from '~/services/clientes.service';
+import { useCachedState, clearFormCache } from '~/hooks/useFormCache';
+import { useAuth } from '~/contexts/AuthContext';
 import { Plus, X } from 'lucide-react';
 
 const input = "w-full rounded-lg border border-border-subtle bg-elevated px-3 py-2.5 text-sm text-content focus:outline-none focus:border-border-medium focus:ring-1 focus:ring-blue-500/30 transition-colors";
@@ -8,17 +10,28 @@ const input = "w-full rounded-lg border border-border-subtle bg-elevated px-3 py
 const ESTADOS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 
 export function ClienteForm() {
-  const [nome, setNome] = useState('');
-  const [endereco, setEndereco] = useState('');
-  const [cidade, setCidade] = useState('');
+  const FK = 'cliente';
+  const { user } = useAuth();
+  const [nome, setNome] = useCachedState(FK, 'nome', '');
+  const [endereco, setEndereco] = useCachedState(FK, 'endereco', '');
+  const [cidade, setCidade] = useCachedState(FK, 'cidade', '');
   const [cidades, setCidades] = useState<string[]>([]);
-  const [estado, setEstado] = useState('MA');
-  const [cpfCnpj, setCpfCnpj] = useState('');
+  const [estado, setEstado] = useCachedState(FK, 'estado', 'MA');
+  const [cpfCnpj, setCpfCnpj] = useCachedState(FK, 'cpfCnpj', '');
   const [cpfCnpjErro, setCpfCnpjErro] = useState('');
-  const [contatos, setContatos] = useState(['']);
+  const [contatos, setContatos] = useCachedState<string[]>(FK, 'contatos', ['']);
+  const [nomesExistentes, setNomesExistentes] = useState<string[]>([]);
+  const [cpfsExistentes, setCpfsExistentes] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState('');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    getClientes().then(lista => {
+      setNomesExistentes(lista.map(c => c.nome.trim().toLowerCase()));
+      setCpfsExistentes(lista.map(c => c.cpfCnpj?.trim()).filter(Boolean));
+    });
+  }, []);
 
   useEffect(() => {
     fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${estado}/municipios?orderBy=nome`)
@@ -43,16 +56,8 @@ export function ClienteForm() {
   const contatoDddOk = (v: string) => { const d = v.replace(/\D/g, ''); return d.length >= 2 && DDDS_VALIDOS.includes(d.slice(0, 2)); };
   const contatoValido = (v: string) => { const d = v.replace(/\D/g, ''); return d.length === 11 && d[2] === '9' && DDDS_VALIDOS.includes(d.slice(0, 2)); };
 
-  const updateContato = (index: number, value: string) => {
-    const arr = [...contatos];
-    const newDigits = value.replace(/\D/g, '').slice(0, 11);
-    arr[index] = formatContato(newDigits);
-    setContatos(arr);
-  };
-
   const handleContatoKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
     const digits = contatos[index].replace(/\D/g, '');
-    // Só permite: números, backspace, tab
     if (e.key === 'Backspace') {
       e.preventDefault();
       const arr = [...contatos];
@@ -78,7 +83,6 @@ export function ClienteForm() {
   };
 
   const addContato = () => setContatos([...contatos, '']);
-
   const removeContato = (index: number) => {
     if (contatos.length <= 1) return;
     setContatos(contatos.filter((_, i) => i !== index));
@@ -126,11 +130,12 @@ export function ClienteForm() {
   };
 
   const cpfCnpjOk = cpfCnpj.length === 11 ? validarCpf(cpfCnpj) : cpfCnpj.length === 14 ? validarCnpj(cpfCnpj) : false;
+  const cpfCnpjDuplicado = cpfCnpjOk && cpfsExistentes.includes(cpfCnpj.trim());
 
-  const nomeOk = nome.trim().length >= 3;
+  const nomeDuplicado = nome.trim().length >= 3 && nomesExistentes.includes(nome.trim().toLowerCase());
+  const nomeOk = nome.trim().length >= 3 && !nomeDuplicado;
   const enderecoOk = endereco.trim().length >= 3;
   const cidadeOk = cidade.trim().length >= 2 && cidades.includes(cidade.trim());
-
   const contatosOk = contatos.every(c => contatoValido(c));
 
   const handleSubmit = async (e: FormEvent) => {
@@ -139,14 +144,10 @@ export function ClienteForm() {
       setErro('Preencha todos os campos obrigatórios');
       return;
     }
-    if (!cpfCnpjOk) {
-      setErro('CPF ou CNPJ inválido');
-      return;
-    }
-    if (!contatosOk) {
-      setErro('Todos os contatos devem ter 11 dígitos');
-      return;
-    }
+    if (nomeDuplicado) { setErro('Já existe um cliente com esse nome'); return; }
+    if (!cpfCnpjOk) { setErro('CPF ou CNPJ inválido'); return; }
+    if (cpfCnpjDuplicado) { setErro('Já existe um cliente com esse CPF/CNPJ'); return; }
+    if (!contatosOk) { setErro('Todos os contatos devem ter 11 dígitos'); return; }
     setErro(''); setLoading(true);
     try {
       const contatosFiltrados = contatos.filter(c => c.trim());
@@ -154,7 +155,10 @@ export function ClienteForm() {
         nome, endereco, cidade, estado, cpfCnpj,
         contato: contatosFiltrados[0] || '',
         contatos: contatosFiltrados,
+        donoId: user?.uid || user?.id,
+        donoNome: user?.nome,
       });
+      clearFormCache(FK);
       navigate('/clientes');
     } catch (error) {
       setErro(error instanceof Error ? error.message : 'Erro ao cadastrar cliente');
@@ -166,21 +170,23 @@ export function ClienteForm() {
       <div>
         <label className="text-xs text-content-muted mb-1 block">Nome / Razão Social</label>
         <input value={nome} onChange={(e) => setNome(e.target.value)}
-          className={`${input} ${nomeOk ? 'border-green-500/50 focus:ring-green-500/30' : ''}`} required />
+          className={`${input} ${nomeOk ? 'border-green-500/50 focus:ring-green-500/30' : nomeDuplicado ? 'border-red-500/50 focus:ring-red-500/30' : ''}`} required />
         {nomeOk && <p className="text-xs text-green-400 mt-1">✓</p>}
+        {nomeDuplicado && <p className="text-xs text-red-400 mt-1">Já existe um cliente com esse nome</p>}
       </div>
       <div>
         <label className="text-xs text-content-muted mb-1 block">CPF / CNPJ</label>
         <input
           value={cpfCnpj}
           onChange={(e) => handleCpfCnpjChange(e.target.value)}
-          className={`${input} ${cpfCnpjErro ? 'border-red-500/50 focus:ring-red-500/30' : cpfCnpjOk ? 'border-green-500/50 focus:ring-green-500/30' : ''}`}
+          className={`${input} ${cpfCnpjErro || cpfCnpjDuplicado ? 'border-red-500/50 focus:ring-red-500/30' : cpfCnpjOk ? 'border-green-500/50 focus:ring-green-500/30' : ''}`}
           placeholder="11 dígitos (CPF) ou 14 dígitos (CNPJ)"
           required
           inputMode="numeric"
         />
         {cpfCnpjErro && <p className="text-xs text-red-400 mt-1">{cpfCnpjErro}</p>}
-        {cpfCnpjOk && <p className="text-xs text-green-400 mt-1">{cpfCnpj.length === 11 ? 'CPF válido ✓' : 'CNPJ válido ✓'}</p>}
+        {cpfCnpjDuplicado && <p className="text-xs text-red-400 mt-1">Já existe um cliente com esse CPF/CNPJ</p>}
+        {cpfCnpjOk && !cpfCnpjDuplicado && <p className="text-xs text-green-400 mt-1">{cpfCnpj.length === 11 ? 'CPF válido ✓' : 'CNPJ válido ✓'}</p>}
       </div>
       <div>
         <label className="text-xs text-content-muted mb-1 block">Endereço</label>
@@ -214,7 +220,6 @@ export function ClienteForm() {
         </div>
       </div>
 
-      {/* Contatos */}
       <div className="space-y-2">
         <label className="text-xs text-content-muted block">Contato(s)</label>
         {contatos.map((c, i) => (
@@ -231,18 +236,10 @@ export function ClienteForm() {
                 required
                 inputMode="tel"
               />
-              {contatoValido(c) && (
-                <p className="text-xs text-green-400 mt-0.5">Contato válido ✓</p>
-              )}
-              {c && contatoDigitos(c) >= 2 && !contatoDddOk(c) && (
-                <p className="text-xs text-red-400 mt-0.5">DDD inválido</p>
-              )}
-              {c && contatoDigitos(c) === 11 && contatoDddOk(c) && !contatoValido(c) && (
-                <p className="text-xs text-red-400 mt-0.5">Celular deve começar com 9</p>
-              )}
-              {c && contatoDigitos(c) > 0 && contatoDigitos(c) < 11 && contatoDddOk(c) && (
-                <p className="text-xs text-red-400 mt-0.5">Faltam {11 - contatoDigitos(c)} dígito(s)</p>
-              )}
+              {contatoValido(c) && <p className="text-xs text-green-400 mt-0.5">Contato válido ✓</p>}
+              {c && contatoDigitos(c) >= 2 && !contatoDddOk(c) && <p className="text-xs text-red-400 mt-0.5">DDD inválido</p>}
+              {c && contatoDigitos(c) === 11 && contatoDddOk(c) && !contatoValido(c) && <p className="text-xs text-red-400 mt-0.5">Celular deve começar com 9</p>}
+              {c && contatoDigitos(c) > 0 && contatoDigitos(c) < 11 && contatoDddOk(c) && <p className="text-xs text-red-400 mt-0.5">Faltam {11 - contatoDigitos(c)} dígito(s)</p>}
             </div>
             {contatos.length > 1 && (
               <button type="button" onClick={() => removeContato(i)} className="rounded-lg px-2 text-red-500/60 hover:text-red-500 hover:bg-red-500/10 transition-colors">
@@ -264,7 +261,7 @@ export function ClienteForm() {
           className="rounded-lg border border-border-subtle bg-elevated py-2.5 text-sm font-medium text-content-secondary transition hover:bg-border-medium">
           Cancelar
         </button>
-        <button type="submit" disabled={loading || !cpfCnpjOk || !contatosOk || !cidadeOk}
+        <button type="submit" disabled={loading || !cpfCnpjOk || cpfCnpjDuplicado || !contatosOk || !cidadeOk || nomeDuplicado}
           className="rounded-lg bg-gradient-to-r from-green-600 to-emerald-500 py-2.5 text-sm font-semibold text-white shadow-lg shadow-green-500/20 transition hover:from-green-500 hover:to-emerald-400 active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed">
           {loading ? 'Salvando...' : 'Cadastrar Cliente'}
         </button>

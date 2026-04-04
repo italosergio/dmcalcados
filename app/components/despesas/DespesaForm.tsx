@@ -2,8 +2,12 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { Plus, X, Pencil, Trash2, Check, ImagePlus, Fuel, UtensilsCrossed, BedDouble, Wrench, HelpCircle, Zap, Droplets, Wifi, Truck, Home, ShoppingCart, Heart, Briefcase, Star, Tag, type LucideIcon } from 'lucide-react';
 import { createDespesa, getTiposDespesa, addTipoDespesa, updateTipoDespesa, deleteTipoDespesa } from '~/services/despesas.service';
+import { getUsers } from '~/services/users.service';
 import { uploadImage } from '~/services/cloudinary.service';
 import { useAuth } from '~/contexts/AuthContext';
+import { useCachedState, clearFormCache } from '~/hooks/useFormCache';
+import type { User } from '~/models';
+import { userIsVendedor } from '~/models';
 
 const input = "w-full rounded-lg border border-border-subtle bg-elevated px-3 py-2.5 text-sm text-content focus:outline-none focus:border-border-medium focus:ring-1 focus:ring-blue-500/30 transition-colors";
 
@@ -46,9 +50,10 @@ export function getIconeForTipo(nome: string, iconeId?: string): LucideIcon | nu
 type TipoItem = { key: string | null; nome: string; icone?: string };
 
 export function DespesaForm() {
+  const FK = 'despesa';
   const [tipos, setTipos] = useState<TipoItem[]>([]);
-  const [tipoSelecionado, setTipoSelecionado] = useState('');
-  const [tipoOutro, setTipoOutro] = useState('');
+  const [tipoSelecionado, setTipoSelecionado] = useCachedState(FK, 'tipo', '');
+  const [tipoOutro, setTipoOutro] = useCachedState(FK, 'tipoOutro', '');
   const [novoTipo, setNovoTipo] = useState('');
   const [novoIcone, setNovoIcone] = useState('Tag');
   const [adicionando, setAdicionando] = useState(false);
@@ -57,14 +62,24 @@ export function DespesaForm() {
   const [editandoNome, setEditandoNome] = useState('');
   const [menuTipo, setMenuTipo] = useState<string | null>(null);
 
-  const [valor, setValor] = useState('');
-  const [data, setData] = useState(new Date().toISOString().split('T')[0]);
+  const [valor, setValor] = useCachedState(FK, 'valor', '');
+  const [data, setData] = useCachedState(FK, 'data', new Date().toISOString().split('T')[0]);
   const [imagem, setImagem] = useState<File | null>(null);
   const [imagemPreview, setImagemPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState('');
+  const [vendedores, setVendedores] = useState<User[]>([]);
+  const [vendedorId, setVendedorId] = useState('');
+  const [descricao, setDescricao] = useState('');
+  const [rateioAtivo, setRateioAtivo] = useState(false);
+  const [rateioIds, setRateioIds] = useState<string[]>([]);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+
+  useEffect(() => {
+    getUsers().then(u => setVendedores(u.filter(x => userIsVendedor(x) && (x.uid || x.id) !== (user?.uid || user?.id))));
+  }, [user]);
 
   useEffect(() => {
     getTiposDespesa().then(salvos => {
@@ -129,7 +144,27 @@ export function DespesaForm() {
     try {
       let imagemUrl: string | undefined;
       if (imagem) imagemUrl = await uploadImage(imagem, 'despesas');
-      await createDespesa({ tipo: tipoFinal, valor: parseFloat(valor), data: new Date(data + 'T12:00:00'), usuarioId: user.uid, usuarioNome: user.nome, imagemUrl } as any);
+      const alvo = isAdmin && vendedorId
+        ? vendedores.find(v => (v.uid || v.id) === vendedorId)
+        : null;
+      const valorTotal = parseFloat(valor);
+      const rateio = rateioAtivo && rateioIds.length > 0
+        ? rateioIds.map(uid => {
+            const u = vendedores.find(v => (v.uid || v.id) === uid);
+            return { usuarioId: uid, usuarioNome: u?.nome || uid, valor: parseFloat((valorTotal / (rateioIds.length + 1)).toFixed(2)) };
+          })
+        : undefined;
+      await createDespesa({
+        tipo: tipoFinal,
+        valor: valorTotal,
+        data: new Date(data + 'T12:00:00'),
+        usuarioId: alvo ? (alvo.uid || alvo.id) : (user.uid || user.id),
+        usuarioNome: alvo ? alvo.nome : user.nome,
+        descricao: descricao.trim() || undefined,
+        imagemUrl,
+        rateio,
+      });
+      clearFormCache(FK);
       navigate('/despesas');
     } catch (error) {
       setErro(error instanceof Error ? error.message : 'Erro ao cadastrar despesa');
@@ -252,6 +287,18 @@ export function DespesaForm() {
         )}
       </div>
 
+      {isAdmin && vendedores.length > 0 && (
+        <div>
+          <label className="text-xs text-content-muted mb-1 block">Registrar em nome de (opcional)</label>
+          <select value={vendedorId} onChange={(e) => setVendedorId(e.target.value)} className={input}>
+            <option value="">Meu nome ({user?.nome})</option>
+            {vendedores.map(v => (
+              <option key={v.uid || v.id} value={v.uid || v.id}>{v.nome} (@{v.username})</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="text-xs text-content-muted mb-1 block">Valor (R$)</label>
@@ -262,6 +309,45 @@ export function DespesaForm() {
           <input type="date" value={data} onChange={(e) => setData(e.target.value)} className={input} required />
         </div>
       </div>
+
+      <div>
+        <label className="text-xs text-content-muted mb-1 block">Descrição (opcional)</label>
+        <input value={descricao} onChange={(e) => setDescricao(e.target.value)} className={input} placeholder="Ex: almoço na estrada, abastecimento km 320..." />
+      </div>
+
+      {/* Rateio */}
+      {vendedores.length > 0 && (
+        <div>
+          <label className="flex items-center gap-2 text-xs text-content-secondary cursor-pointer">
+            <input type="checkbox" checked={rateioAtivo} onChange={(e) => { setRateioAtivo(e.target.checked); if (!e.target.checked) setRateioIds([]); }} className="rounded accent-blue-500" />
+            Incluir outras pessoas nessa despesa
+          </label>
+          {rateioAtivo && (
+            <div className="mt-2 space-y-1.5">
+              <div className="flex flex-wrap gap-1.5">
+                {vendedores.map(v => {
+                  const uid = v.uid || v.id;
+                  const checked = rateioIds.includes(uid);
+                  return (
+                    <button key={uid} type="button"
+                      onClick={() => setRateioIds(prev => prev.includes(uid) ? prev.filter(id => id !== uid) : [...prev, uid])}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-medium border transition ${
+                        checked ? 'bg-blue-600/10 text-blue-400 border-blue-600/30' : 'bg-elevated text-content-muted border-transparent hover:bg-border-medium'
+                      }`}>
+                      {v.nome}
+                    </button>
+                  );
+                })}
+              </div>
+              {rateioIds.length > 0 && (
+                <p className="text-[10px] text-content-muted">
+                  Despesa registrada para {rateioIds.length + 1} pessoa(s)
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div>
         <label className="text-xs text-content-muted mb-1 block">Comprovante (opcional)</label>
