@@ -3,7 +3,7 @@
     "users": {
       ".read": "auth != null",
       "$uid": {
-        ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin'"
+        ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('roles').child('0').val() === 'admin' || root.child('users').child(auth.uid).child('roles').child('0').val() === 'superadmin' || root.child('users').child(auth.uid).child('roles').child('1').val() === 'admin' || root.child('users').child(auth.uid).child('roles').child('1').val() === 'superadmin'"
       },
       ".indexOn": ["deletedAt", "roleUpdatedAt"]
     },
@@ -35,6 +35,11 @@
       ".read": "auth != null",
       ".write": "auth != null",
       ".indexOn": ["produtoId", "createdAt"]
+    },
+    "ciclos": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["vendedorId", "status", "abertoEm"]
     }
   }
 }
