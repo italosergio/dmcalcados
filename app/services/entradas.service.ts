@@ -9,7 +9,7 @@ export async function getEntradas(): Promise<EntradaProduto[]> {
   return Object.keys(data).map(key => ({ id: key, ...data[key] }));
 }
 
-export async function createEntrada(data: Omit<EntradaProduto, 'id' | 'createdAt'> & { createdAt?: string }): Promise<string> {
+export async function createEntrada(data: Omit<EntradaProduto, 'id' | 'createdAt'> & { createdAt?: string; loteId?: string }): Promise<string> {
   const newRef = push(ref(db, 'entradas'));
   await set(newRef, { ...data, createdAt: data.createdAt || new Date().toISOString() });
   return newRef.key!;
