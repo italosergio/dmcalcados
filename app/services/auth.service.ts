@@ -1,7 +1,7 @@
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { ref, get, set } from 'firebase/database';
 import { auth, db } from './firebase';
-import type { User } from '~/models';
+import type { User, UserRole } from '~/models';
 
 export async function login(username: string, password: string) {
   const email = `${username}@dmcalcados.local`;
@@ -10,7 +10,7 @@ export async function login(username: string, password: string) {
   return userCredential.user;
 }
 
-export async function register(username: string, password: string, nome: string, role: 'admin' | 'vendedor' | 'superadmin' = 'vendedor') {
+export async function register(username: string, password: string, nome: string, role: UserRole = 'vendedor1') {
   const email = `${username}@dmcalcados.local`;
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
