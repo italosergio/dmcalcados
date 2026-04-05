@@ -58,7 +58,7 @@ export default function VendasPage() {
   const [filtroCondicao, setFiltroCondicao] = useState<string[]>([]);
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
-  const [periodoFiltro, setPeriodoFiltro] = useState<'hoje' | '7dias' | '30dias' | 'mes' | 'ano' | 'tudo'>('30dias');
+  const [periodoFiltro, setPeriodoFiltro] = useState<'hoje' | '7dias' | '30dias' | '60dias' | 'mes' | 'ano' | 'tudo'>('30dias');
   const [deleteClicks, setDeleteClicks] = useState<Record<string, number>>({});
   const deleteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [imagemAberta, setImagemAberta] = useState<string | null>(null);
@@ -79,7 +79,7 @@ export default function VendasPage() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const p = params.get('periodo');
-    if (p && ['hoje', '7dias', '30dias', 'mes', 'ano', 'tudo'].includes(p)) {
+    if (p && ['hoje', '7dias', '30dias', '60dias', 'mes', 'ano', 'tudo'].includes(p)) {
       setPeriodoFiltro(p as typeof periodoFiltro);
     }
   }, [location.search]);
@@ -154,6 +154,7 @@ export default function VendasPage() {
       if (periodoFiltro === 'hoje') inicio.setHours(0, 0, 0, 0);
       else if (periodoFiltro === '7dias') inicio.setDate(agora.getDate() - 7);
       else if (periodoFiltro === '30dias') inicio.setDate(agora.getDate() - 30);
+      else if (periodoFiltro === '60dias') inicio.setDate(agora.getDate() - 60);
       else if (periodoFiltro === 'mes') { inicio.setDate(1); inicio.setHours(0, 0, 0, 0); }
       else if (periodoFiltro === 'ano') inicio.setFullYear(agora.getFullYear(), 0, 1);
       result = result.filter(v => new Date(v.data) >= inicio);
@@ -276,7 +277,7 @@ export default function VendasPage() {
             ? `a partir de ${new Date(filtroDataInicio + 'T00:00:00').toLocaleDateString('pt-BR')}`
             : filtroDataFim
               ? `até ${new Date(filtroDataFim + 'T00:00:00').toLocaleDateString('pt-BR')}`
-              : { hoje: 'hoje', '7dias': 'últimos 7 dias', '30dias': 'últimos 30 dias', mes: 'do mês', ano: 'do ano', tudo: '' }[periodoFiltro];
+              : { hoje: 'hoje', '7dias': 'últimos 7 dias', '30dias': 'últimos 30 dias', '60dias': 'últimos 60 dias', mes: 'do mês', ano: 'do ano', tudo: '' }[periodoFiltro];
         return (
           <div className="mb-4 space-y-3 sm:space-y-0 sm:flex sm:flex-wrap sm:items-stretch sm:gap-3">
             {/* Mobile: botão + total na mesma linha */}
@@ -318,6 +319,7 @@ export default function VendasPage() {
           { value: 'hoje', label: 'Hoje' },
           { value: '7dias', label: '7 dias' },
           { value: '30dias', label: '30 dias' },
+          { value: '60dias', label: '60 dias' },
           { value: 'mes', label: 'Mês' },
           { value: 'ano', label: 'Ano' },
           { value: 'tudo', label: 'Tudo' },
@@ -399,7 +401,7 @@ export default function VendasPage() {
       {!loading && filteredVendas.length === 0 && vendas.length > 0 && filtroCondicao.length === 0 && !filtroDataInicio && !filtroDataFim && (
         <div className="rounded-xl border border-border-subtle bg-surface p-6 sm:p-8 text-center">
           <ShoppingBag size={40} className="mx-auto mb-3 text-content-muted opacity-40" />
-          <p className="mb-2 text-sm sm:text-base font-medium">Nenhuma venda registrada {periodoFiltro === 'hoje' ? 'hoje' : periodoFiltro === '7dias' ? 'nos últimos 7 dias' : periodoFiltro === '30dias' ? 'nos últimos 30 dias' : periodoFiltro === 'mes' ? 'neste mês' : 'no ano'}</p>
+          <p className="mb-2 text-sm sm:text-base font-medium">Nenhuma venda registrada {periodoFiltro === 'hoje' ? 'hoje' : periodoFiltro === '7dias' ? 'nos últimos 7 dias' : periodoFiltro === '30dias' ? 'nos últimos 30 dias' : periodoFiltro === '60dias' ? 'nos últimos 60 dias' : periodoFiltro === 'mes' ? 'neste mês' : 'no ano'}</p>
           <button onClick={() => setPeriodoFiltro('tudo')}
             className="rounded-lg border border-border-subtle bg-elevated px-4 py-2 text-sm font-medium text-content-secondary transition hover:bg-border-medium">
             Ver todas as vendas
@@ -412,7 +414,7 @@ export default function VendasPage() {
           <p className="mb-2 text-sm sm:text-base">Nenhuma venda encontrada com os filtros:</p>
           <div className="mb-4 flex flex-wrap justify-center gap-1.5">
             {periodoFiltro !== 'tudo' && !filtroDataInicio && !filtroDataFim && (
-              <span className="text-xs bg-elevated px-2.5 py-1 rounded-lg">{{ hoje: 'Hoje', '7dias': '7 dias', '30dias': '30 dias', mes: 'Mês', ano: 'Ano' }[periodoFiltro]}</span>
+              <span className="text-xs bg-elevated px-2.5 py-1 rounded-lg">{{ hoje: 'Hoje', '7dias': '7 dias', '30dias': '30 dias', '60dias': '60 dias', mes: 'Mês', ano: 'Ano' }[periodoFiltro]}</span>
             )}
             {filtroDataInicio && <span className="text-xs bg-elevated px-2.5 py-1 rounded-lg">De: {new Date(filtroDataInicio + 'T00:00:00').toLocaleDateString('pt-BR')}</span>}
             {filtroDataFim && <span className="text-xs bg-elevated px-2.5 py-1 rounded-lg">Até: {new Date(filtroDataFim + 'T00:00:00').toLocaleDateString('pt-BR')}</span>}

@@ -10,7 +10,7 @@ import { getIconeForTipo } from '~/components/despesas/DespesaForm';
 import { formatCurrency, formatDate } from '~/utils/format';
 import type { Despesa } from '~/models';
 
-type Periodo = 'hoje' | '7dias' | '30dias' | 'mes' | 'ano' | 'tudo';
+type Periodo = 'hoje' | '7dias' | '30dias' | '60dias' | 'mes' | 'ano' | 'tudo';
 
 export default function DespesasPage() {
   const { despesas, loading: despesasLoading } = useDespesas();
@@ -39,7 +39,7 @@ export default function DespesasPage() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const p = params.get('periodo');
-    if (p && ['hoje', '7dias', '30dias', 'mes', 'ano', 'tudo'].includes(p)) {
+    if (p && ['hoje', '7dias', '30dias', '60dias', 'mes', 'ano', 'tudo'].includes(p)) {
       setPeriodo(p as Periodo);
     }
   }, [location.search]);
@@ -111,6 +111,7 @@ export default function DespesasPage() {
       if (periodo === 'hoje') inicio.setHours(0, 0, 0, 0);
       else if (periodo === '7dias') inicio.setDate(agora.getDate() - 7);
       else if (periodo === '30dias') inicio.setDate(agora.getDate() - 30);
+      else if (periodo === '60dias') inicio.setDate(agora.getDate() - 60);
       else if (periodo === 'mes') { inicio.setDate(1); inicio.setHours(0, 0, 0, 0); }
       else if (periodo === 'ano') inicio.setFullYear(agora.getFullYear(), 0, 1);
       if (new Date(d.data) < inicio) return false;
@@ -150,7 +151,7 @@ export default function DespesasPage() {
       ? `a partir de ${new Date(filtroDataInicio + 'T00:00:00').toLocaleDateString('pt-BR')}`
       : filtroDataFim
         ? `até ${new Date(filtroDataFim + 'T00:00:00').toLocaleDateString('pt-BR')}`
-        : { hoje: 'hoje', '7dias': 'últimos 7 dias', '30dias': 'últimos 30 dias', mes: 'do mês', ano: 'do ano', tudo: '' }[periodo];
+        : { hoje: 'hoje', '7dias': 'últimos 7 dias', '30dias': 'últimos 30 dias', '60dias': 'últimos 60 dias', mes: 'do mês', ano: 'do ano', tudo: '' }[periodo];
 
   return (
     <div className={viewMode === 'tabela' ? 'flex flex-col h-[calc(100vh-4rem)] overflow-hidden' : ''}>
@@ -201,6 +202,7 @@ export default function DespesasPage() {
           { value: 'hoje', label: 'Hoje' },
           { value: '7dias', label: '7 dias' },
           { value: '30dias', label: '30 dias' },
+          { value: '60dias', label: '60 dias' },
           { value: 'mes', label: 'Mês' },
           { value: 'ano', label: 'Ano' },
           { value: 'tudo', label: 'Tudo' },
@@ -273,7 +275,7 @@ export default function DespesasPage() {
       {!loading && filtered.length === 0 && filtroTipos.length === 0 && !filtroDataInicio && !filtroDataFim && despesas.length > 0 && (
         <div className="rounded-xl border border-border-subtle bg-surface p-6 sm:p-8 text-center">
           <Receipt size={40} className="mx-auto mb-3 text-content-muted opacity-40" />
-          <p className="mb-2 text-sm sm:text-base font-medium">Nenhuma despesa registrada {periodo === 'hoje' ? 'hoje' : periodo === '7dias' ? 'nos últimos 7 dias' : periodo === '30dias' ? 'nos últimos 30 dias' : periodo === 'mes' ? 'neste mês' : 'no ano'}</p>
+          <p className="mb-2 text-sm sm:text-base font-medium">Nenhuma despesa registrada {periodo === 'hoje' ? 'hoje' : periodo === '7dias' ? 'nos últimos 7 dias' : periodo === '30dias' ? 'nos últimos 30 dias' : periodo === '60dias' ? 'nos últimos 60 dias' : periodo === 'mes' ? 'neste mês' : 'no ano'}</p>
           <button onClick={() => setPeriodo('tudo')}
             className="rounded-lg border border-border-subtle bg-elevated px-4 py-2 text-sm font-medium text-content-secondary transition hover:bg-border-medium">
             Ver todas as despesas
