@@ -1,5 +1,5 @@
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
-import { ref, get, set } from 'firebase/database';
+import { ref, get, set, update, query, orderByChild, equalTo } from 'firebase/database';
 import { auth, app, db } from './firebase';
 import type { User, UserRole } from '~/models';
 
@@ -85,6 +85,15 @@ export async function updateProfile(uid: string, data: { nome?: string; foto?: s
   if (data.foto !== undefined) updates.foto = data.foto;
   if (data.contato !== undefined) updates.contato = data.contato;
   await set(ref(db, `users/${uid}`), { ...current, ...updates });
+
+  if (data.nome) {
+    const vendasSnap = await get(query(ref(db, 'vendas'), orderByChild('vendedorId'), equalTo(uid)));
+    if (vendasSnap.exists()) {
+      const batch: Record<string, string> = {};
+      Object.keys(vendasSnap.val()).forEach(key => { batch[`vendas/${key}/vendedorNome`] = data.nome!; });
+      await update(ref(db), batch);
+    }
+  }
 }
 
 export async function updatePassword(newPassword: string) {
