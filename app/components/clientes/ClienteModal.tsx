@@ -4,6 +4,9 @@ import { suspenderCliente } from '~/services/clientes.service';
 import { formatCurrency } from '~/utils/format';
 import type { Cliente, Venda, User as UserType } from '~/models';
 import { userIsAdmin } from '~/models';
+import { getClientePayStatus, PAY_STATUS_CONFIG, getTicketLevel, TICKET_CONFIG } from '~/utils/clienteStatus';
+import type { PagamentoParcela } from '~/services/pagamentos.service';
+import { marcarParcela } from '~/services/pagamentos.service';
 
 const chartTheme = {
   backgroundColor: '#232328',
@@ -25,9 +28,10 @@ interface Props {
   vendedores?: UserType[];
   onEdit?: (clienteId: string, data: Partial<Cliente>) => Promise<void>;
   onShare?: (clienteId: string, userIds: string[]) => Promise<void>;
+  pagamentos?: Record<string, Record<string, PagamentoParcela>>;
 }
 
-export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda, user, vendedores = [], onEdit, onShare }: Props) {
+export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda, user, vendedores = [], onEdit, onShare, pagamentos = {} }: Props) {
   const [vendaAberta, setVendaAberta] = useState<Venda | null>(null);
   const [periodo, setPeriodo] = useState<Periodo>('1a');
   const [Highcharts, setHighcharts] = useState<any>(null);
@@ -47,6 +51,23 @@ export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda, user, 
 
   // Suspender state
   const [suspenso, setSuspenso] = useState(!!cliente.suspenso);
+
+  // Status badges
+  const payStatus = useMemo(() => getClientePayStatus(cliente.id, vendas, pagamentos), [cliente.id, vendas, pagamentos]);
+  const ticketLevel = useMemo(() => getTicketLevel(cliente.id, vendas), [cliente.id, vendas]);
+
+  // Parcelas do cliente
+  const clienteParcelas = useMemo(() => {
+    const result: { vendaId: string; pedidoNumero: number; index: number; total: number; valor: number; data: string; pago: boolean }[] = [];
+    for (const v of vendas) {
+      if (v.clienteId !== cliente.id || v.deletedAt || v.condicaoPagamento === 'avista' || !v.datasParcelas?.length) continue;
+      const valorParcela = (v.valorPrazo || v.valorTotal) / v.datasParcelas.length;
+      for (let i = 0; i < v.datasParcelas.length; i++) {
+        result.push({ vendaId: v.id, pedidoNumero: v.pedidoNumero, index: i, total: v.datasParcelas.length, valor: valorParcela, data: v.datasParcelas[i], pago: pagamentos[v.id]?.[i]?.pago || false });
+      }
+    }
+    return result.sort((a, b) => a.pago === b.pago ? a.data.localeCompare(b.data) : a.pago ? 1 : -1);
+  }, [vendas, cliente.id, pagamentos]);
 
   const isAdmin = user ? userIsAdmin(user as any) : false;
   const podeCompartilhar = user ? isAdmin || cliente.donoId === (user?.uid || user?.id) : false;
@@ -187,8 +208,12 @@ export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda, user, 
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">
-          <h3 className="font-semibold truncate">{cliente.nome}</h3>
-          <button onClick={onClose} className="text-content-muted hover:text-content transition-colors"><X size={20} /></button>
+          <div className="flex items-center gap-2 min-w-0">
+            <h3 className="font-semibold truncate">{cliente.nome}</h3>
+            {payStatus && (() => { const c = PAY_STATUS_CONFIG[payStatus]; const I = c.icon; return <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${c.bg} ${c.color} inline-flex items-center gap-1`}><I size={10} /> {c.label}</span>; })()}
+            {ticketLevel && (() => { const c = TICKET_CONFIG[ticketLevel]; const I = c.icon; return <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${c.bg} ${c.color} inline-flex items-center gap-1`}><I size={10} /> {c.label}</span>; })()}
+          </div>
+          <button onClick={onClose} className="text-content-muted hover:text-content transition-colors shrink-0"><X size={20} /></button>
         </div>
         <div className="p-5 space-y-3">
           {/* Dados do cliente */}
@@ -378,6 +403,39 @@ export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda, user, 
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+          {/* Histórico de pagamentos */}
+          {clienteParcelas.length > 0 && (
+            <div>
+              <p className="text-[10px] font-medium text-content-muted mb-1.5">Parcelas</p>
+              <div className="space-y-1">
+                {clienteParcelas.map(p => {
+                  const hoje = new Date().setHours(0, 0, 0, 0);
+                  const diff = Math.floor((hoje - new Date(p.data + 'T00:00:00').getTime()) / 86400000);
+                  const atrasado = !p.pago && diff > 0;
+                  return (
+                    <div key={`${p.vendaId}-${p.index}`} className={`flex items-center justify-between rounded-lg bg-elevated p-2 ${p.pago ? 'opacity-50' : ''}`}>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <span>#{p.pedidoNumero}</span>
+                          <span className="text-content-muted">{p.index + 1}/{p.total}</span>
+                          <span className="text-content-muted">·</span>
+                          <span className={atrasado ? 'text-red-400' : ''}>{new Date(p.data + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                          {atrasado && <span className="text-[9px] text-red-400">{diff}d</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold">{formatCurrency(p.valor)}</span>
+                        <button onClick={() => marcarParcela(p.vendaId, p.index, !p.pago)}
+                          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${p.pago ? 'border-blue-500 bg-blue-500 text-white' : 'border-border-medium hover:border-green-500'}`}>
+                          {p.pago && <Check size={12} />}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

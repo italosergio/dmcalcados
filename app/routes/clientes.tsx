@@ -9,6 +9,8 @@ import { useAuth } from '~/contexts/AuthContext';
 import { formatCurrency } from '~/utils/format';
 import type { Cliente, Venda, User } from '~/models';
 import { userIsAdmin, userIsVendedor } from '~/models';
+import { getClientePayStatus, PAY_STATUS_CONFIG, getTicketLevel, TICKET_CONFIG } from '~/utils/clienteStatus';
+import { onPagamentos, type PagamentoParcela } from '~/services/pagamentos.service';
 
 export default function ClientesPage() {
   const { user, loading: authLoading } = useAuth();
@@ -36,6 +38,12 @@ export default function ClientesPage() {
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
   const modeloRef = useRef<HTMLDivElement>(null);
+  const [pagamentos, setPagamentos] = useState<Record<string, Record<string, PagamentoParcela>>>({});
+
+  useEffect(() => {
+    const unsub = onPagamentos(setPagamentos);
+    return () => unsub();
+  }, []);
 
   if (!allowed) return null;
 
@@ -283,6 +291,8 @@ export default function ClientesPage() {
                   {isNovo(cliente) && <span className="text-[9px] bg-green-500/15 text-green-400 px-1.5 py-0.5 rounded font-medium">Novo</span>}
                   {cliente.suspenso && <span className="text-[9px] bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded font-medium">Suspenso</span>}
                   {isInativo(cliente) && !cliente.suspenso && <span className="text-[9px] bg-yellow-500/15 text-yellow-400 px-1.5 py-0.5 rounded font-medium">Inativo</span>}
+                  {(() => { const ps = getClientePayStatus(cliente.id, vendas, pagamentos); if (!ps) return null; const c = PAY_STATUS_CONFIG[ps]; const I = c.icon; return <span className={`text-[9px] ${c.bg} ${c.color} px-1.5 py-0.5 rounded font-medium inline-flex items-center gap-0.5`}><I size={9} /> {c.label}</span>; })()}
+                  {(() => { const tl = getTicketLevel(cliente.id, vendas); if (!tl) return null; const c = TICKET_CONFIG[tl]; const I = c.icon; return <span className={`text-[9px] ${c.bg} ${c.color} px-1.5 py-0.5 rounded font-medium inline-flex items-center gap-0.5`}><I size={9} /> {c.label}</span>; })()}
                 </div>
                 <div className="space-y-0.5 flex-1">
                   {(cliente.cidade || cliente.estado) && (
@@ -349,7 +359,7 @@ export default function ClientesPage() {
         <ClienteModal cliente={clienteSelecionado} vendas={vendas} onClose={() => setClienteSelecionado(null)}
           onNavigateVenda={(vendaId) => navigate('/vendas', { state: { vendaId } })}
           user={user} vendedores={vendedores}
-          onEdit={handleSaveEdit} onShare={handleCompartilhar} />
+          onEdit={handleSaveEdit} onShare={handleCompartilhar} pagamentos={pagamentos} />
       )}
     </div>
   );

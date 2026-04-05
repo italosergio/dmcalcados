@@ -7,6 +7,8 @@ import { useVendas, useClientes } from '~/hooks/useRealtime';
 import { useAuth } from '~/contexts/AuthContext';
 import { formatCurrency } from '~/utils/format';
 import type { Cliente, Venda } from '~/models';
+import { getClientePayStatus, PAY_STATUS_CONFIG, getTicketLevel, TICKET_CONFIG } from '~/utils/clienteStatus';
+import { onPagamentos, type PagamentoParcela } from '~/services/pagamentos.service';
 
 export default function MeusClientesPage() {
   const { clientes: allClientes, loading: clientesLoading } = useClientes();
@@ -23,6 +25,12 @@ export default function MeusClientesPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [filtroNovos, setFiltroNovos] = useState(false);
+  const [pagamentos, setPagamentos] = useState<Record<string, Record<string, PagamentoParcela>>>({});
+
+  useEffect(() => {
+    const unsub = onPagamentos(setPagamentos);
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -144,6 +152,10 @@ export default function MeusClientesPage() {
                     {cliente.nome}
                     {isNovo(cliente) && <span className="ml-1.5 text-[10px] bg-green-500/15 text-green-400 px-1.5 py-0.5 rounded font-medium">Novo</span>}
                   </h3>
+                  <div className="flex flex-wrap gap-1 mt-0.5">
+                    {(() => { const ps = getClientePayStatus(cliente.id, vendas, pagamentos); if (!ps) return null; const c = PAY_STATUS_CONFIG[ps]; const I = c.icon; return <span className={`text-[9px] ${c.bg} ${c.color} px-1.5 py-0.5 rounded font-medium inline-flex items-center gap-0.5`}><I size={9} /> {c.label}</span>; })()}
+                    {(() => { const tl = getTicketLevel(cliente.id, vendas); if (!tl) return null; const c = TICKET_CONFIG[tl]; const I = c.icon; return <span className={`text-[9px] ${c.bg} ${c.color} px-1.5 py-0.5 rounded font-medium inline-flex items-center gap-0.5`}><I size={9} /> {c.label}</span>; })()}
+                  </div>
                   {(cliente.endereco || cliente.cidade) && (
                     <p className="text-xs text-content-muted truncate flex items-center gap-1"><MapPin size={12} className="shrink-0" />{[cliente.cidade, cliente.estado].filter(Boolean).join(' · ')}</p>
                   )}
@@ -198,7 +210,7 @@ export default function MeusClientesPage() {
       {/* Modal detalhe do cliente */}
       {clienteSelecionado && (
         <ClienteModal cliente={clienteSelecionado} vendas={vendas} onClose={() => setClienteSelecionado(null)}
-          onNavigateVenda={(vendaId) => navigate('/vendas', { state: { vendaId } })} />
+          onNavigateVenda={(vendaId) => navigate('/vendas', { state: { vendaId } })} pagamentos={pagamentos} />
       )}
     </div>
   );
