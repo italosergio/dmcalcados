@@ -23,5 +23,6 @@ export default [
     route("ciclos", "routes/ciclos.tsx"),
     route("meu-estoque", "routes/meu-estoque.tsx"),
     route("conta", "routes/conta.tsx"),
+    route("analytics", "routes/analytics.tsx"),
   ]),
 ] satisfies RouteConfig;

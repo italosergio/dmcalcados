@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router';
-import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, History, LogOut, X, UserCircle, Home, Package, RefreshCw, Plus, ArrowRightLeft, Loader2 } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, History, LogOut, X, UserCircle, Home, Package, RefreshCw, Plus, ArrowRightLeft, Loader2, Activity } from 'lucide-react';
 import { logout } from '~/services/auth.service';
 import { useNavigate } from 'react-router';
 import { useAuth } from '~/contexts/AuthContext';
@@ -97,6 +97,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   if (user && userIsAdmin(user)) {
     links.push({ to: '/historico', icon: History, label: 'Histórico' });
+  }
+
+  if (user && getUserRoles(user).includes('desenvolvedor')) {
+    links.push({ to: '/analytics', icon: Activity, label: 'Analytics' });
   }
 
   const isActive = (path: string) => location.pathname.startsWith(path);
