@@ -1,14 +1,14 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { ref, get } from 'firebase/database';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { ref, onValue } from 'firebase/database';
 import { db } from '~/services/firebase';
-import { getProdutos } from '~/services/produtos.service';
-import { getClientes } from '~/services/clientes.service';
+import { useVendas, useDespesas, useProdutos, useClientes, useUsers } from '~/hooks/useRealtime';
 import { formatCurrency } from '~/utils/format';
 import { useAuth } from '~/contexts/AuthContext';
 import { useNavigate } from 'react-router';
 import { Trophy, ShoppingBag, CalendarDays, CalendarRange, DollarSign, Package, Users, UserPlus, Medal } from 'lucide-react';
 import { RankingModal } from './RankingModal';
 import { calcularESalvarRanking } from '~/services/ranking.service';
+import { isVendedor as isVendedorRole } from '~/models';
 
 const iconMap = {
   trophy: Trophy,
@@ -32,24 +32,14 @@ interface Stat {
   action?: Action;
 }
 
-async function getAllVendas() {
-  const snapshot = await get(ref(db, 'vendas'));
-  if (!snapshot.exists()) return [];
-  const data = snapshot.val();
-  return Object.keys(data).map(key => ({ id: key, ...data[key] })).filter((v: any) => !v.deletedAt);
-}
-
-async function getAllDespesas() {
-  const snapshot = await get(ref(db, 'despesas'));
-  if (!snapshot.exists()) return [];
-  const data = snapshot.val();
-  return Object.keys(data).map(key => ({ id: key, ...data[key] })).filter((d: any) => !d.deletedAt);
-}
-
 export function HeaderTicker() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [stats, setStats] = useState<Stat[]>([]);
+  const { vendas: todasVendas } = useVendas();
+  const { despesas: todasDespesas } = useDespesas();
+  const { produtos } = useProdutos();
+  const { clientes } = useClientes();
+  const { users } = useUsers();
   const [showRanking, setShowRanking] = useState(false);
   const [rankingTab, setRankingTab] = useState<'dia' | 'mes' | 'ano'>('mes');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -60,127 +50,129 @@ export function HeaderTicker() {
   const animRef = useRef<number>(0);
   const paused = useRef(false);
   const speed = 0.5;
+  const rankingSaved = useRef(false);
+
+  const vendas = useMemo(() => todasVendas.filter((v: any) => !v.deletedAt), [todasVendas]);
+  const despesas = useMemo(() => todasDespesas.filter((d: any) => !d.deletedAt), [todasDespesas]);
+
+  const nomeMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    users.forEach(u => { map[u.uid || u.id] = u.nome; map[u.id] = u.nome; });
+    return map;
+  }, [users]);
+
+  const vendedorIds = useMemo(() => {
+    const set = new Set<string>();
+    users.forEach(u => {
+      const roles: string[] = (u as any).roles?.length ? (u as any).roles : [(u as any).role];
+      if (roles.some(r => isVendedorRole(r as any))) set.add(u.uid || u.id);
+    });
+    return set;
+  }, [users]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!rankingSaved.current && vendas.length > 0) {
+      rankingSaved.current = true;
+      calcularESalvarRanking().catch(() => {});
+    }
+  }, [vendas]);
+
+  const stats = useMemo<Stat[]>(() => {
+    if (!user || vendas.length === 0 && despesas.length === 0 && produtos.length === 0) return [];
 
     const isAdmin = user.role === 'admin' || user.role === 'superadmin' || user.role === 'desenvolvedor';
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const inicioAno = new Date(hoje.getFullYear(), 0, 1);
 
-    Promise.all([getAllVendas(), getAllDespesas(), getProdutos(), getClientes()]).then(async ([vendas, despesas, produtos, clientes]) => {
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-      const inicioAno = new Date(hoje.getFullYear(), 0, 1);
+    const resolveName = (id: string, fallback: string) => nomeMap[id] || fallback;
 
-      // Buscar users para identificar vendedores
-      const usersSnap = await get(ref(db, 'users'));
-      const usersData = usersSnap.exists() ? usersSnap.val() : {};
-      const vendedorIds = new Set(Object.entries(usersData).filter(([_, u]: any) => {
-        const roles: string[] = u.roles?.length ? u.roles : [u.role];
-        return roles.some((r: string) => r === 'vendedor' || r === 'vendedor1' || r === 'vendedor2' || r === 'vendedor3');
-      }).map(([id]) => id));
+    const buildRanking = (filtradas: any[]) => {
+      const map: Record<string, { nome: string; total: number }> = {};
+      filtradas.filter(v => vendedorIds.has(v.vendedorId)).forEach((v: any) => {
+        if (!map[v.vendedorId]) map[v.vendedorId] = { nome: resolveName(v.vendedorId, v.vendedorNome), total: 0 };
+        map[v.vendedorId].total += v.valorTotal;
+      });
+      return Object.entries(map).sort((a, b) => b[1].total - a[1].total);
+    };
 
-      // Salvar ranking snapshot
-      calcularESalvarRanking().catch(() => {});
+    if (isAdmin) {
+      const vendasHoje = vendas.filter(v => new Date(v.data) >= hoje);
+      const vendasMes = vendas.filter(v => new Date(v.data) >= inicioMes);
+      const vendasAno = vendas.filter(v => new Date(v.data) >= inicioAno);
 
-      if (isAdmin) {
-        const vendasHoje = vendas.filter(v => new Date(v.data) >= hoje);
-        const vendasMes = vendas.filter(v => new Date(v.data) >= inicioMes);
-        const vendasAno = vendas.filter(v => new Date(v.data) >= inicioAno);
+      const totalHoje = vendasHoje.reduce((s, v: any) => s + v.valorTotal, 0);
+      const totalMes = vendasMes.reduce((s, v: any) => s + v.valorTotal, 0);
+      const totalAno = vendasAno.reduce((s, v: any) => s + v.valorTotal, 0);
 
-        const totalHoje = vendasHoje.reduce((s: number, v: any) => s + v.valorTotal, 0);
-        const totalMes = vendasMes.reduce((s: number, v: any) => s + v.valorTotal, 0);
-        const totalAno = vendasAno.reduce((s: number, v: any) => s + v.valorTotal, 0);
+      const totalDespesas = despesas.reduce((s, d: any) => s + d.valor, 0);
+      const valorEstoque = produtos.reduce((s, p) => s + (p.valor * p.estoque), 0);
 
-        const totalDespesas = despesas.reduce((s: number, d: any) => s + d.valor, 0);
-        const valorEstoque = produtos.reduce((s, p) => s + (p.valor * p.estoque), 0);
+      const rankDia = buildRanking(vendasHoje);
+      const rankMes = buildRanking(vendasMes);
+      const rankAno = buildRanking(vendasAno);
+      const topDia = rankDia[0];
+      const topMes = rankMes[0];
+      const topAno = rankAno[0];
 
-        const vendedorMap: Record<string, { nome: string; total: number }> = {};
-        vendasMes.filter(v => vendedorIds.has(v.vendedorId)).forEach((v: any) => {
-          if (!vendedorMap[v.vendedorId]) vendedorMap[v.vendedorId] = { nome: v.vendedorNome, total: 0 };
-          vendedorMap[v.vendedorId].total += v.valorTotal;
-        });
-        const topVendedor = Object.values(vendedorMap).sort((a, b) => b.total - a.total)[0];
+      const clientesNovos = clientes.filter(c => c.createdAt && new Date(c.createdAt) >= inicioMes).length;
 
-        // Rankings por período
-        const buildRankingAdmin = (filtradas: any[]) => {
-          const map: Record<string, { nome: string; total: number }> = {};
-          filtradas.filter(v => vendedorIds.has(v.vendedorId)).forEach((v: any) => {
-            if (!map[v.vendedorId]) map[v.vendedorId] = { nome: v.vendedorNome, total: 0 };
-            map[v.vendedorId].total += v.valorTotal;
-          });
-          return Object.values(map).sort((a, b) => b.total - a.total);
-        };
-        const rankDia = buildRankingAdmin(vendasHoje);
-        const rankAno = buildRankingAdmin(vendasAno);
-        const topDia = rankDia[0];
-        const topAno = rankAno[0];
+      return [
+        { label: 'Ranking dia', value: topDia ? `${topDia[1].nome} · ${formatCurrency(topDia[1].total)}` : '—', color: 'orange', icon: 'medal', action: { type: 'ranking', tab: 'dia' } },
+        { label: 'Ranking mês', value: topMes ? `${topMes[1].nome} · ${formatCurrency(topMes[1].total)}` : '—', color: 'orange', icon: 'trophy', action: { type: 'ranking', tab: 'mes' } },
+        { label: 'Ranking ano', value: topAno ? `${topAno[1].nome} · ${formatCurrency(topAno[1].total)}` : '—', color: 'orange', icon: 'trophy', action: { type: 'ranking', tab: 'ano' } },
+        { label: 'Vendas hoje', value: `${formatCurrency(totalHoje)} (${vendasHoje.length})`, color: 'green', icon: 'shoppingBag', action: { type: 'navigate', to: '/vendas?periodo=hoje' } },
+        { label: 'Vendas mês', value: `${formatCurrency(totalMes)} (${vendasMes.length})`, color: 'green', icon: 'calendarDays', action: { type: 'navigate', to: '/vendas?periodo=mes' } },
+        { label: 'Vendas ano', value: `${formatCurrency(totalAno)} (${vendasAno.length})`, color: 'green', icon: 'calendarRange', action: { type: 'navigate', to: '/vendas?periodo=ano' } },
+        { label: 'Despesas', value: formatCurrency(totalDespesas), color: 'orange', icon: 'dollarSign', action: { type: 'navigate', to: '/despesas?periodo=tudo' } },
+        { label: 'Estoque', value: formatCurrency(valorEstoque), color: 'blue', icon: 'package', action: { type: 'navigate', to: '/estoque' } },
+        { label: 'Clientes', value: `${clientes.length}`, color: 'green', icon: 'users', action: { type: 'navigate', to: '/clientes' } },
+        { label: 'Novos', value: `${clientesNovos}`, color: 'green', icon: 'userPlus', action: { type: 'navigate', to: '/clientes?novos=1' } },
+      ];
+    } else {
+      const uid = user.id;
+      const minhasVendas = vendas.filter((v: any) => v.vendedorId === uid);
+      const minhasHoje = minhasVendas.filter(v => new Date(v.data) >= hoje);
+      const minhasMes = minhasVendas.filter(v => new Date(v.data) >= inicioMes);
+      const minhasAno = minhasVendas.filter(v => new Date(v.data) >= inicioAno);
 
-        const clientesNovos = clientes.filter(c => c.createdAt && new Date(c.createdAt) >= inicioMes).length;
+      const totalHoje = minhasHoje.reduce((s, v: any) => s + v.valorTotal, 0);
+      const totalMes = minhasMes.reduce((s, v: any) => s + v.valorTotal, 0);
+      const totalAno = minhasAno.reduce((s, v: any) => s + v.valorTotal, 0);
 
-        setStats([
-          { label: 'Ranking dia', value: topDia ? `${topDia.nome} · ${formatCurrency(topDia.total)}` : '—', color: 'orange', icon: 'medal', action: { type: 'ranking', tab: 'dia' } },
-          { label: 'Ranking mês', value: topVendedor ? `${topVendedor.nome} · ${formatCurrency(topVendedor.total)}` : '—', color: 'orange', icon: 'trophy', action: { type: 'ranking', tab: 'mes' } },
-          { label: 'Ranking ano', value: topAno ? `${topAno.nome} · ${formatCurrency(topAno.total)}` : '—', color: 'orange', icon: 'trophy', action: { type: 'ranking', tab: 'ano' } },
-          { label: 'Vendas hoje', value: `${formatCurrency(totalHoje)} (${vendasHoje.length})`, color: 'green', icon: 'shoppingBag', action: { type: 'navigate', to: '/vendas?periodo=hoje' } },
-          { label: 'Vendas mês', value: `${formatCurrency(totalMes)} (${vendasMes.length})`, color: 'green', icon: 'calendarDays', action: { type: 'navigate', to: '/vendas?periodo=mes' } },
-          { label: 'Vendas ano', value: `${formatCurrency(totalAno)} (${vendasAno.length})`, color: 'green', icon: 'calendarRange', action: { type: 'navigate', to: '/vendas?periodo=ano' } },
-          { label: 'Despesas', value: formatCurrency(totalDespesas), color: 'orange', icon: 'dollarSign', action: { type: 'navigate', to: '/despesas?periodo=tudo' } },
-          { label: 'Estoque', value: formatCurrency(valorEstoque), color: 'blue', icon: 'package', action: { type: 'navigate', to: '/estoque' } },
-          { label: 'Clientes', value: `${clientes.length}`, color: 'green', icon: 'users', action: { type: 'navigate', to: '/clientes' } },
-          { label: 'Novos', value: `${clientesNovos}`, color: 'green', icon: 'userPlus', action: { type: 'navigate', to: '/clientes?novos=1' } },
-        ]);
-      } else {
-        const uid = user.id;
-        const minhasVendas = vendas.filter((v: any) => v.vendedorId === uid);
-        const minhasHoje = minhasVendas.filter(v => new Date(v.data) >= hoje);
-        const minhasMes = minhasVendas.filter(v => new Date(v.data) >= inicioMes);
-        const minhasAno = minhasVendas.filter(v => new Date(v.data) >= inicioAno);
+      const rankDia = buildRanking(vendas.filter(v => new Date(v.data) >= hoje));
+      const rankMes = buildRanking(vendas.filter(v => new Date(v.data) >= inicioMes));
+      const rankAno = buildRanking(vendas.filter(v => new Date(v.data) >= inicioAno));
+      const posDia = rankDia.findIndex(([id]) => id === uid) + 1;
+      const posMes = rankMes.findIndex(([id]) => id === uid) + 1;
+      const posAno = rankAno.findIndex(([id]) => id === uid) + 1;
 
-        const totalHoje = minhasHoje.reduce((s: number, v: any) => s + v.valorTotal, 0);
-        const totalMes = minhasMes.reduce((s: number, v: any) => s + v.valorTotal, 0);
-        const totalAno = minhasAno.reduce((s: number, v: any) => s + v.valorTotal, 0);
+      const clienteIds = new Set(minhasVendas.map((v: any) => v.clienteId));
+      const clientesAntigos = new Set(minhasVendas.filter(v => new Date(v.data) < inicioMes).map((v: any) => v.clienteId));
+      const clientesNovosIds = new Set(minhasVendas.filter(v => new Date(v.data) >= inicioMes).map((v: any) => v.clienteId));
+      const clientesNovosMes = [...clientesNovosIds].filter(id => !clientesAntigos.has(id)).length;
 
-        // Rankings
-        const buildRanking = (filtradas: any[]) => {
-          const map: Record<string, number> = {};
-          filtradas.filter(v => vendedorIds.has(v.vendedorId)).forEach((v: any) => { map[v.vendedorId] = (map[v.vendedorId] || 0) + v.valorTotal; });
-          return Object.entries(map).sort((a, b) => b[1] - a[1]);
-        };
-        const rankDia = buildRanking(vendas.filter(v => new Date(v.data) >= hoje));
-        const rankMes = buildRanking(vendas.filter(v => new Date(v.data) >= inicioMes));
-        const rankAno = buildRanking(vendas.filter(v => new Date(v.data) >= inicioAno));
-        const posDia = rankDia.findIndex(([id]) => id === uid) + 1;
-        const posMes = rankMes.findIndex(([id]) => id === uid) + 1;
-        const posAno = rankAno.findIndex(([id]) => id === uid) + 1;
-        const total = rankMes.length;
+      const minhasDespesas = despesas.filter((d: any) => d.usuarioId === uid || (d.rateio && d.rateio.some((r: any) => r.usuarioId === uid)));
+      const despHoje = minhasDespesas.filter(d => new Date(d.data) >= hoje).reduce((s, d: any) => s + d.valor, 0);
+      const despMes = minhasDespesas.filter(d => new Date(d.data) >= inicioMes).reduce((s, d: any) => s + d.valor, 0);
+      const despAno = minhasDespesas.filter(d => new Date(d.data) >= inicioAno).reduce((s, d: any) => s + d.valor, 0);
 
-        const clienteIds = new Set(minhasVendas.map((v: any) => v.clienteId));
-        const clientesAntigos = new Set(minhasVendas.filter(v => new Date(v.data) < inicioMes).map((v: any) => v.clienteId));
-        const clientesNovosIds = new Set(minhasVendas.filter(v => new Date(v.data) >= inicioMes).map((v: any) => v.clienteId));
-        const clientesNovosMes = [...clientesNovosIds].filter(id => !clientesAntigos.has(id)).length;
-
-        const minhasDespesas = despesas.filter((d: any) => d.usuarioId === uid || (d.rateio && d.rateio.some((r: any) => r.usuarioId === uid)));
-        const despHoje = minhasDespesas.filter(d => new Date(d.data) >= hoje).reduce((s: number, d: any) => s + d.valor, 0);
-        const despMes = minhasDespesas.filter(d => new Date(d.data) >= inicioMes).reduce((s: number, d: any) => s + d.valor, 0);
-        const despAno = minhasDespesas.filter(d => new Date(d.data) >= inicioAno).reduce((s: number, d: any) => s + d.valor, 0);
-
-        setStats([
-          { label: 'Vendas hoje', value: `${formatCurrency(totalHoje)} (${minhasHoje.length})`, color: 'green', icon: 'shoppingBag', action: { type: 'navigate', to: '/vendas?periodo=hoje' } },
-          { label: 'Vendas mês', value: `${formatCurrency(totalMes)} (${minhasMes.length})`, color: 'green', icon: 'calendarDays', action: { type: 'navigate', to: '/vendas?periodo=mes' } },
-          { label: 'Vendas ano', value: `${formatCurrency(totalAno)} (${minhasAno.length})`, color: 'green', icon: 'calendarRange', action: { type: 'navigate', to: '/vendas?periodo=ano' } },
-          { label: 'Ranking dia', value: posDia > 0 ? `${posDia}º de ${rankDia.length}` : '—', color: 'orange', icon: 'medal', action: { type: 'ranking', tab: 'dia' } },
-          { label: 'Ranking mês', value: posMes > 0 ? `${posMes}º de ${total}` : '—', color: 'orange', icon: 'trophy', action: { type: 'ranking', tab: 'mes' } },
-          { label: 'Ranking ano', value: posAno > 0 ? `${posAno}º de ${rankAno.length}` : '—', color: 'orange', icon: 'trophy', action: { type: 'ranking', tab: 'ano' } },
-          { label: 'Meus clientes', value: `${clienteIds.size}`, color: 'green', icon: 'users', action: { type: 'navigate', to: '/meus-clientes' } },
-          { label: 'Clientes novos', value: `${clientesNovosMes}`, color: 'green', icon: 'userPlus', action: { type: 'navigate', to: '/meus-clientes?novos=1' } },
-          { label: 'Despesas hoje', value: formatCurrency(despHoje), color: 'orange', icon: 'dollarSign', action: { type: 'navigate', to: '/despesas?periodo=hoje' } },
-          { label: 'Despesas mês', value: formatCurrency(despMes), color: 'orange', icon: 'dollarSign', action: { type: 'navigate', to: '/despesas?periodo=mes' } },
-          { label: 'Despesas ano', value: formatCurrency(despAno), color: 'orange', icon: 'dollarSign', action: { type: 'navigate', to: '/despesas?periodo=ano' } },
-        ]);
-      }
-    }).catch(() => {});
-  }, [user]);
+      return [
+        { label: 'Vendas hoje', value: `${formatCurrency(totalHoje)} (${minhasHoje.length})`, color: 'green', icon: 'shoppingBag', action: { type: 'navigate', to: '/vendas?periodo=hoje' } },
+        { label: 'Vendas mês', value: `${formatCurrency(totalMes)} (${minhasMes.length})`, color: 'green', icon: 'calendarDays', action: { type: 'navigate', to: '/vendas?periodo=mes' } },
+        { label: 'Vendas ano', value: `${formatCurrency(totalAno)} (${minhasAno.length})`, color: 'green', icon: 'calendarRange', action: { type: 'navigate', to: '/vendas?periodo=ano' } },
+        { label: 'Ranking dia', value: posDia > 0 ? `${posDia}º de ${rankDia.length}` : '—', color: 'orange', icon: 'medal', action: { type: 'ranking', tab: 'dia' } },
+        { label: 'Ranking mês', value: posMes > 0 ? `${posMes}º de ${rankMes.length}` : '—', color: 'orange', icon: 'trophy', action: { type: 'ranking', tab: 'mes' } },
+        { label: 'Ranking ano', value: posAno > 0 ? `${posAno}º de ${rankAno.length}` : '—', color: 'orange', icon: 'trophy', action: { type: 'ranking', tab: 'ano' } },
+        { label: 'Meus clientes', value: `${clienteIds.size}`, color: 'green', icon: 'users', action: { type: 'navigate', to: '/meus-clientes' } },
+        { label: 'Clientes novos', value: `${clientesNovosMes}`, color: 'green', icon: 'userPlus', action: { type: 'navigate', to: '/meus-clientes?novos=1' } },
+        { label: 'Despesas hoje', value: formatCurrency(despHoje), color: 'orange', icon: 'dollarSign', action: { type: 'navigate', to: '/despesas?periodo=hoje' } },
+        { label: 'Despesas mês', value: formatCurrency(despMes), color: 'orange', icon: 'dollarSign', action: { type: 'navigate', to: '/despesas?periodo=mes' } },
+        { label: 'Despesas ano', value: formatCurrency(despAno), color: 'orange', icon: 'dollarSign', action: { type: 'navigate', to: '/despesas?periodo=ano' } },
+      ];
+    }
+  }, [user, vendas, despesas, produtos, clientes, nomeMap, vendedorIds]);
 
   const tick = useCallback(() => {
     const el = containerRef.current;
@@ -204,7 +196,6 @@ export function HeaderTicker() {
     didDrag.current = false;
     startX.current = e.clientX;
     startScroll.current = containerRef.current!.scrollLeft;
-    containerRef.current!.setPointerCapture(e.pointerId);
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
