@@ -6,17 +6,21 @@ import { LegendaSeletor } from './ChartFilters';
 import { chartTheme, filtrarPorPeriodo, filtrarPorCondicao, baseAxis, baseYAxis, baseTooltip, getModelos, MODEL_COLORS } from './chartUtils';
 import { formatCurrency } from '~/utils/format';
 import type { Venda } from '~/models';
+import type { PeriodoGrafico } from './ChartFilters';
 
 interface Props {
   vendas: Venda[];
   resolveNome: (id: string, fallback: string) => string;
+  globalPeriodo?: PeriodoGrafico;
+  globalCustomInicio?: string;
+  globalCustomFim?: string;
 }
 
-export function VendasPorVendedor({ vendas, resolveNome }: Props) {
+export function VendasPorVendedor({ vendas, resolveNome, globalPeriodo, globalCustomInicio, globalCustomFim }: Props) {
   const [selectedModelos, setSelectedModelos] = useState<string[]>([]);
 
   return (
-    <ChartCard showCondicao defaultPeriodo="30dias">
+    <ChartCard showCondicao defaultPeriodo="30dias" globalPeriodo={globalPeriodo} globalCustomInicio={globalCustomInicio} globalCustomFim={globalCustomFim}>
       {({ periodo, customInicio, customFim, condicoes }) => {
         const filtered = filtrarPorCondicao(filtrarPorPeriodo(vendas, periodo, customInicio, customFim), condicoes);
         const modelos = getModelos(filtered);

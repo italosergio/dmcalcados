@@ -27,6 +27,7 @@ export function filtrarPorPeriodo<T extends { data: Date }>(
     case 'mes': inicio.setDate(1); inicio.setHours(0, 0, 0, 0); break;
     case '7dias': inicio.setDate(agora.getDate() - 7); break;
     case '30dias': inicio.setDate(agora.getDate() - 30); break;
+    case '60dias': inicio.setDate(agora.getDate() - 60); break;
     case 'ano': inicio.setFullYear(agora.getFullYear(), 0, 1); inicio.setHours(0, 0, 0, 0); break;
     case '365dias': inicio.setDate(agora.getDate() - 365); break;
   }
@@ -53,8 +54,16 @@ export function getCategories(periodo: PeriodoGrafico, customInicio: string, cus
     return { cats: meses.slice(0, mesAtual + 1), isMonthly: true };
   }
 
-  if (periodo === '365dias') {
+  if (periodo === '365dias' || periodo === '60dias') {
     const agora = new Date();
+    if (periodo === '60dias') {
+      const cats: string[] = [];
+      for (let i = 59; i >= 0; i--) {
+        const d = new Date(Date.now() - i * 86400000);
+        cats.push(d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }));
+      }
+      return { cats, isMonthly: false };
+    }
     const cats: string[] = [];
     for (let i = 11; i >= 0; i--) {
       const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);

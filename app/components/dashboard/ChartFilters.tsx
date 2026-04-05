@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 
-export type PeriodoGrafico = 'hoje' | 'semana' | 'mes' | '7dias' | '30dias' | 'ano' | '365dias' | 'custom';
+export type PeriodoGrafico = 'hoje' | 'semana' | 'mes' | '7dias' | '30dias' | '60dias' | 'ano' | '365dias' | 'custom';
 
 export const PERIODO_OPTIONS: { value: PeriodoGrafico; label: string }[] = [
   { value: 'hoje', label: 'Hoje' },
@@ -10,6 +10,7 @@ export const PERIODO_OPTIONS: { value: PeriodoGrafico; label: string }[] = [
   { value: 'ano', label: 'Ano' },
   { value: '7dias', label: '7d' },
   { value: '30dias', label: '30d' },
+  { value: '60dias', label: '60d' },
   { value: '365dias', label: '365d' },
   { value: 'custom', label: 'Período' },
 ];

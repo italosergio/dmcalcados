@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { Card } from '~/components/common/Card';
 import { ChartFilters, type PeriodoGrafico } from './ChartFilters';
 
@@ -11,13 +11,24 @@ interface ChartCardProps {
   }) => ReactNode;
   showCondicao?: boolean;
   defaultPeriodo?: PeriodoGrafico;
+  globalPeriodo?: PeriodoGrafico;
+  globalCustomInicio?: string;
+  globalCustomFim?: string;
 }
 
-export function ChartCard({ children, showCondicao = false, defaultPeriodo = '30dias' }: ChartCardProps) {
+export function ChartCard({ children, showCondicao = false, defaultPeriodo = '30dias', globalPeriodo, globalCustomInicio, globalCustomFim }: ChartCardProps) {
   const [periodo, setPeriodo] = useState<PeriodoGrafico>(defaultPeriodo);
   const [customInicio, setCustomInicio] = useState('');
   const [customFim, setCustomFim] = useState('');
   const [condicoes, setCondicoes] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (globalPeriodo !== undefined) {
+      setPeriodo(globalPeriodo);
+      setCustomInicio(globalCustomInicio || '');
+      setCustomFim(globalCustomFim || '');
+    }
+  }, [globalPeriodo, globalCustomInicio, globalCustomFim]);
 
   return (
     <Card>

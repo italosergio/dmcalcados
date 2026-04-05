@@ -5,10 +5,11 @@ import { ChartCard } from './ChartCard';
 import { chartTheme, filtrarPorPeriodo, getCategories, bucketKey, baseAxis, baseYAxis, baseTooltip } from './chartUtils';
 import { formatCurrency } from '~/utils/format';
 import type { Venda, Despesa } from '~/models';
+import type { PeriodoGrafico } from './ChartFilters';
 
-export function SaldoTimeline({ vendas, despesas }: { vendas: Venda[]; despesas: Despesa[] }) {
+export function SaldoTimeline({ vendas, despesas, globalPeriodo, globalCustomInicio, globalCustomFim }: { vendas: Venda[]; despesas: Despesa[]; globalPeriodo?: PeriodoGrafico; globalCustomInicio?: string; globalCustomFim?: string }) {
   return (
-    <ChartCard defaultPeriodo="30dias">
+    <ChartCard defaultPeriodo="30dias" globalPeriodo={globalPeriodo} globalCustomInicio={globalCustomInicio} globalCustomFim={globalCustomFim}>
       {({ periodo, customInicio, customFim }) => {
         const vFilt = filtrarPorPeriodo(vendas, periodo, customInicio, customFim);
         const dFilt = filtrarPorPeriodo(despesas, periodo, customInicio, customFim);

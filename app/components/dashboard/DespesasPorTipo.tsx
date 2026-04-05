@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { Card } from '~/components/common/Card';
@@ -11,12 +11,23 @@ interface Props {
   despesas: Despesa[];
   resolveNome: (id: string, fallback: string) => string;
   vendedores: string[];
+  globalPeriodo?: PeriodoGrafico;
+  globalCustomInicio?: string;
+  globalCustomFim?: string;
 }
 
-export function DespesasPorTipo({ despesas, resolveNome, vendedores }: Props) {
+export function DespesasPorTipo({ despesas, resolveNome, vendedores, globalPeriodo, globalCustomInicio, globalCustomFim }: Props) {
   const [periodo, setPeriodo] = useState<PeriodoGrafico>('30dias');
   const [customInicio, setCustomInicio] = useState('');
   const [customFim, setCustomFim] = useState('');
+
+  useEffect(() => {
+    if (globalPeriodo !== undefined) {
+      setPeriodo(globalPeriodo);
+      setCustomInicio(globalCustomInicio || '');
+      setCustomFim(globalCustomFim || '');
+    }
+  }, [globalPeriodo, globalCustomInicio, globalCustomFim]);
   const [selectedVendedores, setSelectedVendedores] = useState<string[]>([]);
 
   const filtered = useMemo(() => filtrarPorPeriodo(despesas, periodo, customInicio, customFim), [despesas, periodo, customInicio, customFim]);

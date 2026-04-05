@@ -1,10 +1,12 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Card } from '~/components/common/Card';
 import { useVendas, useDespesas, useUsers, useClientes } from '~/hooks/useRealtime';
 import { formatCurrency } from '~/utils/format';
-import { TrendingUp, TrendingDown, DollarSign, ShoppingBag, Receipt } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, ShoppingBag, Receipt, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '~/contexts/AuthContext';
+import { filtrarPorPeriodo } from '~/components/dashboard/chartUtils';
+import type { PeriodoGrafico } from '~/components/dashboard/ChartFilters';
 import {
   VendasTimeline, DespesasTimeline, VendasPorVendedor, TopClientes,
   DespesasPorTipo, DespesasPorUsuario, TopModelos, SaldoTimeline,
@@ -22,10 +24,16 @@ export default function DashboardPage() {
   const { clientes, loading: clientesLoading } = useClientes();
   const loading = vendasLoading || despesasLoading || usersLoading || clientesLoading;
 
-  const vendas = useMemo(() => todasVendasRaw.filter((v: any) => !v.deletedAt), [todasVendasRaw]);
-  const despesas = useMemo(() => todasDespesasRaw.filter((d: any) => !d.deletedAt), [todasDespesasRaw]);
+  const [periodoGlobal, setPeriodoGlobal] = useState<PeriodoGrafico>('365dias');
+  const [customInicio, setCustomInicio] = useState('');
+  const [customFim, setCustomFim] = useState('');
 
-  // Totais desde sempre (sem filtro de período)
+  const todasVendas = useMemo(() => todasVendasRaw.filter((v: any) => !v.deletedAt), [todasVendasRaw]);
+  const todasDespesas = useMemo(() => todasDespesasRaw.filter((d: any) => !d.deletedAt), [todasDespesasRaw]);
+
+  const vendas = useMemo(() => filtrarPorPeriodo(todasVendas, periodoGlobal, customInicio, customFim), [todasVendas, periodoGlobal, customInicio, customFim]);
+  const despesas = useMemo(() => filtrarPorPeriodo(todasDespesas, periodoGlobal, customInicio, customFim), [todasDespesas, periodoGlobal, customInicio, customFim]);
+
   const totalVendas = vendas.reduce((s, v) => s + v.valorTotal, 0);
   const totalDespesas = despesas.reduce((s, d) => s + d.valor, 0);
   const saldo = totalVendas - totalDespesas;
@@ -59,8 +67,8 @@ export default function DashboardPage() {
         </div>
       ) : (
         <>
-          {/* Cards totais (desde sempre) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-4">
+          {/* Cards totais */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-3">
             <Card className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border-green-800 cursor-pointer hover:brightness-110 transition" onClick={() => navigate('/vendas')}>
               <div className="flex items-start justify-between">
                 <div>
@@ -103,33 +111,71 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          {/* Gráficos - cada um com filtros próprios */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Coluna Vendas */}
-            <div className="space-y-4">
-              <VendasTimeline vendas={vendas} />
-              {isAdmin && <VendasPorVendedor vendas={vendas} resolveNome={resolveNome} />}
-              <TopClientes vendas={vendas} resolveCliente={resolveCliente} />
-              <CondicaoPagamentoTimeline vendas={vendas} />
-            </div>
-
-            {/* Coluna Despesas */}
-            <div className="space-y-4">
-              <DespesasTimeline despesas={despesas} />
-              {isAdmin && <DespesasPorUsuario despesas={despesas} resolveNome={resolveNome} />}
-              <DespesasPorTipo despesas={despesas} resolveNome={resolveNome} vendedores={vendedoresNomes} />
-              {isAdmin && <SaldoTimeline vendas={vendas} despesas={despesas} />}
-            </div>
+          {/* Filtros globais */}
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            {([
+              { value: 'hoje', label: 'Hoje' },
+              { value: '7dias', label: '7 dias' },
+              { value: '30dias', label: '30 dias' },
+              { value: '60dias', label: '60 dias' },
+              { value: 'mes', label: 'Mês' },
+              { value: 'ano', label: 'Ano' },
+              { value: '365dias', label: '365 dias' },
+            ] as { value: PeriodoGrafico; label: string }[]).map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => { setPeriodoGlobal(opt.value); setCustomInicio(''); setCustomFim(''); }}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  periodoGlobal === opt.value && !customInicio && !customFim
+                    ? 'bg-green-600 text-white shadow-sm'
+                    : 'bg-elevated text-content-secondary hover:bg-border-medium'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+            <span className="hidden lg:inline text-content-muted/30">│</span>
+            <input type="date" value={customInicio} onChange={(e) => { setCustomInicio(e.target.value); if (e.target.value) setPeriodoGlobal('custom'); }}
+              className={`rounded-lg border bg-elevated px-2 py-1.5 text-xs focus:outline-none focus:border-border-medium w-[7.5rem] transition-colors ${customInicio ? 'border-green-600/30 text-content' : 'border-border-subtle text-content-muted'}`} />
+            <span className="text-[10px] text-content-muted">até</span>
+            <input type="date" value={customFim} onChange={(e) => { setCustomFim(e.target.value); if (e.target.value) setPeriodoGlobal('custom'); }}
+              className={`rounded-lg border bg-elevated px-2 py-1.5 text-xs focus:outline-none focus:border-border-medium w-[7.5rem] transition-colors ${customFim ? 'border-green-600/30 text-content' : 'border-border-subtle text-content-muted'}`} />
           </div>
 
-          {/* Linha extra: modelos + extras */}
+          {/* Timelines lado a lado */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <VendasTimeline vendas={vendas} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />
+            <DespesasTimeline despesas={despesas} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />
+          </div>
+
+          {/* Saldo + Comparativo mensal */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-            <TopModelos vendas={vendas} resolveNome={resolveNome} vendedores={vendedoresNomes} />
-            <div className="space-y-4">
-              <ComparativoMensal vendas={vendas} despesas={despesas} />
-              {isAdmin && <TicketMedioPorVendedor vendas={vendas} resolveNome={resolveNome} />}
-              <SazonalidadeSemanal vendas={vendas} />
-            </div>
+            {isAdmin && <SaldoTimeline vendas={vendas} despesas={despesas} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />}
+            <ComparativoMensal vendas={vendas} despesas={despesas} />
+          </div>
+
+          {/* Rankings: vendedores + clientes */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+            {isAdmin && <VendasPorVendedor vendas={vendas} resolveNome={resolveNome} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />}
+            <TopClientes vendas={vendas} resolveCliente={resolveCliente} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />
+          </div>
+
+          {/* Despesas: por tipo + por usuário */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+            <DespesasPorTipo despesas={despesas} resolveNome={resolveNome} vendedores={vendedoresNomes} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />
+            {isAdmin && <DespesasPorUsuario despesas={despesas} resolveNome={resolveNome} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />}
+          </div>
+
+          {/* Modelos + Ticket médio */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+            <TopModelos vendas={vendas} resolveNome={resolveNome} vendedores={vendedoresNomes} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />
+            {isAdmin && <TicketMedioPorVendedor vendas={vendas} resolveNome={resolveNome} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />}
+          </div>
+
+          {/* Padrões: condição de pagamento + sazonalidade */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+            <CondicaoPagamentoTimeline vendas={vendas} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />
+            <SazonalidadeSemanal vendas={vendas} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />
           </div>
         </>
       )}

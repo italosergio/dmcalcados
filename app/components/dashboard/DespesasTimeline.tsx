@@ -4,10 +4,10 @@ import HighchartsReact from 'highcharts-react-official';
 import { ChartCard } from './ChartCard';
 import { LegendaSeletor } from './ChartFilters';
 import { chartTheme, filtrarPorPeriodo, getCategories, bucketKey, baseAxis, baseYAxis, baseTooltip, MODEL_COLORS } from './chartUtils';
-import { formatCurrency } from '~/utils/format';
 import type { Despesa } from '~/models';
+import type { PeriodoGrafico } from './ChartFilters';
 
-export function DespesasTimeline({ despesas }: { despesas: Despesa[] }) {
+export function DespesasTimeline({ despesas, globalPeriodo, globalCustomInicio, globalCustomFim }: { despesas: Despesa[]; globalPeriodo?: PeriodoGrafico; globalCustomInicio?: string; globalCustomFim?: string }) {
   const [selectedTipos, setSelectedTipos] = useState<string[]>([]);
   const initialized = useRef(false);
 
@@ -25,7 +25,7 @@ export function DespesasTimeline({ despesas }: { despesas: Despesa[] }) {
   }, [allTipos]);
 
   return (
-    <ChartCard showCondicao={false} defaultPeriodo="30dias">
+    <ChartCard showCondicao={false} defaultPeriodo="30dias" globalPeriodo={globalPeriodo} globalCustomInicio={globalCustomInicio} globalCustomFim={globalCustomFim}>
       {({ periodo, customInicio, customFim }) => {
         const filtered = filtrarPorPeriodo(despesas, periodo, customInicio, customFim);
         const { cats, isMonthly } = getCategories(periodo, customInicio, customFim);

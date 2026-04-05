@@ -4,10 +4,10 @@ import HighchartsReact from 'highcharts-react-official';
 import { ChartCard } from './ChartCard';
 import { LegendaSeletor } from './ChartFilters';
 import { chartTheme, filtrarPorPeriodo, filtrarPorCondicao, getCategories, bucketKey, baseAxis, baseYAxis, baseTooltip, getModelos, MODEL_COLORS } from './chartUtils';
-import { formatCurrency } from '~/utils/format';
 import type { Venda } from '~/models';
+import type { PeriodoGrafico } from './ChartFilters';
 
-export function VendasTimeline({ vendas }: { vendas: Venda[] }) {
+export function VendasTimeline({ vendas, globalPeriodo, globalCustomInicio, globalCustomFim }: { vendas: Venda[]; globalPeriodo?: PeriodoGrafico; globalCustomInicio?: string; globalCustomFim?: string }) {
   const [selectedModelos, setSelectedModelos] = useState<string[]>([]);
   const initialized = useRef(false);
 
@@ -21,7 +21,7 @@ export function VendasTimeline({ vendas }: { vendas: Venda[] }) {
   }, [allModelos]);
 
   return (
-    <ChartCard showCondicao defaultPeriodo="30dias">
+    <ChartCard showCondicao defaultPeriodo="30dias" globalPeriodo={globalPeriodo} globalCustomInicio={globalCustomInicio} globalCustomFim={globalCustomFim}>
       {({ periodo, customInicio, customFim, condicoes }) => {
         const filtered = filtrarPorCondicao(filtrarPorPeriodo(vendas, periodo, customInicio, customFim), condicoes);
         const { cats, isMonthly } = getCategories(periodo, customInicio, customFim);

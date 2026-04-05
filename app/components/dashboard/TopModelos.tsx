@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { Card } from '~/components/common/Card';
@@ -11,14 +11,25 @@ interface Props {
   vendas: Venda[];
   resolveNome: (id: string, fallback: string) => string;
   vendedores: string[];
+  globalPeriodo?: PeriodoGrafico;
+  globalCustomInicio?: string;
+  globalCustomFim?: string;
 }
 
-export function TopModelos({ vendas, resolveNome, vendedores }: Props) {
+export function TopModelos({ vendas, resolveNome, vendedores, globalPeriodo, globalCustomInicio, globalCustomFim }: Props) {
   const [periodo, setPeriodo] = useState<PeriodoGrafico>('30dias');
   const [customInicio, setCustomInicio] = useState('');
   const [customFim, setCustomFim] = useState('');
   const [condicoes, setCondicoes] = useState<string[]>([]);
   const [selectedVendedores, setSelectedVendedores] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (globalPeriodo !== undefined) {
+      setPeriodo(globalPeriodo);
+      setCustomInicio(globalCustomInicio || '');
+      setCustomFim(globalCustomFim || '');
+    }
+  }, [globalPeriodo, globalCustomInicio, globalCustomFim]);
 
   const filtered = useMemo(() =>
     filtrarPorCondicao(filtrarPorPeriodo(vendas, periodo, customInicio, customFim), condicoes),

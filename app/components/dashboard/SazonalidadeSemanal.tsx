@@ -5,12 +5,13 @@ import { ChartCard } from './ChartCard';
 import { chartTheme, filtrarPorPeriodo, filtrarPorCondicao, baseAxis, baseYAxis, baseTooltip } from './chartUtils';
 import { formatCurrency } from '~/utils/format';
 import type { Venda } from '~/models';
+import type { PeriodoGrafico } from './ChartFilters';
 
 const DIAS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
-export function SazonalidadeSemanal({ vendas }: { vendas: Venda[] }) {
+export function SazonalidadeSemanal({ vendas, globalPeriodo, globalCustomInicio, globalCustomFim }: { vendas: Venda[]; globalPeriodo?: PeriodoGrafico; globalCustomInicio?: string; globalCustomFim?: string }) {
   return (
-    <ChartCard showCondicao defaultPeriodo="30dias">
+    <ChartCard showCondicao defaultPeriodo="30dias" globalPeriodo={globalPeriodo} globalCustomInicio={globalCustomInicio} globalCustomFim={globalCustomFim}>
       {({ periodo, customInicio, customFim, condicoes }) => {
         const filtered = filtrarPorCondicao(filtrarPorPeriodo(vendas, periodo, customInicio, customFim), condicoes);
 
