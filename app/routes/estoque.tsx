@@ -93,6 +93,8 @@ export default function ProdutosPage() {
     if (user && userIsVendedor(user) && !userIsAdmin(user)) { navigate('/vendas'); }
   }, [user]);
 
+  if (!user || (userIsVendedor(user) && !userIsAdmin(user))) return null;
+
   const totalPares = produtos.reduce((s, p) => s + p.estoque, 0);
   const totalPacotes = Math.floor(totalPares / 15);
   const paresAvulsos = totalPares % 15;

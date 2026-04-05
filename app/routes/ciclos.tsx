@@ -12,7 +12,7 @@ const input = "w-full rounded-lg border border-border-subtle bg-elevated px-3 py
 const PECAS_POR_PACOTE = 15;
 
 export default function CiclosPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { ciclos, loading: ciclosLoading } = useCiclos();
   const { users: allUsers, loading: usersLoading } = useUsers();
   const { produtos, loading: produtosLoading } = useProdutos();
@@ -50,6 +50,7 @@ export default function CiclosPage() {
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
+  if (authLoading) return null;
   if (!user || !userCanAccessAdmin(user)) return <Navigate to="/vendas" replace />;
   if (loading) return <div className="flex items-center justify-center py-20 text-content-secondary">Carregando...</div>;
 

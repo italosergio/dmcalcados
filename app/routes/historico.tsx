@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { get, ref } from 'firebase/database';
 import { db } from '~/services/firebase';
 import { ShoppingBag, DollarSign, Package, UserPlus, Trash2, UserCog, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatCurrency } from '~/utils/format';
+import { useAuth } from '~/contexts/AuthContext';
+import { userIsAdmin } from '~/models';
 
 interface HistoryItem {
   id: string;
@@ -14,11 +17,18 @@ interface HistoryItem {
 }
 
 export default function HistoricoPage() {
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const allowed = !authLoading && user && userIsAdmin(user);
+
+  useEffect(() => { if (!authLoading && !allowed) navigate('/vendas'); }, [authLoading, allowed]);
+
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!allowed) return;
     Promise.all([
       get(ref(db, 'vendas')),
       get(ref(db, 'despesas')),
@@ -106,7 +116,9 @@ export default function HistoricoPage() {
       setHistory(items.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()));
       setLoading(false);
     });
-  }, []);
+  }, [allowed]);
+
+  if (!allowed) return null;
 
   const getIcon = (type: string, action: string) => {
     if (action === 'deleted') {

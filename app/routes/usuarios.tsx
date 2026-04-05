@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router';
 import { Shield, User, Trash2, Plus, X, ShieldAlert, ShieldOff, KeyRound, Pencil, Check } from 'lucide-react';
 import { updateUserRoles, deleteUser, updateUserStatus, resetUserPassword } from '~/services/users.service';
 import { register, updateProfile } from '~/services/auth.service';
 import { useAuth } from '~/contexts/AuthContext';
 import type { User as UserType, UserRole } from '~/models';
-import { getUserRoles } from '~/models';
+import { getUserRoles, userIsAdmin } from '~/models';
 import { ROLE_LABELS, ROLE_COLORS, RoleBadge } from '~/utils/roles';
 import { useUsers } from '~/hooks/useRealtime';
 
@@ -44,6 +45,12 @@ function primaryIconColor(user: UserType): string {
 
 export default function UsuariosPage() {
   const { users, loading } = useUsers();
+  const { user: currentUser, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const allowed = !authLoading && currentUser && userIsAdmin(currentUser);
+
+  useEffect(() => { if (!authLoading && !allowed) navigate('/vendas'); }, [authLoading, allowed]);
+
   const [deleteClicks, setDeleteClicks] = useState<Record<string, number>>({});
   const deleteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [showForm, setShowForm] = useState(false);
@@ -66,7 +73,7 @@ export default function UsuariosPage() {
   const [editingName, setEditingName] = useState(false);
   const [editName, setEditName] = useState('');
   const [nameLoading, setNameLoading] = useState(false);
-  const { user: currentUser } = useAuth();
+  const [nameErro, setNameErro] = useState('');
 
   const isDev = currentUser?.role === 'desenvolvedor';
   const isSuperAdmin = isDev || currentUser?.role === 'superadmin';
@@ -75,6 +82,8 @@ export default function UsuariosPage() {
     : ADMIN_ROLES;
 
   useEffect(() => {}, [currentUser]);
+
+  if (!allowed) return null;
 
   const openModal = (u: UserType) => {
     setModalUser(u);
@@ -126,6 +135,8 @@ export default function UsuariosPage() {
   const handleRegister = async () => {
     if (!novoNome.trim() || !novoUsername.trim()) { setFormErro('Preencha todos os campos'); return; }
     if (novoRoles.length === 0) { setFormErro('Selecione ao menos uma role'); return; }
+    if (users.some(u => u.username?.toLowerCase() === novoUsername.trim().toLowerCase())) { setFormErro('Já existe um usuário com esse username'); return; }
+    if (users.some(u => u.nome?.trim().toLowerCase() === novoNome.trim().toLowerCase())) { setFormErro('Já existe um usuário com esse nome'); return; }
     setFormErro(''); setFormLoading(true);
     try {
       // role principal para o register (compatibilidade)
@@ -147,7 +158,7 @@ export default function UsuariosPage() {
   };
 
   if (currentUser?.role !== 'admin' && currentUser?.role !== 'superadmin' && currentUser?.role !== 'desenvolvedor') {
-    return <div className="p-8 text-center text-red-400">Acesso negado</div>;
+    return null;
   }
 
   const isSuperAdminUser = (u: UserType) => getUserRoles(u).includes('superadmin') || getUserRoles(u).includes('desenvolvedor');
@@ -278,9 +289,12 @@ export default function UsuariosPage() {
                  <User size={20} className={primaryIconColor(modalUser)} />}
                 <div>
                   {editingName ? (
-                    <form className="flex items-center gap-1" onSubmit={async (e) => {
+                    <form className="flex flex-col gap-1" onKeyDown={(e) => { if (e.key === 'Escape') { setEditingName(false); setNameErro(''); } }} onSubmit={async (e) => {
                       e.preventDefault();
                       if (!editName.trim() || nameLoading) return;
+                      const dup = users.some(u => u.id !== modalUser.id && u.nome?.trim().toLowerCase() === editName.trim().toLowerCase());
+                      if (dup) { setNameErro('Já existe um usuário com esse nome'); return; }
+                      setNameErro('');
                       setNameLoading(true);
                       try {
                         await updateProfile(modalUser.id, { nome: editName.trim() });
@@ -288,10 +302,13 @@ export default function UsuariosPage() {
                         setEditingName(false);
                       } catch {} finally { setNameLoading(false); }
                     }}>
-                      <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
+                      <div className="flex items-center gap-1">
+                      <input autoFocus value={editName} onChange={e => { setEditName(e.target.value); setNameErro(''); }}
                         className="bg-elevated border border-border-subtle rounded px-1.5 py-0.5 text-sm text-content focus:outline-none focus:border-green-600/50 w-36" />
                       <button type="submit" disabled={nameLoading} className="text-green-400 hover:text-green-300"><Check size={14} /></button>
-                      <button type="button" onClick={() => setEditingName(false)} className="text-content-muted hover:text-content"><X size={14} /></button>
+                      <button type="button" onClick={() => { setEditingName(false); setNameErro(''); }} className="text-content-muted hover:text-content"><X size={14} /></button>
+                      </div>
+                      {nameErro && <p className="text-[10px] text-red-400">{nameErro}</p>}
                     </form>
                   ) : (
                     <p className="text-sm font-semibold flex items-center gap-1">
