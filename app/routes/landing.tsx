@@ -1,9 +1,13 @@
-import { Link } from 'react-router';
-import { ArrowRight, ChevronDown, LayoutDashboard, ShoppingBag, UserCircle, LogOut } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useAuth } from '~/contexts/AuthContext';
-import { logout } from '~/services/auth.service';
 import { useNavigate } from 'react-router';
 import { useState, useRef, useEffect } from 'react';
+
+function shortName(nome?: string) {
+  if (!nome) return '';
+  const parts = nome.trim().split(/\s+/);
+  return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}` : parts[0];
+}
 
 export function meta() {
   return [
@@ -12,68 +16,7 @@ export function meta() {
   ];
 }
 
-function UserMenu() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const handleLogout = async () => {
-    setOpen(false);
-    await logout();
-    window.location.href = '/';
-  };
-
-  return (
-    <div ref={menuRef} className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 text-sm text-content-secondary hover:text-content transition-colors"
-      >
-        Olá, {user?.nome?.split(' ')[0]}
-        <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-
-      {open && (
-        <div className="absolute right-0 mt-2 w-48 rounded-lg border border-border-subtle bg-surface py-1 shadow-lg z-[60]">
-          <Link to="/vendas" onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-content-secondary hover:bg-surface-hover hover:text-content transition-colors">
-            <ShoppingBag size={15} />
-            Vendas
-          </Link>
-          <Link to="/vendas/nova" onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-content-secondary hover:bg-surface-hover hover:text-content transition-colors">
-            <ShoppingBag size={15} />
-            Nova Venda
-          </Link>
-          <Link to="/conta" onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-content-secondary hover:bg-surface-hover hover:text-content transition-colors">
-            <UserCircle size={15} />
-            Conta
-          </Link>
-          <hr className="my-1 border-border-subtle" />
-          <button onClick={handleLogout} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-content-secondary hover:bg-red-600/10 hover:text-red-400 transition-colors">
-            <LogOut size={15} />
-            Sair
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function HeaderAuth() {
-  const { user, loading } = useAuth();
-
-  if (loading) return null;
-
-  return user ? <UserMenu /> : null;
-}
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -165,32 +108,33 @@ export default function LandingPage() {
 
       {/* Header */}
       <header className="relative z-20 px-6 sm:px-10 py-3">
-        <div className="flex justify-end">
-          <HeaderAuth />
-        </div>
         <div className="flex flex-col items-center w-full">
+          {user && (
+            <span style={{ fontFamily: '"Playfair Display", serif' }} className="text-[11px] text-content-muted mb-1">Bem-vindo, {shortName(user.nome)}</span>
+          )}
           <img
             src="/logo-dmcalcados.png"
             alt="DM Calçados"
-            className={`h-28 sm:h-40 w-auto object-contain cursor-pointer select-none transition-transform ${logoShake ? 'animate-[shake_0.3s_ease-in-out]' : ''}`}
+            className={`h-28 sm:h-40 w-auto object-contain cursor-pointer select-none transition-transform logo-glow ${logoShake ? 'animate-[shake_0.3s_ease-in-out]' : ''}`}
             onClick={handleLogoClick}
           />
-          <span className="text-[10px] sm:text-xs uppercase tracking-[0.25em] text-gold mt-1 text-center">Distribuidora Maranhense de Calçados</span>
+          <span style={{ fontFamily: '"Playfair Display", serif' }} className="text-[10px] sm:text-xs uppercase tracking-[0.25em] text-gold mt-1 text-center">Distribuidora Maranhense de Calçados</span>
         </div>
       </header>
 
       {/* Hero */}
-      <main className="relative z-10 flex-1 flex items-center justify-center px-4 sm:px-10 sm:-mt-16">
+      <main className="relative z-10 flex-1 flex items-center justify-center px-4 sm:px-10 -mt-20 sm:-mt-16">
         <div className="max-w-2xl text-center">
-          <h1 className="text-[2.5rem] sm:text-4xl lg:text-5xl font-bold leading-none mb-4">
+          <h1 style={{ fontFamily: '"Playfair Display", serif' }} className="text-[2.5rem] sm:text-4xl lg:text-5xl font-bold leading-none mb-4">
             Sandálias que vendem fácil{' '}
             <br className="hidden sm:block" />
-            <span className="text-content-secondary">no seu comércio</span>
+            <span className="landing-fade-text">no seu comércio</span>
           </h1>
-          <p className="text-lg sm:text-base text-content-secondary leading-relaxed mb-8 max-w-lg mx-auto">
+          <p style={{ fontFamily: '"Playfair Display", serif' }} className="text-lg sm:text-base text-content-secondary leading-relaxed mb-8 max-w-lg mx-auto">
             As melhores marcas para o seu negócio.
             Preço justo, entrega confiável e parceria de verdade.
           </p>
+          <div className="flex flex-col items-center gap-4">
           <a
             href="https://wa.me/5588981144905"
             target="_blank"
@@ -199,9 +143,21 @@ export default function LandingPage() {
           >
             <span className="cta-bg absolute inset-0" />
             <span className="cta-shine absolute inset-0" />
-            <span className="relative z-10">Fale com a gente</span>
+            <span style={{ fontFamily: '"Playfair Display", serif' }} className="relative z-10">Fale com a gente</span>
             <ArrowRight size={16} className="relative z-10 transition-transform duration-300 group-hover:translate-x-1" />
           </a>
+          {user ? (
+            <button onClick={() => navigate('/vendas')}
+              className="cta-button-silver group relative inline-flex items-center gap-3 px-8 py-3 text-sm font-semibold uppercase tracking-wider text-white overflow-hidden">
+              <span className="cta-bg-silver absolute inset-0" />
+              <span className="cta-shine absolute inset-0" />
+              <span style={{ fontFamily: '"Playfair Display", serif' }} className="relative z-10">Acessar Painel</span>
+              <ArrowRight size={16} className="relative z-10 transition-transform duration-300 group-hover:translate-x-1" />
+            </button>
+          ) : (
+            <button onClick={() => navigate('/login')} className="text-xs text-content-muted hover:text-content transition-colors">Entrar</button>
+          )}
+          </div>
         </div>
       </main>
 
@@ -214,7 +170,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="relative z-10 px-6 sm:px-10 py-3 text-center">
-        <p className="text-[10px] text-content-muted">
+        <p style={{ fontFamily: '"Playfair Display", serif' }} className="text-[10px] text-content-muted">
           CNPJ: 14.271.980/0001-71 · © {new Date().getFullYear()} DM Calçados - Distribuidora Maranhense de Calçados. Todos os direitos reservados.
         </p>
       </footer>

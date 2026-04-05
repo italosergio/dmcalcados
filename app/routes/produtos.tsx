@@ -66,15 +66,15 @@ export default function ProdutosPage() {
         <div className="grid grid-cols-3 gap-2 sm:flex sm:gap-3 ml-auto">
           <Card className="bg-gradient-to-r from-green-900/20 to-emerald-900/20 border-green-800 !py-2 !px-2.5 sm:!px-3 sm:max-w-[7rem]">
             <p className="text-[10px] text-content-secondary font-medium leading-tight">Produtos</p>
-            <p className="text-base sm:text-2xl font-bold text-green-400 leading-tight">{produtos.length}</p>
+            <p className="text-xs sm:text-base font-bold text-green-400 leading-tight">{produtos.length}</p>
           </Card>
           <Card className="bg-gradient-to-r from-blue-900/20 to-indigo-900/20 border-blue-800 !py-2 !px-2.5 sm:!px-3 cursor-pointer hover:brightness-110 transition" onClick={() => navigate('/estoque')}>
             <p className="text-[10px] text-content-secondary font-medium leading-tight">Total pares</p>
-            <p className="text-base sm:text-2xl font-bold text-blue-400 leading-tight">{totalPares}</p>
+            <p className="text-xs sm:text-base font-bold text-blue-400 leading-tight">{totalPares}</p>
           </Card>
           <Card className="bg-gradient-to-r from-yellow-900/20 to-amber-900/20 border-yellow-800 !py-2 !px-2.5 sm:!px-3 cursor-pointer hover:brightness-110 transition" onClick={() => navigate('/estoque')}>
             <p className="text-[10px] text-content-secondary font-medium leading-tight">Valor estoque</p>
-            <p className="text-base sm:text-2xl font-bold text-yellow-400 leading-tight">{formatCurrency(valorEstoque)}</p>
+            <p className="text-xs sm:text-base font-bold text-yellow-400 leading-tight">{formatCurrency(valorEstoque)}</p>
           </Card>
         </div>
       </div>

@@ -1,11 +1,11 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router';
-import { UserCircle, Trash2, Undo2, Plus, ShoppingBag, X, Calendar, CreditCard, MapPin, Phone, Package, User, LayoutGrid, List, ImageIcon } from 'lucide-react';
+import { UserCircle, Trash2, Undo2, Plus, ShoppingBag, X, Calendar, CreditCard, MapPin, Phone, Package, User, LayoutGrid, List, ImageIcon, FileText } from 'lucide-react';
 import { ImageLightbox } from '~/components/common/ImageLightbox';
 import { Button } from '~/components/common/Button';
 import { Card } from '~/components/common/Card';
 import { Input } from '~/components/common/Input';
-import { useVendas, useClientes } from '~/hooks/useRealtime';
+import { useVendas, useClientes, useUsers } from '~/hooks/useRealtime';
 import { auth } from '~/services/firebase';
 import { formatCurrency } from '~/utils/format';
 import type { Venda, Cliente, CondicaoPagamento } from '~/models';
@@ -46,14 +46,19 @@ function CondicaoTags({ condicao }: { condicao: string }) {
 export default function VendasPage() {
   const { vendas, loading: vendasLoading } = useVendas();
   const { clientes, loading: clientesLoading } = useClientes();
+  const { users } = useUsers();
   const [vendaSelecionada, setVendaSelecionada] = useState<Venda | null>(null);
   const [filteredVendas, setFilteredVendas] = useState<Venda[]>([]);
   const loading = vendasLoading || clientesLoading;
+  const clienteNomeMap = new Map(clientes.map(c => [c.id, c.nome]));
+  const userNomeMap = new Map(users.map(u => [u.uid || u.id, u.nome]));
+  const resolveCliente = (id: string, fallback: string) => clienteNomeMap.get(id) || fallback;
+  const resolveUser = (id: string, fallback: string) => userNomeMap.get(id) || fallback;
   const [searchVendedor, setSearchVendedor] = useState('');
   const [filtroCondicao, setFiltroCondicao] = useState<string[]>([]);
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
-  const [periodoFiltro, setPeriodoFiltro] = useState<'hoje' | '7dias' | '30dias' | 'ano' | 'tudo'>('30dias');
+  const [periodoFiltro, setPeriodoFiltro] = useState<'hoje' | '7dias' | '30dias' | 'mes' | 'ano' | 'tudo'>('30dias');
   const [deleteClicks, setDeleteClicks] = useState<Record<string, number>>({});
   const deleteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [imagemAberta, setImagemAberta] = useState<string | null>(null);
@@ -69,11 +74,24 @@ export default function VendasPage() {
   };
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Ler período da URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const p = params.get('periodo');
+    if (p && ['hoje', '7dias', '30dias', 'mes', 'ano', 'tudo'].includes(p)) {
+      setPeriodoFiltro(p as typeof periodoFiltro);
+    }
+  }, [location.search]);
+
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+
   const handleDelete = useCallback((vendaId: string) => {
     const clicks = (deleteClicks[vendaId] || 0) + 1;
     clearTimeout(deleteTimers.current[vendaId]);
     if (clicks >= 3) {
       setDeleteClicks(prev => { const n = { ...prev }; delete n[vendaId]; return n; });
+      setActionLoading(prev => ({ ...prev, [vendaId]: true }));
       import('~/services/vendas.service').then(m => m.deleteVenda(vendaId));
     } else {
       setDeleteClicks(prev => ({ ...prev, [vendaId]: clicks }));
@@ -91,8 +109,21 @@ export default function VendasPage() {
   };
 
   const handleRestore = useCallback((vendaId: string) => {
+    setActionLoading(prev => ({ ...prev, [vendaId]: true }));
     import('~/services/vendas.service').then(m => m.restoreVenda(vendaId));
   }, []);
+
+  // Limpar loading quando dados atualizam
+  useEffect(() => {
+    setActionLoading({});
+  }, [vendas]);
+
+  // Sincronizar modal com dados realtime
+  useEffect(() => {
+    if (!vendaSelecionada) return;
+    const atualizada = vendas.find(v => v.id === vendaSelecionada.id);
+    if (atualizada) setVendaSelecionada(atualizada);
+  }, [vendas]);
 
   useEffect(() => {
     const state = location.state as { vendaId?: string } | null;
@@ -123,6 +154,7 @@ export default function VendasPage() {
       if (periodoFiltro === 'hoje') inicio.setHours(0, 0, 0, 0);
       else if (periodoFiltro === '7dias') inicio.setDate(agora.getDate() - 7);
       else if (periodoFiltro === '30dias') inicio.setDate(agora.getDate() - 30);
+      else if (periodoFiltro === 'mes') { inicio.setDate(1); inicio.setHours(0, 0, 0, 0); }
       else if (periodoFiltro === 'ano') inicio.setFullYear(agora.getFullYear(), 0, 1);
       result = result.filter(v => new Date(v.data) >= inicio);
     }
@@ -244,35 +276,35 @@ export default function VendasPage() {
             ? `a partir de ${new Date(filtroDataInicio + 'T00:00:00').toLocaleDateString('pt-BR')}`
             : filtroDataFim
               ? `até ${new Date(filtroDataFim + 'T00:00:00').toLocaleDateString('pt-BR')}`
-              : { hoje: 'hoje', '7dias': 'últimos 7 dias', '30dias': 'últimos 30 dias', ano: 'do ano', tudo: '' }[periodoFiltro];
+              : { hoje: 'hoje', '7dias': 'últimos 7 dias', '30dias': 'últimos 30 dias', mes: 'do mês', ano: 'do ano', tudo: '' }[periodoFiltro];
         return (
           <div className="mb-4 space-y-3 sm:space-y-0 sm:flex sm:flex-wrap sm:items-stretch sm:gap-3">
-            {/* Mobile: só o botão */}
-            <div className="flex items-center sm:contents">
+            {/* Mobile: botão + total na mesma linha */}
+            <div className="flex items-stretch gap-2 sm:contents">
               <button
                 onClick={() => navigate('/vendas/nova')}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-green-500/20 transition hover:from-green-500 hover:to-emerald-400 active:scale-95"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-green-500/20 transition hover:from-green-500 hover:to-emerald-400 active:scale-95 shrink-0"
               >
-                <Plus size={18} /> Nova Venda
+                <Plus size={18} /> <span className="hidden sm:inline">Nova Venda</span><span className="sm:hidden">Venda</span>
               </button>
-            </div>
-            {/* Cards de total */}
-            <div className="grid grid-cols-3 gap-2 sm:contents">
-              <Card className="bg-gradient-to-r from-green-900/20 to-emerald-900/20 border-green-800 !py-2 !px-2.5 sm:!px-3 sm:flex-1 sm:min-w-0">
+              <Card className="flex-1 min-w-0 bg-gradient-to-r from-green-900/20 to-emerald-900/20 border-green-800 !py-2 !px-2.5 sm:!px-3 sm:flex-1 sm:min-w-0">
                 <p className="text-[10px] text-content-secondary font-medium leading-tight truncate">Total {periodoLabel}</p>
-                <p className="text-base sm:text-2xl font-bold text-green-400 leading-tight">{formatCurrency(totalVendas)}</p>
+                <p className="text-xs sm:text-base font-bold text-green-400 leading-tight">{formatCurrency(totalVendas)}</p>
                 <p className="text-[10px] text-content-muted leading-tight">{filteredVendas.length} venda(s)</p>
               </Card>
+            </div>
+            {/* Cards secundários */}
+            <div className="grid grid-cols-2 gap-2 sm:contents">
               {showAvistaEntrada && (
                 <Card className="bg-gradient-to-r from-blue-900/20 to-indigo-900/20 border-blue-800 !py-2 !px-2.5 sm:!px-3">
                   <p className="text-[10px] text-content-secondary font-medium leading-tight truncate">{avistaEntradaLabel}</p>
-                  <p className="text-base sm:text-2xl font-bold text-blue-400 leading-tight">{formatCurrency(totalAvistaEntrada)}</p>
+                  <p className="text-xs sm:text-base font-bold text-blue-400 leading-tight">{formatCurrency(totalAvistaEntrada)}</p>
                 </Card>
               )}
               {showPrazo && (
                 <Card className="bg-gradient-to-r from-yellow-900/20 to-amber-900/20 border-yellow-800 !py-2 !px-2.5 sm:!px-3">
                   <p className="text-[10px] text-content-secondary font-medium leading-tight truncate">{prazoLabel}</p>
-                  <p className="text-base sm:text-2xl font-bold text-yellow-400 leading-tight">{formatCurrency(totalPrazo)}</p>
+                  <p className="text-xs sm:text-base font-bold text-yellow-400 leading-tight">{formatCurrency(totalPrazo)}</p>
                 </Card>
               )}
             </div>
@@ -286,6 +318,7 @@ export default function VendasPage() {
           { value: 'hoje', label: 'Hoje' },
           { value: '7dias', label: '7 dias' },
           { value: '30dias', label: '30 dias' },
+          { value: 'mes', label: 'Mês' },
           { value: 'ano', label: 'Ano' },
           { value: 'tudo', label: 'Tudo' },
         ] as { value: typeof periodoFiltro; label: string }[]).map(opt => (
@@ -366,7 +399,7 @@ export default function VendasPage() {
       {!loading && filteredVendas.length === 0 && vendas.length > 0 && filtroCondicao.length === 0 && !filtroDataInicio && !filtroDataFim && (
         <div className="rounded-xl border border-border-subtle bg-surface p-6 sm:p-8 text-center">
           <ShoppingBag size={40} className="mx-auto mb-3 text-content-muted opacity-40" />
-          <p className="mb-2 text-sm sm:text-base font-medium">Nenhuma venda registrada {periodoFiltro === 'hoje' ? 'hoje' : periodoFiltro === '7dias' ? 'nos últimos 7 dias' : periodoFiltro === '30dias' ? 'nos últimos 30 dias' : 'no ano'}</p>
+          <p className="mb-2 text-sm sm:text-base font-medium">Nenhuma venda registrada {periodoFiltro === 'hoje' ? 'hoje' : periodoFiltro === '7dias' ? 'nos últimos 7 dias' : periodoFiltro === '30dias' ? 'nos últimos 30 dias' : periodoFiltro === 'mes' ? 'neste mês' : 'no ano'}</p>
           <button onClick={() => setPeriodoFiltro('tudo')}
             className="rounded-lg border border-border-subtle bg-elevated px-4 py-2 text-sm font-medium text-content-secondary transition hover:bg-border-medium">
             Ver todas as vendas
@@ -379,7 +412,7 @@ export default function VendasPage() {
           <p className="mb-2 text-sm sm:text-base">Nenhuma venda encontrada com os filtros:</p>
           <div className="mb-4 flex flex-wrap justify-center gap-1.5">
             {periodoFiltro !== 'tudo' && !filtroDataInicio && !filtroDataFim && (
-              <span className="text-xs bg-elevated px-2.5 py-1 rounded-lg">{{ hoje: 'Hoje', '7dias': '7 dias', '30dias': '30 dias', ano: 'Ano' }[periodoFiltro]}</span>
+              <span className="text-xs bg-elevated px-2.5 py-1 rounded-lg">{{ hoje: 'Hoje', '7dias': '7 dias', '30dias': '30 dias', mes: 'Mês', ano: 'Ano' }[periodoFiltro]}</span>
             )}
             {filtroDataInicio && <span className="text-xs bg-elevated px-2.5 py-1 rounded-lg">De: {new Date(filtroDataInicio + 'T00:00:00').toLocaleDateString('pt-BR')}</span>}
             {filtroDataFim && <span className="text-xs bg-elevated px-2.5 py-1 rounded-lg">Até: {new Date(filtroDataFim + 'T00:00:00').toLocaleDateString('pt-BR')}</span>}
@@ -409,15 +442,18 @@ export default function VendasPage() {
                     {(venda as any).imagemUrl && (
                       <ImageIcon size={13} className="text-blue-400 shrink-0" />
                     )}
+                    {(venda as any).descricao && (
+                      <FileText size={13} className="text-content-muted/60 shrink-0" />
+                    )}
                   </div>
                   {(venda as any).deletedAt && (
                     <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded font-medium">Apagada</span>
                   )}
                   <p className={`text-lg sm:text-xl font-bold ${ (venda as any).deletedAt ? 'text-red-400 line-through' : 'text-green-400' }`}>{formatCurrency(venda.valorTotal)}</p>
-                  <p className="text-sm font-medium text-content-secondary truncate flex items-center gap-1"><User size={14} className="shrink-0" />{venda.clienteNome}</p>
+                  <p className="text-sm font-medium text-content-secondary truncate flex items-center gap-1"><User size={14} className="shrink-0" />{resolveCliente(venda.clienteId, venda.clienteNome)}</p>
                   <div className="mt-1 flex items-center gap-1 text-xs text-content-muted">
                     <UserCircle size={14} />
-                    <span className="truncate">{venda.vendedorNome}</span>
+                    <span className="truncate">{resolveUser(venda.vendedorId, venda.vendedorNome)}</span>
                     {(venda as any).registradoPorNome && (
                       <span className="text-content-muted/60">&middot; reg. por {(venda as any).registradoPorNome}</span>
                     )}
@@ -484,8 +520,8 @@ export default function VendasPage() {
                 {filteredVendas.map(venda => (
                   <tr key={venda.id} onClick={() => setVendaSelecionada(venda)} className={`cursor-pointer transition-colors ${ (venda as any).deletedAt ? 'bg-red-950/20 opacity-70 hover:opacity-90' : 'hover:bg-surface-hover' }`}>
                     <td className="px-3 py-2.5 text-xs text-content-muted whitespace-nowrap">{new Date(venda.data).toLocaleDateString('pt-BR')}</td>
-                    <td className="px-3 py-2.5 text-sm truncate max-w-[140px] sm:max-w-none">{venda.clienteNome}</td>
-                    <td className="px-3 py-2.5 text-sm text-content-secondary truncate max-w-[120px] hidden sm:table-cell">{venda.vendedorNome}</td>
+                    <td className="px-3 py-2.5 text-sm truncate max-w-[140px] sm:max-w-none">{resolveCliente(venda.clienteId, venda.clienteNome)}</td>
+                    <td className="px-3 py-2.5 text-sm text-content-secondary truncate max-w-[120px] hidden sm:table-cell">{resolveUser(venda.vendedorId, venda.vendedorNome)}</td>
                     <td className="px-3 py-2.5 text-center hidden sm:table-cell"><CondicaoTags condicao={venda.condicaoPagamento} /></td>
                     <td className={`px-3 py-2.5 text-sm font-semibold text-right whitespace-nowrap ${ (venda as any).deletedAt ? 'text-red-400 line-through' : 'text-green-400' }`}>{formatCurrency(venda.valorTotal)}</td>
                   </tr>
@@ -524,7 +560,7 @@ export default function VendasPage() {
                   </div>
                   <div className="rounded-lg bg-elevated p-2.5">
                     <div className="flex items-center gap-1.5 text-content-muted mb-0.5"><UserCircle size={12} /><span className="text-[10px]">Vendedor</span></div>
-                    <p className="text-xs font-semibold">{v.vendedorNome}</p>
+                    <p className="text-xs font-semibold">{resolveUser(v.vendedorId, v.vendedorNome)}</p>
                     {(v as any).registradoPorNome && (
                       <p className="text-[10px] text-content-muted mt-0.5">Registrado por {(v as any).registradoPorNome}</p>
                     )}
@@ -533,7 +569,7 @@ export default function VendasPage() {
 
                 <div className="rounded-lg bg-elevated p-2.5">
                   <p className="text-[10px] text-content-muted mb-1">Cliente</p>
-                  <p className="text-xs font-semibold">{v.clienteNome}</p>
+                  <p className="text-xs font-semibold">{resolveCliente(v.clienteId, v.clienteNome)}</p>
                   {c && (
                     <div className="mt-1 space-y-0.5 text-[10px] text-content-secondary">
                       {c.cpfCnpj && <p>{c.cpfCnpj.length === 11 ? 'CPF' : 'CNPJ'}: {c.cpfCnpj}</p>}
@@ -624,10 +660,11 @@ export default function VendasPage() {
                     <button
                       type="button"
                       onClick={() => handleRestore(v.id)}
-                      className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/20 transition-colors"
+                      disabled={actionLoading[v.id]}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/20 transition-colors disabled:opacity-40"
                     >
                       <Undo2 size={13} />
-                      Desfazer exclusão
+                      {actionLoading[v.id] ? 'Aguarde...' : 'Desfazer exclusão'}
                     </button>
                   </div>
                 )}
@@ -636,16 +673,19 @@ export default function VendasPage() {
                 <button
                   type="button"
                   onClick={() => handleDelete(v.id)}
-                  className={`w-full flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
-                    (deleteClicks[v.id] || 0) === 0
-                      ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
-                      : (deleteClicks[v.id] || 0) === 1
-                        ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                        : 'bg-red-600/30 text-red-300 hover:bg-red-600/40'
+                  disabled={actionLoading[v.id]}
+                  className={`w-full flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors disabled:opacity-40 ${
+                    actionLoading[v.id]
+                      ? 'bg-elevated text-content-muted'
+                      : (deleteClicks[v.id] || 0) === 0
+                        ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
+                        : (deleteClicks[v.id] || 0) === 1
+                          ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                          : 'bg-red-600/30 text-red-300 hover:bg-red-600/40'
                   }`}
                 >
                   <Trash2 size={14} />
-                  {deleteLabel(v.id) || 'Apagar'}
+                  {actionLoading[v.id] ? 'Aguarde...' : (deleteLabel(v.id) || 'Apagar')}
                 </button>
                 )}
               </div>

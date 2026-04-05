@@ -37,7 +37,7 @@ export async function getVendas(): Promise<Venda[]> {
   const userData = await get(ref(db, `users/${user.uid}`));
   const uData = userData.val();
   const roles: string[] = uData?.roles?.length ? uData.roles : [uData?.role];
-  const isAdmin = roles.some(r => r === 'admin' || r === 'superadmin');
+  const isAdmin = roles.some(r => r === 'admin' || r === 'superadmin' || r === 'desenvolvedor');
 
   const [vendasSnap, usersSnap] = await Promise.all([
     get(ref(db, 'vendas')),
@@ -103,7 +103,7 @@ export async function createVenda(data: Omit<Venda, 'id' | 'createdAt' | 'pedido
   const vendedorData = vendedorSnap.val();
   const roles: string[] = vendedorData?.roles?.length ? vendedorData.roles : [vendedorData?.role];
   const vendedorIsVendedor = roles.some(r => isVendedor(r as any));
-  const vendedorIsAdmin = roles.some(r => r === 'admin' || r === 'superadmin');
+  const vendedorIsAdmin = roles.some(r => r === 'admin' || r === 'superadmin' || r === 'desenvolvedor');
 
   if (vendedorIsVendedor && !vendedorIsAdmin) {
     // Desconta do ciclo do vendedor

@@ -2,9 +2,12 @@ import { useState, type FormEvent, type ChangeEvent } from 'react';
 import { useAuth } from '~/contexts/AuthContext';
 import { updateProfile, updatePassword } from '~/services/auth.service';
 import { uploadImage } from '~/services/cloudinary.service';
-import { Camera } from 'lucide-react';
+import { Camera, Phone, Plus, Pencil, Check } from 'lucide-react';
+import { getUserRoles } from '~/models';
+import { RoleBadge } from '~/utils/roles';
 
 const input = "w-full rounded-lg border border-border-subtle bg-elevated px-3 py-2.5 text-sm text-content focus:outline-none focus:border-border-medium focus:ring-1 focus:ring-blue-500/30 transition-colors";
+
 
 export default function ContaPage() {
   const { user } = useAuth();
@@ -13,6 +16,10 @@ export default function ContaPage() {
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [fotoPreview, setFotoPreview] = useState(user?.foto || '');
   const [fotoFile, setFotoFile] = useState<File | null>(null);
+  const [contato, setContato] = useState(user?.contato || '');
+  const [showContatoInput, setShowContatoInput] = useState(false);
+  const [editandoNome, setEditandoNome] = useState(false);
+  const [nome, setNome] = useState(user?.nome || '');
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
 
@@ -33,7 +40,12 @@ export default function ContaPage() {
     try {
       let fotoUrl = user.foto;
       if (fotoFile) fotoUrl = await uploadImage(fotoFile);
-      if (fotoUrl !== user.foto) await updateProfile(user.uid, { foto: fotoUrl });
+
+      const profileUpdates: { foto?: string; contato?: string; nome?: string } = {};
+      if (fotoUrl !== user.foto) profileUpdates.foto = fotoUrl;
+      if (contato !== (user.contato || '')) profileUpdates.contato = contato;
+      if (nome.trim() && nome.trim() !== user.nome) profileUpdates.nome = nome.trim();
+      if (Object.keys(profileUpdates).length) await updateProfile(user.uid, profileUpdates);
 
       if (senha) {
         const { reauthenticateWithCredential, EmailAuthProvider } = await import('firebase/auth');
@@ -44,7 +56,7 @@ export default function ContaPage() {
       }
 
       setMsg('Dados atualizados com sucesso!');
-      setSenhaAtual(''); setSenha(''); setConfirmarSenha('');
+      setSenhaAtual(''); setSenha(''); setConfirmarSenha(''); setEditandoNome(false);
     } catch (err: any) {
       const code = err?.code || '';
       if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') setMsg('Senha atual incorreta');
@@ -52,6 +64,8 @@ export default function ContaPage() {
       else setMsg(`Erro ao atualizar: ${err?.message || 'tente novamente'}`);
     } finally { setLoading(false); }
   };
+
+  const roles = user ? getUserRoles(user) : [];
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto">
@@ -73,15 +87,59 @@ export default function ContaPage() {
       </div>
 
       {/* Info read-only */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-3">
         <div>
           <label className="text-xs text-content-muted mb-1 block">Nome</label>
-          <p className="text-sm font-medium">{user?.nome}</p>
+          {editandoNome ? (
+            <div className="flex items-center gap-1.5">
+              <input value={nome} onChange={(e) => setNome(e.target.value)} className={input} autoFocus />
+              <button type="button" onClick={() => setEditandoNome(false)} className="rounded-md p-1 text-green-400 hover:bg-green-500/10 transition-colors"><Check size={14} /></button>
+            </div>
+          ) : (
+            <p className="text-sm font-medium flex items-center gap-1.5">
+              {user?.nome}
+              <button type="button" onClick={() => { setNome(user?.nome || ''); setEditandoNome(true); }} className="text-content-muted/30 hover:text-content-muted transition-colors"><Pencil size={12} /></button>
+            </p>
+          )}
         </div>
         <div>
           <label className="text-xs text-content-muted mb-1 block">Usuário</label>
           <p className="text-sm text-content-muted">{user?.username}</p>
         </div>
+      </div>
+
+      {/* Role */}
+      <div>
+        <label className="text-xs text-content-muted mb-1.5 block">Cargo</label>
+        <div className="flex flex-wrap gap-1.5">
+          {roles.map(r => <RoleBadge key={r} role={r} />)}
+        </div>
+      </div>
+
+      {/* Contato */}
+      <div>
+        <label className="text-xs text-content-muted mb-1 block">Contato</label>
+        {user?.contato || showContatoInput ? (
+          <div className="flex items-center gap-2">
+            <Phone size={14} className="text-content-muted shrink-0" />
+            <input
+              type="text"
+              value={contato}
+              onChange={(e) => setContato(e.target.value)}
+              className={input}
+              placeholder="(00) 00000-0000"
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowContatoInput(true)}
+            className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            <Plus size={14} />
+            Adicionar contato
+          </button>
+        )}
       </div>
 
       <hr className="border-border-subtle" />

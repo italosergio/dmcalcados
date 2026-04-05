@@ -499,9 +499,13 @@ export function VendaForm() {
                       </button>
                     </>
                   ) : clientesFiltrados.map(c => (
-                    <button key={c.id} type="button" onClick={() => selecionarCliente(c)}
-                      className={`w-full px-3 py-2 text-left text-sm hover:bg-surface-hover transition-colors ${clienteId === c.id ? 'bg-blue-500/10 text-blue-400' : 'text-content'}`}>
-                      <span className="block truncate">{c.nome}</span>
+                    <button key={c.id} type="button" onClick={() => !c.suspenso && selecionarCliente(c)}
+                      disabled={!!c.suspenso}
+                      className={`w-full px-3 py-2 text-left text-sm transition-colors ${c.suspenso ? 'opacity-40 cursor-not-allowed' : 'hover:bg-surface-hover'} ${clienteId === c.id ? 'bg-blue-500/10 text-blue-400' : 'text-content'}`}>
+                      <span className="block truncate">
+                        {c.nome}
+                        {c.suspenso && <span className="ml-1.5 text-[10px] bg-red-500/15 text-red-400 px-1 py-0.5 rounded font-medium">Suspenso</span>}
+                      </span>
                       {(c.contatos?.[0] || c.contato) && <span className="text-xs text-content-muted">{c.contatos?.[0] || c.contato}</span>}
                     </button>
                   ))}

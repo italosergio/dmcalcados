@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Plus, X, Package, Search, CheckCircle2, AlertCircle } from 'lucide-react';
-import { getProdutos, createProduto } from '~/services/produtos.service';
+import { createProduto } from '~/services/produtos.service';
 import { createEntrada } from '~/services/entradas.service';
 import { updateProduto } from '~/services/produtos.service';
 import { uploadImage } from '~/services/cloudinary.service';
 import { formatCurrency } from '~/utils/format';
+import { useProdutos } from '~/hooks/useRealtime';
 import type { Produto } from '~/models';
 
 const inputBase = "w-full rounded-lg border bg-elevated px-3 py-2.5 text-sm text-content focus:outline-none focus:ring-1 transition-colors";
@@ -20,9 +21,8 @@ interface ItemEntrada {
 }
 
 export default function EstoqueEntradaPage() {
-  const [produtos, setProdutos] = useState<Produto[]>([]);
+  const { produtos, loading } = useProdutos();
   const [itens, setItens] = useState<ItemEntrada[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [busca, setBusca] = useState('');
   const [dropdown, setDropdown] = useState(false);
@@ -36,8 +36,6 @@ export default function EstoqueEntradaPage() {
   const [npSaving, setNpSaving] = useState(false);
 
   const navigate = useNavigate();
-
-  useEffect(() => { getProdutos().then(setProdutos).finally(() => setLoading(false)); }, []);
 
   const filteredProdutos = produtos.filter(p =>
     !itens.some(i => i.produtoId === p.id) &&
@@ -73,7 +71,6 @@ export default function EstoqueEntradaPage() {
       const valor = parseFloat(npValor) || 0;
       const id = await createProduto({ modelo: npModelo.trim(), referencia: npReferencia.trim(), valor, foto: '', estoque: 0 });
       const novo = { id, modelo: npModelo.trim(), referencia: npReferencia.trim(), valor, foto: '', estoque: 0, createdAt: new Date(), updatedAt: new Date() } as Produto;
-      setProdutos(prev => [...prev, novo]);
       addProduto(novo);
       setNovoProduto(false); setNpModelo(''); setNpReferencia(''); setNpValor('');
     } catch { } finally { setNpSaving(false); }

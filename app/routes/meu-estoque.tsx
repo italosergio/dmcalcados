@@ -1,21 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '~/contexts/AuthContext';
-import { getCiclosByVendedor } from '~/services/ciclos.service';
+import { useCiclos } from '~/hooks/useRealtime';
 import { formatCurrency } from '~/utils/format';
 import type { Ciclo } from '~/models';
 import { Package, Calendar, TrendingUp, X } from 'lucide-react';
 
 export default function MeuEstoquePage() {
   const { user } = useAuth();
-  const [ciclos, setCiclos] = useState<Ciclo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { ciclos: allCiclos, loading } = useCiclos();
   const [modalCiclo, setModalCiclo] = useState<Ciclo | null>(null);
 
-  useEffect(() => {
-    if (!user) return;
-    const uid = user.uid || user.id;
-    getCiclosByVendedor(uid).then(setCiclos).finally(() => setLoading(false));
-  }, [user]);
+  const uid = user?.uid || user?.id || '';
+  const ciclos = allCiclos.filter(c => c.vendedorId === uid);
 
   if (loading) return <div className="flex items-center justify-center py-20 text-content-secondary">Carregando...</div>;
 
@@ -31,7 +27,6 @@ export default function MeuEstoquePage() {
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
-      <h1 className="text-lg font-semibold">Meu Estoque</h1>
 
       {/* Ciclo ativo */}
       {ativo ? (
@@ -61,7 +56,7 @@ export default function MeuEstoquePage() {
                 </tr>
               </thead>
               <tbody>
-                {ativo.produtos.map((p, i) => (
+                {ativo.produtos.map((p: any, i: number) => (
                   <tr key={i} className="border-b border-border-subtle last:border-0 hover:bg-surface-hover transition-colors">
                     <td className="px-3 py-2">
                       <span className="font-medium">{p.modelo}</span>
@@ -136,7 +131,7 @@ export default function MeuEstoquePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {modalCiclo.produtos.map((p, i) => (
+                  {modalCiclo.produtos.map((p: any, i: number) => (
                     <tr key={i} className="border-b border-border-subtle last:border-0">
                       <td className="px-3 py-2 font-medium">{p.modelo}</td>
                       <td className="px-3 py-2 text-center text-content-muted">{p.pacotesInicial} pct ({p.pecasInicial} pçs)</td>

@@ -1,33 +1,28 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import { Plus, Package, Search, Warehouse, PackageOpen, Footprints, LayoutGrid, List, X, Pencil, Trash2, Calendar, Tag, TrendingUp, TrendingDown, CheckCircle2, AlertCircle } from 'lucide-react';
-import { createEntrada } from '~/services/entradas.service';
-import { createProduto, updateProduto as updateProdutoService } from '~/services/produtos.service';
+import { Plus, Package, Warehouse, PackageOpen, Footprints, X, Pencil, Trash2, Calendar, Tag, TrendingUp, TrendingDown, CheckCircle2, AlertCircle, Search } from 'lucide-react';
+import { useProdutos, useVendas, useEntradas } from '~/hooks/useRealtime';
+import { createEntrada, migrarEntradasExistentes } from '~/services/entradas.service';
+import { createProduto, updateProduto as updateProdutoService, deleteProduto } from '~/services/produtos.service';
+
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { ProdutoCard } from '~/components/produtos/ProdutoCard';
-import { getProdutos, deleteProduto } from '~/services/produtos.service';
-import { getVendas } from '~/services/vendas.service';
-import { getEntradas, migrarEntradasExistentes } from '~/services/entradas.service';
-
 import { ResponsiveTable, Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from '~/components/common/ResponsiveTable';
 import type { Produto, Venda, EntradaProduto } from '~/models';
-import { formatCurrency } from '~/utils/format';
 import { useAuth } from '~/contexts/AuthContext';
 import { userIsAdmin, userIsVendedor } from '~/models';
 import { useCachedState, clearFormCache } from '~/hooks/useFormCache';
+import { formatCurrency } from '~/utils/format';
 
 type Periodo = '7d' | '30d' | '90d' | '12m';
 
 export default function ProdutosPage() {
   const { user } = useAuth();
-  const [produtos, setProdutos] = useState<Produto[]>([]);
-  const [vendas, setVendas] = useState<Venda[]>([]);
-  const [entradas, setEntradas] = useState<EntradaProduto[]>([]);
-  const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
-  const changeViewMode = (mode: 'cards' | 'table') => { setViewMode(mode); if (typeof window !== 'undefined') localStorage.setItem('produtos-view', mode); };
+  const { produtos, loading: produtosLoading } = useProdutos();
+  const { vendas, loading: vendasLoading } = useVendas();
+  const { entradas, loading: entradasLoading } = useEntradas();
+  const loading = produtosLoading || vendasLoading || entradasLoading;
   const [produtoSelecionado, setProdutoSelecionado] = useState<Produto | null>(null);
   const [periodo, setPeriodo] = useState<Periodo>('30d');
   const [modelosFiltro, setModelosFiltro] = useState<string[]>([]);
@@ -71,7 +66,6 @@ export default function ProdutosPage() {
       const valor = parseFloat(npValor) || 0;
       const id = await createProduto({ modelo: npModelo.trim(), referencia: npReferencia.trim(), valor, foto: '', estoque: 0 });
       const novo = { id, modelo: npModelo.trim(), referencia: npReferencia.trim(), valor, foto: '', estoque: 0, createdAt: new Date(), updatedAt: new Date() } as Produto;
-      setProdutos(prev => [...prev, novo]);
       addEntradaProduto(novo);
       setNpModal(false); setNpModelo(''); setNpReferencia(''); setNpValor('');
     } catch { } finally { setNpSaving(false); }
@@ -92,7 +86,6 @@ export default function ProdutosPage() {
         if (produto) await updateProdutoService(item.produtoId, { estoque: produto.estoque + qtdReal });
       }
       setModalEntrada(false); setEntradaItens([]); clearFormCache('entrada');
-      loadProdutos();
     } catch { } finally { setEntradaSaving(false); }
   };
 
@@ -100,32 +93,10 @@ export default function ProdutosPage() {
     if (user && userIsVendedor(user) && !userIsAdmin(user)) { navigate('/vendas'); }
   }, [user]);
 
-  const loadProdutos = () => {
-    setLoading(true);
-    Promise.all([getProdutos(), getVendas(), getEntradas()])
-      .then(([p, v, e]) => {
-        setProdutos(p);
-        setVendas(v);
-        setEntradas(e);
-      })
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    loadProdutos();
-    const saved = localStorage.getItem('produtos-view') as 'cards' | 'table';
-    if (saved) setViewMode(saved);
-  }, []);
-
   const totalPares = produtos.reduce((s, p) => s + p.estoque, 0);
   const totalPacotes = Math.floor(totalPares / 15);
   const paresAvulsos = totalPares % 15;
   const valorEstoque = produtos.reduce((s, p) => s + p.valor * p.estoque, 0);
-
-  const filtered = produtos.filter(p =>
-    (p.modelo || (p as any).nome || '').toLowerCase().includes(search.toLowerCase()) ||
-    (p.referencia || '').toLowerCase().includes(search.toLowerCase())
-  );
 
   // --- Dados de saída/entrada por produto ---
   const periodoMs = { '7d': 7, '30d': 30, '90d': 90, '12m': 365 };
@@ -172,6 +143,7 @@ export default function ProdutosPage() {
   const chartData = useMemo(() => {
     const modelos = modelosAtivos.slice(0, 8);
     const buckets: Record<string, Record<string, number>> = {};
+    const totalBuckets: Record<string, number> = {};
 
     if (painelModo === 'saida') {
       vendasFiltradas.forEach(v => {
@@ -183,6 +155,7 @@ export default function ProdutosPage() {
           if (!modelos.includes(p.modelo)) return;
           if (!buckets[key]) buckets[key] = {};
           buckets[key][p.modelo] = (buckets[key][p.modelo] || 0) + p.quantidade;
+          totalBuckets[key] = (totalBuckets[key] || 0) + p.quantidade;
         });
       });
     } else {
@@ -194,6 +167,7 @@ export default function ProdutosPage() {
         if (!modelos.includes(e.modelo)) return;
         if (!buckets[key]) buckets[key] = {};
         buckets[key][e.modelo] = (buckets[key][e.modelo] || 0) + e.quantidade;
+        totalBuckets[key] = (totalBuckets[key] || 0) + e.quantidade;
       });
     }
 
@@ -218,6 +192,12 @@ export default function ProdutosPage() {
       color: colors[i % colors.length],
     }));
 
+    series.push({
+      type: 'line' as const, name: 'Total',
+      data: allDates.map(c => totalBuckets[c] || 0),
+      color: '#ffffff',
+    });
+
     return { categories: allDates, series };
   }, [vendasFiltradas, entradasFiltradas, modelosAtivos, periodo, painelModo]);
 
@@ -238,7 +218,7 @@ export default function ProdutosPage() {
     },
     series: chartData.series,
     credits: { enabled: false },
-    legend: { enabled: false },
+    legend: { enabled: true, itemStyle: { color: '#f0f0f2', fontSize: '9px' }, itemHoverStyle: { color: '#fff' } },
     tooltip: { formatter: function() { return '<b>' + this.series.name + '</b><br/>' + this.x + ': ' + this.y + ' un'; } },
     plotOptions: { line: { marker: { radius: 2 } } },
   };
@@ -263,7 +243,6 @@ export default function ProdutosPage() {
   const handleMigrar = async () => {
     setMigrando(true);
     await migrarEntradasExistentes();
-    loadProdutos();
     setMigrando(false);
   };
 
@@ -278,7 +257,7 @@ export default function ProdutosPage() {
     <>
     <div className="flex flex-col lg:h-full" style={{ zoom: 0.8 }}>
       {!loading && produtos.length > 0 && (
-        <div className="mb-4 sm:mb-6 space-y-3 shrink-0">
+        <div className="mb-4 sm:mb-6 space-y-2 shrink-0">
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-xl border border-border-subtle bg-surface p-2 sm:p-3 flex items-center gap-2">
               <div className="rounded-lg bg-green-500/10 p-1.5 shrink-0"><Warehouse size={16} className="text-green-400" /></div>
@@ -302,27 +281,16 @@ export default function ProdutosPage() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => { setEntradaBusca(''); setEntradaDropdown(false); setNpModal(false); setModalEntrada(true); }}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-400 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:from-blue-400 hover:to-blue-300 active:scale-95">
-              <Plus size={16} /> <span className="hidden sm:inline">Registrar Entrada</span><span className="sm:hidden">Entrada</span>
-            </button>
-            <div className="flex rounded-lg border border-border-subtle overflow-hidden">
-              <button onClick={() => changeViewMode('cards')} className={`p-2 transition-colors ${viewMode === 'cards' ? 'bg-elevated text-content' : 'text-content-muted hover:text-content'}`}><LayoutGrid size={16} /></button>
-              <button onClick={() => changeViewMode('table')} className={`p-2 transition-colors ${viewMode === 'table' ? 'bg-elevated text-content' : 'text-content-muted hover:text-content'}`}><List size={16} /></button>
-            </div>
-            <div className="relative flex-1 min-w-0">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" />
-              <input placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-lg border border-border-subtle bg-elevated pl-8 pr-3 py-2 text-xs text-content focus:outline-none focus:border-border-medium focus:ring-1 focus:ring-blue-500/30 transition-colors" />
-            </div>
-          </div>
+          <button onClick={() => { setEntradaBusca(''); setEntradaDropdown(false); setNpModal(false); setModalEntrada(true); }}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-400 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:from-blue-400 hover:to-blue-300 active:scale-[0.98]">
+            <Plus size={16} /> Registrar Entrada
+          </button>
         </div>
       )}
 
       {loading && <p>Carregando...</p>}
 
-      {!loading && filtered.length === 0 && (
+      {!loading && produtos.length === 0 && (
         <div className="rounded-xl border border-dashed border-border-subtle bg-surface p-8 sm:p-12 text-center">
           <Package size={48} className="mx-auto mb-4 text-content-muted opacity-40" />
           <p className="mb-1 text-base sm:text-lg font-semibold">Nenhum produto encontrado</p>
@@ -334,7 +302,7 @@ export default function ProdutosPage() {
         </div>
       )}
 
-      {!loading && filtered.length > 0 && (
+      {!loading && produtos.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:min-h-0 lg:flex-1">
           {/* Lado esquerdo - Estoque */}
           <div className="lg:col-span-2">
@@ -347,7 +315,7 @@ export default function ProdutosPage() {
               {entradasAgrupadas.length === 0 ? (
                 <p className="text-sm text-content-muted text-center py-4">Sem entradas no período</p>
               ) : (
-                <div className="max-h-[12rem] overflow-y-auto space-y-1.5">
+                <div className="max-h-[17.5rem] lg:max-h-[12rem] overflow-y-auto space-y-1.5">
                   {entradasAgrupadas.map((lote) => {
                     const totalUn = lote.itens.reduce((s, e) => s + e.quantidade, 0);
                     const totalValor = lote.itens.reduce((s, e) => s + e.quantidade * e.valorUnitario, 0);
@@ -367,18 +335,9 @@ export default function ProdutosPage() {
               )}
             </div>
 
-            {viewMode === 'cards' && (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                {filtered.map(produto => (
-                  <ProdutoCard key={produto.id} produto={produto} onDeleted={loadProdutos} onClick={() => setProdutoSelecionado(produto)} />
-                ))}
-              </div>
-            )}
-
-            {viewMode === 'table' && (
-              <div className="rounded-xl border border-border-subtle">
+            <div className="rounded-xl border border-border-subtle">
                 <p className="text-xs font-semibold text-content-muted px-4 py-2 bg-surface border-b border-border-subtle">Estoque por Produtos</p>
-                <div className="max-h-[15rem] overflow-y-auto">
+                <div className="lg:max-h-[15rem] overflow-y-auto">
                   <table className="min-w-full divide-y divide-border-subtle">
                     <thead className="bg-surface sticky top-0 z-10">
                       <tr>
@@ -391,7 +350,7 @@ export default function ProdutosPage() {
                       </tr>
                     </thead>
                     <TableBody>
-                      {filtered.map(produto => (
+                      {produtos.map(produto => (
                         <TableRow key={produto.id} onClick={() => setProdutoSelecionado(produto)}>
                           <TableCell>
                             {produto.foto ? (
@@ -411,7 +370,6 @@ export default function ProdutosPage() {
                   </table>
                 </div>
               </div>
-            )}
           </div>
 
           {/* Lado direito - Saída / Entrada */}
@@ -436,7 +394,7 @@ export default function ProdutosPage() {
                   <option value="12m">12 meses</option>
                 </select>
               </div>
-              <div className="space-y-1 max-h-[7.5rem] overflow-y-auto">
+              <div className="space-y-1 lg:max-h-[7.5rem] overflow-y-auto">
                 {dadosPainel.length === 0 && <p className="text-xs text-content-muted text-center py-4">{painelModo === 'saida' ? 'Sem vendas no período' : 'Sem entradas no período'}</p>}
                 {painelModo === 'entrada' && produtosSemEntrada.length > 0 && (
                   <button onClick={handleMigrar} disabled={migrando}
@@ -464,16 +422,6 @@ export default function ProdutosPage() {
                 {painelModo === 'saida' ? <TrendingUp size={14} className="text-green-400" /> : <TrendingDown size={14} className="text-blue-400" />}
                 <h3 className="text-xs font-semibold">{painelModo === 'saida' ? 'Saída' : 'Entrada'} por Modelo</h3>
               </div>
-              {modelosDisponiveis.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {modelosDisponiveis.slice(0, 8).map(m => (
-                    <button key={m} onClick={() => toggleModelo(m)}
-                      className={`px-2 py-0.5 rounded-md text-[10px] transition-colors ${modelosAtivos.includes(m) ? 'bg-blue-500/20 text-blue-400' : 'bg-elevated text-content-muted'}`}>
-                      {m}
-                    </button>
-                  ))}
-                </div>
-              )}
               {chartData.series.length > 0 ? (
                 <HighchartsReact highcharts={Highcharts} options={chartOptions} />
               ) : (
@@ -696,7 +644,7 @@ export default function ProdutosPage() {
                     className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-500/10 py-2 text-xs font-medium text-blue-400 hover:bg-blue-500/20 transition-colors">
                     <Pencil size={14} /> Editar
                   </button>
-                  <button onClick={async () => { await deleteProduto(produtoSelecionado.id); setProdutoSelecionado(null); loadProdutos(); }}
+                  <button onClick={async () => { await deleteProduto(produtoSelecionado.id); setProdutoSelecionado(null); }}
                     className="flex items-center justify-center gap-1.5 rounded-lg bg-red-500/10 py-2 text-xs font-medium text-red-500 hover:bg-red-500/20 transition-colors">
                     <Trash2 size={14} /> Excluir
                   </button>
