@@ -1,10 +1,12 @@
-import { Outlet, Navigate } from 'react-router';
+import { Outlet, Navigate, useLocation } from 'react-router';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useAuth } from '~/contexts/AuthContext';
 import { logout } from '~/services/auth.service';
-import { useState } from 'react';
+import { trackEvent } from '~/services/analytics.service';
+import { useState, useEffect, useRef } from 'react';
 import { ShieldAlert } from 'lucide-react';
+import { userIsAdmin, userCanAccessAdmin, getUserRoles } from '~/models';
 
 const isServer = typeof window === 'undefined';
 
@@ -34,6 +36,31 @@ function LoadingScreen() {
 export default function Layout() {
   const { user, loading, switching } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+  const prevPath = useRef<string>();
+
+  useEffect(() => {
+    if (!user || typeof window === 'undefined') return;
+    if (prevPath.current === location.pathname) return;
+    prevPath.current = location.pathname;
+    const LABELS: Record<string, string> = {
+      '/vendas': 'Vendas', '/vendas/nova': 'Nova Venda',
+      '/despesas': 'Despesas', '/despesas/nova': 'Nova Despesa',
+      '/produtos': 'Produtos', '/produtos/novo': 'Novo Produto',
+      '/estoque': 'Estoque', '/clientes': 'Clientes', '/clientes/novo': 'Novo Cliente',
+      '/meus-clientes': 'Meus Clientes', '/meu-estoque': 'Meu Estoque',
+      '/dashboard': 'Dashboard', '/usuarios': 'Usuários', '/historico': 'Histórico',
+      '/ciclos': 'Ciclos', '/conta': 'Conta', '/analytics': 'Analytics',
+    };
+    const label = LABELS[location.pathname] || location.pathname;
+    const ADMIN_ROUTES = ['/produtos', '/estoque', '/clientes', '/usuarios', '/historico', '/analytics', '/ciclos'];
+    const ADMIN_ACCESS_ROUTES = ['/ciclos']; // Rotas que permitem financeiro/desenvolvedor via userCanAccessAdmin
+    const isAdminRoute = ADMIN_ROUTES.some(r => location.pathname.startsWith(r));
+    const isAdminAccessRoute = ADMIN_ACCESS_ROUTES.some(r => location.pathname.startsWith(r));
+    const shouldFlagSuspicious = isAdminRoute && !userIsAdmin(user) && !(isAdminAccessRoute && userCanAccessAdmin(user));
+    const tipo = shouldFlagSuspicious ? 'navegacao_suspeita' : 'navegacao';
+    trackEvent(tipo, user.id, user.nome, label).catch(() => {});
+  }, [location.pathname, user]);
 
   if (isServer || loading || switching) {
     return <LoadingScreen />;

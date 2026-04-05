@@ -17,7 +17,7 @@ import {
 export default function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'desenvolvedor';
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'desenvolvedor' || user?.role === 'financeiro';
   const { vendas: todasVendasRaw, loading: vendasLoading } = useVendas();
   const { despesas: todasDespesasRaw, loading: despesasLoading } = useDespesas();
   const { users, loading: usersLoading } = useUsers();
