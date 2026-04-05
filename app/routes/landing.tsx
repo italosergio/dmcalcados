@@ -2,6 +2,7 @@ import { ArrowRight } from 'lucide-react';
 import { useAuth } from '~/contexts/AuthContext';
 import { useNavigate } from 'react-router';
 import { useState, useRef, useEffect } from 'react';
+import { trackEvent } from '~/services/analytics.service';
 
 function shortName(nome?: string) {
   if (!nome) return '';
@@ -34,6 +35,11 @@ export default function LandingPage() {
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const swipeSeq = useRef<string[]>([]);
   const swipeTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    trackEvent('navegacao', user?.id || 'anonimo', user?.nome || 'Anônimo', 'Página Inicial').catch(() => {});
+  }, []);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {

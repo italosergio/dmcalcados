@@ -44,6 +44,11 @@
     "rankings": {
       ".read": "auth != null",
       ".write": "auth != null"
+    },
+    "analytics": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["timestamp"]
     }
   }
 }
