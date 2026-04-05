@@ -59,7 +59,7 @@ export default function Layout() {
     const isAdminAccessRoute = ADMIN_ACCESS_ROUTES.some(r => location.pathname.startsWith(r));
     const shouldFlagSuspicious = isAdminRoute && !userIsAdmin(user) && !(isAdminAccessRoute && userCanAccessAdmin(user));
     const tipo = shouldFlagSuspicious ? 'navegacao_suspeita' : 'navegacao';
-    trackEvent(tipo, user.id, user.nome, label).catch(() => {});
+    trackEvent(tipo, user.id, user.nome, label, user.foto).catch(() => {});
   }, [location.pathname, user]);
 
   if (isServer || loading || switching) {

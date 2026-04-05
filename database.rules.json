@@ -48,7 +48,10 @@
     "analytics": {
       ".read": "auth != null",
       ".write": "auth != null",
-      ".indexOn": ["timestamp"]
+      ".indexOn": ["timestamp"],
+      "anonimo": {
+        ".write": true
+      }
     }
   }
 }

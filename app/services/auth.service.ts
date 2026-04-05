@@ -10,7 +10,7 @@ export async function login(username: string, password: string) {
   if (typeof window !== 'undefined') localStorage.setItem('loginTime', Date.now().toString());
   // Track login
   const userData = await getUserData(userCredential.user.uid);
-  trackEvent('login', userCredential.user.uid, userData?.nome || username).catch(() => {});
+  trackEvent('login', userCredential.user.uid, userData?.nome || username, undefined, userData?.foto).catch(() => {});
   return userCredential.user;
 }
 
@@ -58,7 +58,7 @@ export async function logout(removeFromSaved = false, username?: string) {
   const uid = auth.currentUser?.uid;
   if (uid) {
     const userData = await getUserData(uid).catch(() => null);
-    await trackEvent('logout', uid, userData?.nome || username || 'desconhecido').catch(() => {});
+    await trackEvent('logout', uid, userData?.nome || username || 'desconhecido', undefined, userData?.foto).catch(() => {});
   }
   await signOut(auth);
   if (typeof window !== 'undefined') {

@@ -38,8 +38,15 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    trackEvent('navegacao', user?.id || 'anonimo', user?.nome || 'Anônimo', 'Página Inicial').catch(() => {});
-  }, []);
+    const timer = setTimeout(() => {
+      if (user) {
+        trackEvent('navegacao', user.id, user.nome, 'Página Inicial', user.foto).catch(console.error);
+      } else {
+        trackEvent('navegacao', 'anonimo', 'Anônimo', 'Página Inicial').catch(console.error);
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [user]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
