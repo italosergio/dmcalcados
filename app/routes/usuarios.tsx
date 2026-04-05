@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Shield, User, Trash2, Plus, X, ShieldAlert, ShieldOff, KeyRound } from 'lucide-react';
+import { Shield, User, Trash2, Plus, X, ShieldAlert, ShieldOff, KeyRound, Pencil, Check } from 'lucide-react';
 import { updateUserRoles, deleteUser, updateUserStatus, resetUserPassword } from '~/services/users.service';
-import { register } from '~/services/auth.service';
+import { register, updateProfile } from '~/services/auth.service';
 import { useAuth } from '~/contexts/AuthContext';
 import type { User as UserType, UserRole } from '~/models';
 import { getUserRoles } from '~/models';
@@ -63,6 +63,9 @@ export default function UsuariosPage() {
   const [newPassword, setNewPassword] = useState('');
   const [pwLoading, setPwLoading] = useState(false);
   const [pwMsg, setPwMsg] = useState('');
+  const [editingName, setEditingName] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [nameLoading, setNameLoading] = useState(false);
   const { user: currentUser } = useAuth();
 
   const isDev = currentUser?.role === 'desenvolvedor';
@@ -78,6 +81,7 @@ export default function UsuariosPage() {
     setModalRoles(getUserRoles(u));
     setShowSuspend(false); setSuspendMotivo('');
     setShowResetPw(false); setNewPassword(''); setPwMsg('');
+    setEditingName(false); setEditName('');
   };
 
   const toggleModalRole = (role: UserRole) => {
@@ -273,7 +277,28 @@ export default function UsuariosPage() {
                  getUserRoles(modalUser).includes('admin') ? <Shield size={20} className="text-red-400" /> :
                  <User size={20} className={primaryIconColor(modalUser)} />}
                 <div>
-                  <p className="text-sm font-semibold">{modalUser.nome}</p>
+                  {editingName ? (
+                    <form className="flex items-center gap-1" onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!editName.trim() || nameLoading) return;
+                      setNameLoading(true);
+                      try {
+                        await updateProfile(modalUser.id, { nome: editName.trim() });
+                        setModalUser(prev => prev ? { ...prev, nome: editName.trim() } : null);
+                        setEditingName(false);
+                      } catch {} finally { setNameLoading(false); }
+                    }}>
+                      <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
+                        className="bg-elevated border border-border-subtle rounded px-1.5 py-0.5 text-sm text-content focus:outline-none focus:border-green-600/50 w-36" />
+                      <button type="submit" disabled={nameLoading} className="text-green-400 hover:text-green-300"><Check size={14} /></button>
+                      <button type="button" onClick={() => setEditingName(false)} className="text-content-muted hover:text-content"><X size={14} /></button>
+                    </form>
+                  ) : (
+                    <p className="text-sm font-semibold flex items-center gap-1">
+                      {modalUser.nome}
+                      {isDev && <button onClick={() => { setEditingName(true); setEditName(modalUser.nome); }} className="text-content-muted/40 hover:text-content-secondary"><Pencil size={12} /></button>}
+                    </p>
+                  )}
                   <p className="text-xs text-content-muted">@{modalUser.username}</p>
                 </div>
               </div>
