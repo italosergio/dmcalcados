@@ -131,6 +131,92 @@ export async function fecharCiclo(cicloId: string): Promise<void> {
   });
 }
 
+/** Edita ciclo ativo: adiciona/remove produtos e ajusta pacotes */
+export async function editarCiclo(
+  cicloId: string,
+  produtos: { produtoId: string; modelo: string; referencia: string; pacotes: number; valorUnitario: number }[]
+): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Usuário não autenticado');
+
+  const snap = await get(ref(db, `ciclos/${cicloId}`));
+  if (!snap.exists()) throw new Error('Ciclo não encontrado');
+  const cicloData = snap.val();
+  if (cicloData.status === 'fechado') throw new Error('Ciclo já está fechado');
+
+  const prodsAtuais: CicloProduto[] = normalizeProdutos(cicloData.produtos);
+
+  const novosProds: CicloProduto[] = [];
+
+  for (const p of produtos) {
+    const existente = prodsAtuais.find(cp => cp.produtoId === p.produtoId);
+    const novasPecas = p.pacotes * PECAS_POR_PACOTE;
+
+    if (existente) {
+      const vendidas = existente.pecasInicial - existente.pecasAtual;
+      const diff = novasPecas - existente.pecasInicial;
+
+      if (diff !== 0) {
+        const estoqueSnap = await get(ref(db, `produtos/${p.produtoId}/estoque`));
+        const estoqueAtual = estoqueSnap.val() || 0;
+        if (diff > 0 && estoqueAtual < diff) {
+          throw new Error(`Estoque insuficiente para ${p.modelo}. Disponível: ${estoqueAtual} pçs, solicitado: +${diff} pçs`);
+        }
+        await update(ref(db, `produtos/${p.produtoId}`), {
+          estoque: estoqueAtual - diff,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      novosProds.push({
+        ...existente,
+        pacotesInicial: p.pacotes,
+        pecasInicial: novasPecas,
+        pacotesAtual: Math.floor((novasPecas - vendidas) / PECAS_POR_PACOTE),
+        pecasAtual: novasPecas - vendidas,
+        valorUnitario: p.valorUnitario,
+      });
+    } else {
+      // Produto novo no ciclo
+      const estoqueSnap = await get(ref(db, `produtos/${p.produtoId}/estoque`));
+      const estoqueAtual = estoqueSnap.val() || 0;
+      if (estoqueAtual < novasPecas) {
+        throw new Error(`Estoque insuficiente para ${p.modelo}. Disponível: ${estoqueAtual} pçs, solicitado: ${novasPecas} pçs`);
+      }
+      await update(ref(db, `produtos/${p.produtoId}`), {
+        estoque: estoqueAtual - novasPecas,
+        updatedAt: new Date().toISOString(),
+      });
+      novosProds.push({
+        produtoId: p.produtoId,
+        modelo: p.modelo,
+        referencia: p.referencia,
+        pacotesInicial: p.pacotes,
+        pecasInicial: novasPecas,
+        pacotesAtual: p.pacotes,
+        pecasAtual: novasPecas,
+        valorUnitario: p.valorUnitario,
+      });
+    }
+  }
+
+  // Produtos removidos: devolver estoque
+  for (const cp of prodsAtuais) {
+    if (!produtos.find(p => p.produtoId === cp.produtoId)) {
+      if (cp.pecasAtual > 0) {
+        const estoqueSnap = await get(ref(db, `produtos/${cp.produtoId}/estoque`));
+        const estoqueAtual = estoqueSnap.val() || 0;
+        await update(ref(db, `produtos/${cp.produtoId}`), {
+          estoque: estoqueAtual + cp.pecasAtual,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+  }
+
+  await update(ref(db, `ciclos/${cicloId}`), { produtos: novosProds });
+}
+
 /** Chamado pela venda: desconta peças do ciclo ativo do vendedor */
 export async function descontarDoCiclo(
   vendedorId: string,

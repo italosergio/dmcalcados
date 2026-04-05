@@ -36,7 +36,7 @@ export function useVendas() {
       setUsersMap(data);
       const u = data[uid];
       const roles: string[] = u?.roles?.length ? u.roles : [u?.role];
-      setUserRoles({ isAdmin: roles.some(r => r === 'admin' || r === 'superadmin'), uid });
+      setUserRoles({ isAdmin: roles.some(r => r === 'admin' || r === 'superadmin' || r === 'desenvolvedor'), uid });
     });
 
     return () => unsub();
@@ -70,7 +70,7 @@ export function useDespesas() {
       setUsersMap(data);
       const u = data[uid];
       const roles: string[] = u?.roles?.length ? u.roles : [u?.role];
-      setUserRoles({ isAdmin: roles.some(r => r === 'admin' || r === 'superadmin'), uid });
+      setUserRoles({ isAdmin: roles.some(r => r === 'admin' || r === 'superadmin' || r === 'desenvolvedor'), uid });
     });
 
     return () => unsub();
@@ -110,7 +110,7 @@ export function useClientes() {
     const unsub = onValue(ref(db, `users/${uid}`), (snap) => {
       const u = snap.val();
       const roles: string[] = u?.roles?.length ? u.roles : [u?.role];
-      setIsAdmin(roles.some(r => r === 'admin' || r === 'superadmin'));
+      setIsAdmin(roles.some(r => r === 'admin' || r === 'superadmin' || r === 'desenvolvedor'));
     });
     return () => unsub();
   }, []);
@@ -124,6 +124,37 @@ export function useClientes() {
   }, [isAdmin]);
 
   return { clientes: data, loading };
+}
+
+export function useCiclos() {
+  const { data, loading } = useRealtimeRef<any>('ciclos', (raw) => {
+    return Object.keys(raw)
+      .map(key => {
+        const c = raw[key];
+        const prods = c.produtos
+          ? (Array.isArray(c.produtos) ? c.produtos : Object.values(c.produtos)).map((p: any) => {
+              if (p.pacotesInicial != null) return p;
+              const pecasI = p.quantidadeInicial || 0;
+              const pecasA = p.quantidadeAtual || 0;
+              return { ...p, pacotesInicial: Math.floor(pecasI / 15), pecasInicial: pecasI, pacotesAtual: Math.floor(pecasA / 15), pecasAtual: pecasA };
+            })
+          : [];
+        return { id: key, ...c, produtos: prods };
+      })
+      .filter(c => c.createdAt && c.vendedorId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  });
+
+  return { ciclos: data, loading };
+}
+
+export function useEntradas() {
+  const { data, loading } = useRealtimeRef<any>('entradas', (raw) => {
+    return Object.keys(raw)
+      .map(key => ({ id: key, ...raw[key] }))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  });
+  return { entradas: data, loading };
 }
 
 export function useUsers() {

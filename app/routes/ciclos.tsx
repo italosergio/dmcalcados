@@ -1,23 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '~/contexts/AuthContext';
 import { Navigate } from 'react-router';
-import { getCiclos, createCiclo, fecharCiclo } from '~/services/ciclos.service';
-import { getUsers } from '~/services/users.service';
-import { getProdutos } from '~/services/produtos.service';
+import { createCiclo, fecharCiclo, editarCiclo } from '~/services/ciclos.service';
 import { formatCurrency } from '~/utils/format';
 import type { Ciclo, CicloProduto, Produto, User } from '~/models';
 import { userIsAdmin, userIsVendedor, userCanAccessAdmin } from '~/models';
-import { Plus, Minus, X, Package, ChevronDown, ChevronRight, Lock, Unlock } from 'lucide-react';
+import { useProdutos, useCiclos, useUsers } from '~/hooks/useRealtime';
+import { Plus, Minus, X, Package, ChevronDown, ChevronRight, Lock, Unlock, Pencil } from 'lucide-react';
 
 const input = "w-full rounded-lg border border-border-subtle bg-elevated px-3 py-2.5 text-sm text-content focus:outline-none focus:border-border-medium focus:ring-1 focus:ring-blue-500/30 transition-colors";
 const PECAS_POR_PACOTE = 15;
 
 export default function CiclosPage() {
   const { user } = useAuth();
-  const [ciclos, setCiclos] = useState<Ciclo[]>([]);
-  const [vendedores, setVendedores] = useState<User[]>([]);
-  const [produtos, setProdutos] = useState<Produto[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { ciclos, loading: ciclosLoading } = useCiclos();
+  const { users: allUsers, loading: usersLoading } = useUsers();
+  const { produtos, loading: produtosLoading } = useProdutos();
+  const vendedores = allUsers.filter(u => userIsVendedor(u));
+  const loading = ciclosLoading || usersLoading || produtosLoading;
   const [showForm, setShowForm] = useState(false);
   const [vendedorId, setVendedorId] = useState('');
   const [itensCiclo, setItensCiclo] = useState<{ produtoId: string; pacotes: number }[]>([]);
@@ -27,16 +27,28 @@ export default function CiclosPage() {
   const [modalCiclo, setModalCiclo] = useState<Ciclo | null>(null);
   const [fecharClicks, setFecharClicks] = useState(0);
   const [fecharTimer, setFecharTimer] = useState<ReturnType<typeof setTimeout>>();
+  const [fecharLoading, setFecharLoading] = useState(false);
+  const [editCicloId, setEditCicloId] = useState<string | null>(null);
+  const [editItens, setEditItens] = useState<{ produtoId: string; pacotes: number }[]>([]);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editErro, setEditErro] = useState('');
+  const [vendedorDropdown, setVendedorDropdown] = useState(false);
+  const [vendedorBusca, setVendedorBusca] = useState('');
+  const vendedorRef = useRef<HTMLDivElement>(null);
+  const [produtoDropdowns, setProdutoDropdowns] = useState<Record<number, boolean>>({});
+  const [produtoBuscas, setProdutoBuscas] = useState<Record<number, string>>({});
+  const produtoRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
-  const load = useCallback(async () => {
-    const [c, u, p] = await Promise.all([getCiclos(), getUsers(), getProdutos()]);
-    setCiclos(c);
-    setVendedores(u.filter(x => userIsVendedor(x)));
-    setProdutos(p);
-    setLoading(false);
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (vendedorRef.current && !vendedorRef.current.contains(e.target as Node)) setVendedorDropdown(false);
+      Object.entries(produtoRefs.current).forEach(([k, el]) => {
+        if (el && !el.contains(e.target as Node)) setProdutoDropdowns(prev => ({ ...prev, [+k]: false }));
+      });
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
   }, []);
-
-  useEffect(() => { load(); }, [load]);
 
   if (!user || !userCanAccessAdmin(user)) return <Navigate to="/vendas" replace />;
   if (loading) return <div className="flex items-center justify-center py-20 text-content-secondary">Carregando...</div>;
@@ -84,10 +96,42 @@ export default function CiclosPage() {
       setShowForm(false);
       setVendedorId('');
       setItensCiclo([]);
-      await load();
     } catch (e: any) {
       setErro(e.message || 'Erro ao criar ciclo');
     } finally { setSaving(false); }
+  };
+
+  const startEdit = (ciclo: Ciclo) => {
+    setEditCicloId(ciclo.id);
+    setEditItens(ciclo.produtos.map(p => ({ produtoId: p.produtoId, pacotes: p.pacotesInicial })));
+    setEditErro('');
+  };
+
+  const cancelEdit = () => { setEditCicloId(null); setEditItens([]); setEditErro(''); };
+
+  const editAddItem = () => setEditItens([...editItens, { produtoId: '', pacotes: 1 }]);
+  const editRemoveItem = (i: number) => setEditItens(editItens.filter((_, j) => j !== i));
+  const editUpdateItem = (i: number, field: 'produtoId' | 'pacotes', value: string | number) => {
+    setEditItens(editItens.map((item, j) => j === i ? { ...item, [field]: value } : item));
+  };
+
+  const handleEditar = async () => {
+    if (!editCicloId) return;
+    const prodsCiclo = editItens
+      .filter(item => item.produtoId && item.pacotes > 0)
+      .map(item => {
+        const prod = produtos.find(p => p.id === item.produtoId)!;
+        return { produtoId: prod.id, modelo: prod.modelo, referencia: prod.referencia, pacotes: item.pacotes, valorUnitario: prod.valor };
+      });
+    if (prodsCiclo.length === 0) return;
+    setEditSaving(true);
+    setEditErro('');
+    try {
+      await editarCiclo(editCicloId, prodsCiclo);
+      cancelEdit();
+    } catch (e: any) {
+      setEditErro(e.message || 'Erro ao editar ciclo');
+    } finally { setEditSaving(false); }
   };
 
   const handleFechar = async (cicloId: string) => {
@@ -95,12 +139,14 @@ export default function CiclosPage() {
     clearTimeout(fecharTimer);
     if (clicks >= 3) {
       setFecharClicks(0);
+      setFecharLoading(true);
       try {
         await fecharCiclo(cicloId);
         setModalCiclo(null);
-        await load();
       } catch (e: any) {
         setErro(e.message);
+      } finally {
+        setFecharLoading(false);
       }
     } else {
       setFecharClicks(clicks);
@@ -108,7 +154,7 @@ export default function CiclosPage() {
     }
   };
 
-  const fecharLabel = fecharClicks === 0 ? 'Fechar ciclo' : fecharClicks === 1 ? 'Tem certeza?' : 'Confirmar!';
+  const fecharLabel = fecharLoading ? 'Aguarde...' : fecharClicks === 0 ? 'Fechar ciclo' : fecharClicks === 1 ? 'Tem certeza?' : 'Confirmar!';
 
   const prods = (c: Ciclo) => c.produtos || [];
   const totalPecas = (c: Ciclo) => prods(c).reduce((s, p) => s + p.pecasAtual, 0);
@@ -118,13 +164,14 @@ export default function CiclosPage() {
   const totalVendidoValor = (c: Ciclo) => prods(c).reduce((s, p) => s + (p.pecasInicial - p.pecasAtual) * p.valorUnitario, 0);
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Ciclos de Estoque</h1>
-        <button onClick={() => { setShowForm(!showForm); if (!showForm) addItem(); }}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-500 transition">
-          <Plus size={14} /> Novo Ciclo
-        </button>
+    <div className="space-y-6 w-full max-w-2xl mx-auto">
+      <div className="mb-4">
+        {!showForm && (
+          <button onClick={() => { setShowForm(true); addItem(); }}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:from-blue-500 hover:to-blue-400 active:scale-95">
+            <Plus size={18} /> Novo Ciclo
+          </button>
+        )}
       </div>
 
       {/* Form novo ciclo */}
@@ -137,14 +184,50 @@ export default function CiclosPage() {
 
           <div>
             <label className="text-xs text-content-muted mb-1 block">Vendedor</label>
-            <select value={vendedorId} onChange={e => setVendedorId(e.target.value)} className={input}>
-              <option value="">Selecione...</option>
-              {vendedoresComCiclo.map(v => (
-                <option key={v.uid} value={v.uid} disabled={!!v.ativo}>
-                  {v.nome} {v.ativo ? '(ciclo ativo)' : ''}
-                </option>
-              ))}
-            </select>
+            <div ref={vendedorRef} className="relative">
+              <button type="button" onClick={() => setVendedorDropdown(!vendedorDropdown)}
+                className={`${input} text-left flex items-center justify-between ${vendedorId ? 'border-green-500/50' : ''}`}>
+                <span className={vendedorId ? 'text-content' : 'text-content-muted'}>
+                  {vendedorSelecionado ? vendedorSelecionado.nome : 'Selecione o vendedor...'}
+                </span>
+                <ChevronDown size={14} className={`text-content-muted transition-transform ${vendedorDropdown ? 'rotate-180' : ''}`} />
+              </button>
+              {vendedorDropdown && (
+                <div className="absolute z-50 mt-1 w-full rounded-xl border border-border-subtle bg-elevated shadow-xl overflow-hidden">
+                  <div className="p-2 border-b border-border-subtle">
+                    <input value={vendedorBusca} onChange={e => setVendedorBusca(e.target.value)} placeholder="Buscar vendedor..."
+                      className="w-full rounded-lg bg-surface px-3 py-2 text-xs text-content placeholder:text-content-muted focus:outline-none" autoFocus />
+                  </div>
+                  <div className="max-h-48 overflow-y-auto p-1">
+                    {vendedoresComCiclo
+                      .filter(v => v.nome.toLowerCase().includes(vendedorBusca.toLowerCase()))
+                      .map(v => (
+                        <button key={v.uid} type="button"
+                          disabled={!!v.ativo}
+                          onClick={() => { if (!v.ativo) { setVendedorId(v.uid); setVendedorDropdown(false); setVendedorBusca(''); } }}
+                          className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                            v.ativo ? 'opacity-40 cursor-not-allowed' : vendedorId === v.uid ? 'bg-blue-500/10' : 'hover:bg-surface-hover'
+                          }`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                            v.ativo ? 'bg-red-500/10 text-red-400' : vendedorId === v.uid ? 'bg-blue-500/20 text-blue-400' : 'bg-elevated text-content-secondary'
+                          }`}>
+                            {v.nome.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-sm font-medium truncate ${vendedorId === v.uid ? 'text-blue-400' : ''}`}>{v.nome}</p>
+                            <p className="text-[10px] text-content-muted">@{v.username}</p>
+                          </div>
+                          {v.ativo && <span className="text-[10px] bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded font-medium shrink-0">Ciclo ativo</span>}
+                          {vendedorId === v.uid && !v.ativo && <span className="text-blue-400 shrink-0">✓</span>}
+                        </button>
+                      ))}
+                    {vendedoresComCiclo.filter(v => v.nome.toLowerCase().includes(vendedorBusca.toLowerCase())).length === 0 && (
+                      <p className="px-3 py-4 text-xs text-content-muted text-center">Nenhum vendedor encontrado</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             {vendedorTemCicloAtivo && <p className="text-xs text-red-400 mt-1">Este vendedor já possui um ciclo ativo.</p>}
           </div>
 
@@ -153,24 +236,73 @@ export default function CiclosPage() {
             {itensCiclo.map((item, i) => {
               const prod = produtos.find(p => p.id === item.produtoId);
               const estoqueDisp = prod ? Math.floor(prod.estoque / 15) : 0;
+              const jaUsados = itensCiclo.filter((it, j) => j !== i && it.produtoId).map(it => it.produtoId);
+              const produtosDisp = produtos.filter(p => p.estoque >= 15 && !jaUsados.includes(p.id));
+              const busca = produtoBuscas[i] || '';
+              const produtosFiltrados = busca
+                ? produtosDisp.filter(p => p.modelo.toLowerCase().includes(busca.toLowerCase()) || (p.referencia || '').toLowerCase().includes(busca.toLowerCase()))
+                : produtosDisp;
               return (
-                <div key={i} className="flex items-center gap-2">
-                  <select value={item.produtoId} onChange={e => updateItem(i, 'produtoId', e.target.value)} className={`${input} flex-1`}>
-                    <option value="">Produto...</option>
-                    {produtos.filter(p => p.estoque >= 15).map(p => (
-                      <option key={p.id} value={p.id}>{p.modelo} ({p.referencia}) — {Math.floor(p.estoque / 15)} pct</option>
-                    ))}
-                  </select>
-                  <div className="flex items-center gap-0">
-                    <button type="button" onClick={() => updateItem(i, 'pacotes', Math.max(1, item.pacotes - 1))}
-                      className="rounded-l-lg border border-border-subtle bg-elevated px-2 py-2.5 text-content-secondary hover:bg-border-medium transition-colors"><Minus size={14} /></button>
-                    <span className="border-y border-border-subtle bg-elevated px-3 py-2.5 text-sm font-semibold min-w-[2.5rem] text-center">{item.pacotes}</span>
-                    <button type="button" onClick={() => updateItem(i, 'pacotes', Math.min(estoqueDisp || 99, item.pacotes + 1))}
-                      className="rounded-r-lg border border-border-subtle bg-elevated px-2 py-2.5 text-content-secondary hover:bg-border-medium transition-colors"><Plus size={14} /></button>
+                <div key={i} className="rounded-lg border border-border-subtle bg-elevated p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1" ref={el => { produtoRefs.current[i] = el; }}>
+                      <div className="relative">
+                        <button type="button" onClick={() => setProdutoDropdowns(prev => ({ ...prev, [i]: !prev[i] }))}
+                          className={`${input} text-left flex items-center justify-between ${item.produtoId ? 'border-green-500/50' : ''}`}>
+                          <span className={item.produtoId ? 'text-content' : 'text-content-muted'}>
+                            {prod ? `${prod.modelo} (${prod.referencia})` : 'Selecione o produto...'}
+                          </span>
+                          <ChevronDown size={14} className={`text-content-muted transition-transform ${produtoDropdowns[i] ? 'rotate-180' : ''}`} />
+                        </button>
+                        {produtoDropdowns[i] && (
+                          <div className="absolute z-50 mt-1 w-full rounded-xl border border-border-subtle bg-elevated shadow-xl overflow-hidden">
+                            <div className="p-2 border-b border-border-subtle">
+                              <input value={busca} onChange={e => setProdutoBuscas(prev => ({ ...prev, [i]: e.target.value }))} placeholder="Buscar modelo ou referência..."
+                                className="w-full rounded-lg bg-surface px-3 py-2 text-xs text-content placeholder:text-content-muted focus:outline-none" autoFocus />
+                            </div>
+                            <div className="max-h-48 overflow-y-auto p-1">
+                              {produtosFiltrados.map(p => {
+                                const pctDisp = Math.floor(p.estoque / 15);
+                                return (
+                                  <button key={p.id} type="button"
+                                    onClick={() => { updateItem(i, 'produtoId', p.id); setProdutoDropdowns(prev => ({ ...prev, [i]: false })); setProdutoBuscas(prev => ({ ...prev, [i]: '' })); }}
+                                    className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                                      item.produtoId === p.id ? 'bg-blue-500/10' : 'hover:bg-surface-hover'
+                                    }`}>
+                                    <div className="min-w-0 flex-1">
+                                      <p className={`text-sm font-medium truncate ${item.produtoId === p.id ? 'text-blue-400' : ''}`}>{p.modelo}</p>
+                                      <p className="text-[10px] text-content-muted">{p.referencia} · {formatCurrency(p.valor)}/un</p>
+                                    </div>
+                                    <span className="text-xs text-content-secondary bg-surface px-2 py-0.5 rounded-md shrink-0">{pctDisp} pct</span>
+                                    {item.produtoId === p.id && <span className="text-blue-400 shrink-0">✓</span>}
+                                  </button>
+                                );
+                              })}
+                              {produtosFiltrados.length === 0 && (
+                                <p className="px-3 py-4 text-xs text-content-muted text-center">Nenhum produto disponível</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {itensCiclo.length > 1 && (
+                      <button onClick={() => removeItem(i)} className="text-red-500/40 hover:text-red-500 transition-colors"><X size={16} /></button>
+                    )}
                   </div>
-                  <span className="text-xs text-content-muted whitespace-nowrap">{item.pacotes * 15} pçs</span>
-                  {itensCiclo.length > 1 && (
-                    <button onClick={() => removeItem(i)} className="text-red-500/60 hover:text-red-500"><X size={16} /></button>
+                  {item.produtoId && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-0">
+                        <button type="button" onClick={() => updateItem(i, 'pacotes', Math.max(1, item.pacotes - 1))}
+                          className="rounded-l-lg border border-border-subtle bg-surface px-2.5 py-2 text-content-secondary hover:bg-border-medium transition-colors"><Minus size={14} /></button>
+                        <span className="border-y border-border-subtle bg-surface px-4 py-2 text-sm font-semibold min-w-[3rem] text-center">{item.pacotes}</span>
+                        <button type="button" onClick={() => updateItem(i, 'pacotes', Math.min(estoqueDisp || 99, item.pacotes + 1))}
+                          className="rounded-r-lg border border-border-subtle bg-surface px-2.5 py-2 text-content-secondary hover:bg-border-medium transition-colors"><Plus size={14} /></button>
+                      </div>
+                      <span className="text-xs text-content-muted">pct</span>
+                      <span className="text-xs text-content-secondary font-medium">{item.pacotes * 15} pçs</span>
+                      {prod && <span className="text-[10px] text-content-muted ml-auto">máx {estoqueDisp} pct</span>}
+                    </div>
                   )}
                 </div>
               );
@@ -222,9 +354,78 @@ export default function CiclosPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-green-400">Ciclo ativo</span>
-                        <span className="text-[10px] text-content-muted">Desde {new Date(v.ativo.createdAt).toLocaleDateString('pt-BR')}</span>
+                        <div className="flex items-center gap-2">
+                          {editCicloId !== v.ativo.id && (
+                            <button onClick={() => startEdit(v.ativo!)} className="text-blue-400 hover:text-blue-300 transition-colors" title="Editar ciclo">
+                              <Pencil size={13} />
+                            </button>
+                          )}
+                          <span className="text-[10px] text-content-muted">Desde {new Date(v.ativo.createdAt).toLocaleDateString('pt-BR')}</span>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 text-center">
+
+                      {editCicloId === v.ativo.id ? (
+                        <div className="rounded-lg border border-blue-500/30 bg-elevated p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-blue-400">Editando ciclo</span>
+                            <button onClick={cancelEdit} className="text-content-muted hover:text-content"><X size={14} /></button>
+                          </div>
+                          {editItens.map((item, i) => {
+                            const prod = produtos.find(p => p.id === item.produtoId);
+                            const cicloP = v.ativo!.produtos.find(p => p.produtoId === item.produtoId);
+                            const vendidas = cicloP ? cicloP.pecasInicial - cicloP.pecasAtual : 0;
+                            const minPacotes = Math.ceil(vendidas / PECAS_POR_PACOTE);
+                            const estoqueGeral = prod ? prod.estoque : 0;
+                            const pecasOriginais = cicloP ? cicloP.pecasInicial : 0;
+                            const maxPecas = estoqueGeral + pecasOriginais;
+                            const maxPacotes = Math.floor(maxPecas / PECAS_POR_PACOTE);
+                            const jaUsados = editItens.filter((it, j) => j !== i && it.produtoId).map(it => it.produtoId);
+                            const produtosDisp = produtos.filter(p => p.estoque >= 15 || p.id === item.produtoId).filter(p => !jaUsados.includes(p.id));
+                            return (
+                              <div key={i} className="rounded-lg border border-border-subtle bg-surface p-2.5 space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <select value={item.produtoId} onChange={e => editUpdateItem(i, 'produtoId', e.target.value)}
+                                    className={`${input} flex-1 text-xs !py-2`}>
+                                    <option value="">Produto...</option>
+                                    {produtosDisp.map(p => (
+                                      <option key={p.id} value={p.id}>{p.modelo} ({p.referencia})</option>
+                                    ))}
+                                  </select>
+                                  {editItens.length > 1 && (
+                                    <button onClick={() => editRemoveItem(i)} className="text-red-500/40 hover:text-red-500"><X size={14} /></button>
+                                  )}
+                                </div>
+                                {item.produtoId && (
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-0">
+                                      <button type="button" onClick={() => editUpdateItem(i, 'pacotes', Math.max(minPacotes || 1, item.pacotes - 1))}
+                                        className="rounded-l-lg border border-border-subtle bg-elevated px-2 py-1.5 text-content-secondary hover:bg-border-medium transition-colors"><Minus size={12} /></button>
+                                      <span className="border-y border-border-subtle bg-elevated px-3 py-1.5 text-xs font-semibold min-w-[2.5rem] text-center">{item.pacotes}</span>
+                                      <button type="button" onClick={() => editUpdateItem(i, 'pacotes', Math.min(maxPacotes, item.pacotes + 1))}
+                                        className="rounded-r-lg border border-border-subtle bg-elevated px-2 py-1.5 text-content-secondary hover:bg-border-medium transition-colors"><Plus size={12} /></button>
+                                    </div>
+                                    <span className="text-[10px] text-content-muted">pct · {item.pacotes * 15} pçs</span>
+                                    {vendidas > 0 && <span className="text-[10px] text-yellow-400">mín {minPacotes} pct ({vendidas} vendidas)</span>}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                          <button onClick={editAddItem} className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300">
+                            <Plus size={14} /> Adicionar produto
+                          </button>
+                          {editErro && <p className="text-xs text-red-400">{editErro}</p>}
+                          <div className="grid grid-cols-2 gap-2">
+                            <button onClick={cancelEdit} className="rounded-lg border border-border-subtle bg-elevated py-2 text-xs font-medium text-content-secondary hover:bg-border-medium transition">Cancelar</button>
+                            <button onClick={handleEditar} disabled={editSaving || editItens.every(i => !i.produtoId)}
+                              className="rounded-lg bg-blue-600 py-2 text-xs font-medium text-white hover:bg-blue-500 transition disabled:opacity-30">
+                              {editSaving ? 'Salvando...' : 'Salvar alterações'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-2 gap-2 text-center">
                         <div className="rounded-lg bg-elevated p-2">
                           <p className="text-xs text-content-muted">Vendido</p>
                           <p className="text-sm font-bold text-green-400">{totalVendidoPacotes(v.ativo)}/{totalPacotesInicial(v.ativo)} pct</p>
@@ -262,7 +463,8 @@ export default function CiclosPage() {
                       </div>
                       <button
                         onClick={() => handleFechar(v.ativo!.id)}
-                        className={`w-full rounded-lg py-2 text-xs font-medium transition-colors ${
+                        disabled={fecharLoading}
+                        className={`w-full rounded-lg py-2 text-xs font-medium transition-colors disabled:opacity-40 ${
                           fecharClicks === 0 ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
                           : fecharClicks === 1 ? 'bg-red-500/20 text-red-400'
                           : 'bg-red-600/30 text-red-300'
@@ -270,6 +472,8 @@ export default function CiclosPage() {
                       >
                         {fecharLabel}
                       </button>
+                        </>
+                      )}
                     </div>
                   )}
 
@@ -298,7 +502,7 @@ export default function CiclosPage() {
       {/* Modal ciclo fechado */}
       {modalCiclo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setModalCiclo(null)}>
-          <div className="w-full max-w-lg rounded-xl border border-border-subtle bg-surface p-5 space-y-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-2xl rounded-xl border border-border-subtle bg-surface p-5 space-y-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">Ciclo — {modalCiclo.vendedorNome}</h3>
               <button onClick={() => setModalCiclo(null)} className="text-content-muted hover:text-content"><X size={18} /></button>
