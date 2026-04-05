@@ -6,27 +6,6 @@ Backlog de desenvolvimento com status e prioridade.
 
 ## 🔲 Não iniciado
 
-### - [ ] 1. Clientes — Toggle tabela/cards + modal de estatísticas
-- **Página:** `/clientes` e `/meus-clientes`
-- **Escopo:**
-  - [ ] Adicionar toggle para alternar entre visualização em tabela e cards quadrados
-  - [ ] Modal ao clicar no cliente com estatísticas:
-    - [ ] Compras por período
-    - [ ] Modelo mais comprado
-    - [ ] Tendência de volume
-    - [ ] Ticket médio
-- **Prioridade:** Alta
-
-### - [ ] 2. Meu Estoque — Ciclos fechados com modal
-- **Página:** `/meu-estoque`
-- **Escopo:**
-  - [ ] Vendedor visualiza cards dos ciclos anteriores (já encerrados)
-  - [ ] Modal ao clicar no ciclo com estatísticas:
-    - [ ] Produtos vendidos vs devolvidos
-    - [ ] Valor total vendido
-    - [ ] Comissão / performance
-- **Prioridade:** Alta
-
 ### - [ ] 3. Mapear novos eventos para o histórico
 - **Página:** `/historico`
 - **Escopo:**
@@ -168,24 +147,25 @@ Backlog de desenvolvimento com status e prioridade.
 
 ---
 
-## 🔍 Aguardando validação / teste
-
-### - [ ] 11. Fix layout mobile dvh
-- **Arquivo:** `Layout.tsx`
-- **Status:** Código aplicado, não testado em dispositivos reais
-- [ ] Testar em iOS Safari e Android Chrome, validar que `dvh` resolve o problema de altura
-
-### - [ ] 12. Estoque admin — ciclos antigos agrupados por vendedor
-- **Página:** `/produtos` (visão admin dos ciclos)
-- **Status:** Provavelmente já funciona, precisa confirmar
-- [ ] Verificar se ciclos encerrados aparecem corretamente agrupados por vendedor na interface admin
-
-### - [ ] 13. Fix venda sem vendedor
-- **Status:** Código corrigido, não testado em produção
-- [ ] Simular cenário onde `vendedorId` poderia ser nulo e confirmar que o fix previne o erro
-
----
-
 ## ✅ Concluído
+
+### - [x] 1. Clientes — Toggle tabela/cards + modal de estatísticas
+- **Página:** `/clientes` e `/meus-clientes`
+- **Concluído em:** 05/04/2026
+
+### - [x] 2. Meu Estoque — Ciclos fechados com modal
+- **Página:** `/meu-estoque`
+- **Concluído em:** 05/04/2026
+
+### - [x] 11. Fix layout mobile dvh
+- **Arquivo:** `Layout.tsx`
+- **Concluído em:** 05/04/2026
+
+### - [x] 12. Estoque admin — ciclos antigos agrupados por vendedor
+- **Página:** `/produtos` (visão admin dos ciclos)
+- **Concluído em:** 05/04/2026
+
+### - [x] 13. Fix venda sem vendedor
+- **Concluído em:** 05/04/2026
 
 _Mover itens para cá conforme forem finalizados._
