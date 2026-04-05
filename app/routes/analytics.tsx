@@ -58,13 +58,36 @@ function timeAgo(ts: string) {
   return `${Math.floor(h / 24)}d atrás`;
 }
 
+const FILTERS = [
+  { label: '30s', ms: 30000 },
+  { label: '5min', ms: 300000 },
+  { label: '30min', ms: 1800000 },
+  { label: '60min', ms: 3600000 },
+  { label: '24h', ms: 86400000 },
+  { label: '48h', ms: 172800000 },
+  { label: '72h', ms: 259200000 },
+  { label: '7d', ms: 604800000 },
+  { label: '30d', ms: 2592000000 },
+  { label: '60d', ms: 5184000000 },
+  { label: '90d', ms: 7776000000 },
+  { label: '180d', ms: 15552000000 },
+  { label: '365d', ms: 31536000000 },
+  { label: 'Tudo', ms: Infinity },
+];
+
 export default function Analytics() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [events, setEvents] = useState<AnalyticsEvent[]>([]);
+  const [allEvents, setAllEvents] = useState<AnalyticsEvent[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [filter, setFilter] = useState('24h');
   const [, setTick] = useState(0);
 
   const allowed = !loading && user && getUserRoles(user).includes('desenvolvedor');
+
+  const filterMs = FILTERS.find(f => f.label === filter)?.ms || Infinity;
+  const now = Date.now();
+  const events = allEvents.filter(e => now - new Date(e.timestamp).getTime() <= filterMs);
 
   useEffect(() => {
     if (!loading && !allowed) navigate('/vendas');
@@ -72,9 +95,13 @@ export default function Analytics() {
 
   useEffect(() => {
     if (!allowed) return;
-    const unsub = onAnalyticsEvents(200, setEvents);
+    setLoadingEvents(true);
+    const unsub = onAnalyticsEvents(200, (events) => {
+      setAllEvents(events);
+      setLoadingEvents(false);
+    }, user?.id);
     return () => unsub();
-  }, [allowed]);
+  }, [allowed, user?.id]);
 
   useEffect(() => {
     if (!allowed) return;
@@ -95,6 +122,22 @@ export default function Analytics() {
         </div>
       </div>
 
+      <div className="flex gap-2 flex-wrap">
+        {FILTERS.map(f => (
+          <button
+            key={f.label}
+            onClick={() => setFilter(f.label)}
+            className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+              filter === f.label
+                ? 'bg-purple-500 text-white'
+                : 'bg-surface text-content-secondary hover:bg-elevated'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       <Card>
         <ResponsiveTable>
           <Table>
@@ -108,13 +151,19 @@ export default function Analytics() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {events.length === 0 && (
+              {loadingEvents ? (
+                <TableRow>
+                  <TableCell className="text-center text-content-muted" colSpan={5}>
+                    Carregando eventos...
+                  </TableCell>
+                </TableRow>
+              ) : events.length === 0 ? (
                 <TableRow>
                   <TableCell className="text-center text-content-muted" colSpan={5}>
                     Nenhum evento registrado
                   </TableCell>
                 </TableRow>
-              )}
+              ) : null}
               {events.map((ev) => {
                 const Icon = EVENT_ICONS[ev.tipo] || Activity;
                 const color = EVENT_COLORS[ev.tipo] || 'text-content-muted';
@@ -126,7 +175,18 @@ export default function Analytics() {
                         <span className={`text-xs font-medium uppercase ${color}`}>{ev.tipo}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{ev.usuarioNome}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {ev.usuarioFoto ? (
+                          <img src={ev.usuarioFoto} alt="" className="w-6 h-6 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-surface flex items-center justify-center text-xs text-content-muted">
+                            {ev.usuarioNome?.charAt(0).toUpperCase() || '?'}
+                          </div>
+                        )}
+                        <span>{ev.usuarioNome || 'Desconhecido'}</span>
+                      </div>
+                    </TableCell>
                     <TableCell>
                       {ev.detalhes ? (
                         <div className="flex items-center gap-2">
