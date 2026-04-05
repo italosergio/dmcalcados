@@ -9,7 +9,7 @@ export async function getClientes(): Promise<Cliente[]> {
   const userData = await get(ref(db, `users/${user.uid}`));
   const uData = userData.val();
   const roles: string[] = uData?.roles?.length ? uData.roles : [uData?.role];
-  const isAdmin = roles.some(r => r === 'admin' || r === 'superadmin');
+  const isAdmin = roles.some(r => r === 'admin' || r === 'superadmin' || r === 'desenvolvedor');
 
   const snapshot = await get(ref(db, 'clientes'));
   if (!snapshot.exists()) return [];
@@ -68,4 +68,8 @@ export async function updateCliente(clienteId: string, data: Partial<Omit<Client
 
 export async function compartilharCliente(clienteId: string, userIds: string[]): Promise<void> {
   await update(ref(db, `clientes/${clienteId}`), { compartilhadoCom: userIds });
+}
+
+export async function suspenderCliente(clienteId: string, suspenso: boolean): Promise<void> {
+  await update(ref(db, `clientes/${clienteId}`), { suspenso });
 }

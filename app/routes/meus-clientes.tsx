@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useLocation } from 'react-router';
 import { Plus, Users, Search, LayoutGrid, List, MapPin, Phone } from 'lucide-react';
 import { Card } from '~/components/common/Card';
 import { ClienteModal } from '~/components/clientes/ClienteModal';
@@ -21,6 +21,13 @@ export default function MeusClientesPage() {
   });
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [filtroNovos, setFiltroNovos] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    setFiltroNovos(params.get('novos') === '1');
+  }, [location.search]);
 
   const changeViewMode = (mode: 'cards' | 'tabela') => {
     setViewMode(mode);
@@ -57,7 +64,14 @@ export default function MeusClientesPage() {
     return counts;
   }, [vendas, clientes, user]);
 
-  const filtered = clientes.filter(c => c.nome.toLowerCase().includes(search.toLowerCase()));
+  const limite30dias = useMemo(() => {
+    const d = new Date(); d.setDate(d.getDate() - 30); d.setHours(0,0,0,0); return d;
+  }, []);
+  const isNovo = (c: Cliente) => c.createdAt && new Date(c.createdAt) >= limite30dias;
+
+  const filtered = clientes
+    .filter(c => c.nome.toLowerCase().includes(search.toLowerCase()))
+    .filter(c => !filtroNovos || isNovo(c));
   const totalVendido = Object.values(clienteTotals).reduce((s, v) => s + v, 0);
 
   return (
@@ -73,11 +87,11 @@ export default function MeusClientesPage() {
         <div className="grid grid-cols-2 gap-2 sm:contents">
           <Card className="bg-gradient-to-r from-blue-900/20 to-indigo-900/20 border-blue-800 !py-2 !px-2.5 sm:!px-3 sm:flex-1 sm:min-w-0">
             <p className="text-[10px] text-content-secondary font-medium leading-tight">Meus Clientes</p>
-            <p className="text-base sm:text-2xl font-bold text-blue-400 leading-tight">{clientes.length}</p>
+            <p className="text-xs sm:text-base font-bold text-blue-400 leading-tight">{clientes.length}</p>
           </Card>
           <Card className="bg-gradient-to-r from-green-900/20 to-emerald-900/20 border-green-800 !py-2 !px-2.5 sm:!px-3 sm:flex-1 sm:min-w-0">
             <p className="text-[10px] text-content-secondary font-medium leading-tight">Total vendido</p>
-            <p className="text-base sm:text-2xl font-bold text-green-400 leading-tight">{formatCurrency(totalVendido)}</p>
+            <p className="text-xs sm:text-base font-bold text-green-400 leading-tight">{formatCurrency(totalVendido)}</p>
           </Card>
         </div>
       </div>
@@ -89,6 +103,10 @@ export default function MeusClientesPage() {
           <input placeholder="Buscar cliente..." value={search} onChange={(e) => setSearch(e.target.value)}
             className="w-full rounded-lg border border-border-subtle bg-elevated pl-8 pr-3 py-2 text-xs text-content focus:outline-none focus:border-border-medium transition-colors" />
         </div>
+        <button onClick={() => setFiltroNovos(!filtroNovos)}
+          className={`rounded-lg px-2.5 py-1.5 text-xs font-medium border transition ${filtroNovos ? 'bg-green-600/10 text-green-400 border-green-600/30' : 'bg-elevated text-content-muted border-transparent hover:bg-border-medium'}`}>
+          Novos
+        </button>
         <div className="ml-auto flex items-center bg-elevated rounded-lg p-0.5">
           <button onClick={() => changeViewMode('cards')}
             className={`rounded-md p-1.5 transition-colors ${viewMode === 'cards' ? 'bg-surface text-content shadow-sm' : 'text-content-muted hover:text-content'}`}>
@@ -122,7 +140,10 @@ export default function MeusClientesPage() {
             <div key={cliente.id} className="rounded-xl border border-border-subtle bg-surface p-3 sm:p-4 cursor-pointer hover:border-border-medium transition-colors" onClick={() => setClienteSelecionado(cliente)}>
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold truncate">{cliente.nome}</h3>
+                  <h3 className="text-sm font-semibold truncate">
+                    {cliente.nome}
+                    {isNovo(cliente) && <span className="ml-1.5 text-[10px] bg-green-500/15 text-green-400 px-1.5 py-0.5 rounded font-medium">Novo</span>}
+                  </h3>
                   {(cliente.endereco || cliente.cidade) && (
                     <p className="text-xs text-content-muted truncate flex items-center gap-1"><MapPin size={12} className="shrink-0" />{[cliente.cidade, cliente.estado].filter(Boolean).join(' · ')}</p>
                   )}

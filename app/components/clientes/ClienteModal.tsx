@@ -1,13 +1,18 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, MapPin, Phone, Calendar, User, ShoppingBag, TrendingUp, Award, UserCircle, CreditCard, Package, ExternalLink } from 'lucide-react';
+import { X, MapPin, Phone, Calendar, User, ShoppingBag, TrendingUp, Award, UserCircle, CreditCard, Package, ExternalLink, Pencil, Check, Plus, Share2, Ban } from 'lucide-react';
+import { suspenderCliente } from '~/services/clientes.service';
 import { formatCurrency } from '~/utils/format';
-import type { Cliente, Venda } from '~/models';
+import type { Cliente, Venda, User as UserType } from '~/models';
+import { userIsAdmin } from '~/models';
 
 const chartTheme = {
   backgroundColor: '#232328',
   textColor: '#f0f0f2',
   gridColor: '#2e2e36'
 };
+
+const inputCls = "w-full rounded-lg border border-border-subtle bg-elevated px-3 py-2.5 text-sm text-content focus:outline-none focus:border-border-medium focus:ring-1 focus:ring-blue-500/30 transition-colors";
+const ESTADOS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 
 type Periodo = '3m' | '6m' | '1a';
 
@@ -16,13 +21,78 @@ interface Props {
   vendas: Venda[];
   onClose: () => void;
   onNavigateVenda?: (vendaId: string) => void;
+  user?: UserType | null;
+  vendedores?: UserType[];
+  onEdit?: (clienteId: string, data: Partial<Cliente>) => Promise<void>;
+  onShare?: (clienteId: string, userIds: string[]) => Promise<void>;
 }
 
-export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda }: Props) {
+export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda, user, vendedores = [], onEdit, onShare }: Props) {
   const [vendaAberta, setVendaAberta] = useState<Venda | null>(null);
   const [periodo, setPeriodo] = useState<Periodo>('1a');
   const [Highcharts, setHighcharts] = useState<any>(null);
   const [HighchartsReact, setHighchartsReact] = useState<any>(null);
+
+  // Edit state
+  const [editing, setEditing] = useState(false);
+  const [editData, setEditData] = useState<Partial<Cliente>>({});
+  const [editContatos, setEditContatos] = useState<string[]>([]);
+  const [cidades, setCidades] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  // Share state
+  const [compartilhados, setCompartilhados] = useState<string[]>(cliente.compartilhadoCom || []);
+
+  // Suspender state
+  const [suspenso, setSuspenso] = useState(!!cliente.suspenso);
+
+  const isAdmin = user ? userIsAdmin(user as any) : false;
+  const podeCompartilhar = user ? isAdmin || cliente.donoId === (user?.uid || user?.id) : false;
+
+  const fetchCidades = (uf: string) => {
+    fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios?orderBy=nome`)
+      .then(r => r.json())
+      .then((data: { nome: string }[]) => setCidades(data.map(c => c.nome)))
+      .catch(() => setCidades([]));
+  };
+
+  const startEdit = () => {
+    setEditing(true);
+    setEditData({ nome: cliente.nome, endereco: cliente.endereco, cidade: cliente.cidade || '', estado: cliente.estado || 'MA', cpfCnpj: cliente.cpfCnpj });
+    setEditContatos(cliente.contatos?.length ? [...cliente.contatos] : cliente.contato ? [cliente.contato] : ['']);
+    fetchCidades(cliente.estado || 'MA');
+  };
+
+  const saveEdit = async () => {
+    if (!onEdit) return;
+    setSaving(true);
+    try {
+      const contatosFiltrados = editContatos.filter(c => c.trim());
+      await onEdit(cliente.id, { ...editData, contato: contatosFiltrados[0] || '', contatos: contatosFiltrados });
+      setEditing(false);
+    } finally { setSaving(false); }
+  };
+
+  const formatContato = (v: string) => {
+    const nums = v.replace(/\D/g, '').slice(0, 11);
+    if (nums.length <= 2) return nums.length ? `(${nums}` : '';
+    if (nums.length <= 3) return `(${nums.slice(0,2)}) ${nums.slice(2)}`;
+    if (nums.length <= 7) return `(${nums.slice(0,2)}) ${nums.slice(2,3)} ${nums.slice(3)}`;
+    return `(${nums.slice(0,2)}) ${nums.slice(2,3)} ${nums.slice(3,7)}-${nums.slice(7)}`;
+  };
+
+  const toggleCompartilhar = async (uid: string) => {
+    if (!onShare) return;
+    const next = compartilhados.includes(uid) ? compartilhados.filter(id => id !== uid) : [...compartilhados, uid];
+    setCompartilhados(next);
+    await onShare(cliente.id, next);
+  };
+
+  const toggleSuspender = async () => {
+    const next = !suspenso;
+    setSuspenso(next);
+    await suspenderCliente(cliente.id, next);
+  };
 
   useEffect(() => {
     Promise.all([
@@ -116,18 +186,87 @@ export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda }: Prop
         </div>
         <div className="p-5 space-y-3">
           {/* Dados do cliente */}
-          <div className="rounded-lg bg-elevated p-2.5 space-y-1">
-            {cliente.cpfCnpj && <p className="text-xs text-content-secondary">{cliente.cpfCnpj.length <= 11 ? 'CPF' : 'CNPJ'}: {cliente.cpfCnpj}</p>}
-            {(cliente.endereco || cliente.cidade) && (
-              <p className="flex items-center gap-1.5 text-xs text-content-secondary"><MapPin size={12} className="text-content-muted shrink-0" />{[cliente.endereco, cliente.cidade, cliente.estado].filter(Boolean).join(' · ')}</p>
+          <div className="rounded-lg bg-elevated p-2.5 space-y-1 relative group">
+            {onEdit && !editing && (
+              <button onClick={startEdit} className="absolute top-2 right-2 rounded-md p-1 text-content-muted/40 hover:text-blue-400 hover:bg-blue-500/10 opacity-0 group-hover:opacity-100 transition-all" title="Editar">
+                <Pencil size={13} />
+              </button>
             )}
-            {contatos.map((c, i) => (
-              <p key={i} className="flex items-center gap-1.5 text-xs text-content-secondary"><Phone size={12} className="text-content-muted shrink-0" />{c}</p>
-            ))}
-            {cliente.createdAt && (
-              <p className="flex items-center gap-1.5 text-[10px] text-content-muted"><Calendar size={11} className="shrink-0" />Cliente desde {new Date(cliente.createdAt).toLocaleDateString('pt-BR')}</p>
+            {!editing ? (
+              <>
+                {cliente.cpfCnpj && <p className="text-xs text-content-secondary">{cliente.cpfCnpj.length <= 11 ? 'CPF' : 'CNPJ'}: {cliente.cpfCnpj}</p>}
+                {(cliente.endereco || cliente.cidade) && (
+                  <p className="flex items-center gap-1.5 text-xs text-content-secondary"><MapPin size={12} className="text-content-muted shrink-0" />{[cliente.endereco, cliente.cidade, cliente.estado].filter(Boolean).join(' · ')}</p>
+                )}
+                {contatos.map((c, i) => (
+                  <p key={i} className="flex items-center gap-1.5 text-xs text-content-secondary"><Phone size={12} className="text-content-muted shrink-0" />{c}</p>
+                ))}
+                {cliente.createdAt && (
+                  <p className="flex items-center gap-1.5 text-[10px] text-content-muted"><Calendar size={11} className="shrink-0" />Cliente desde {new Date(cliente.createdAt).toLocaleDateString('pt-BR')}</p>
+                )}
+              </>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-semibold text-blue-400">Editando</span>
+                  <button onClick={() => setEditing(false)} className="text-content-muted hover:text-content"><X size={16} /></button>
+                </div>
+                <input value={editData.nome || ''} onChange={(e) => setEditData({ ...editData, nome: e.target.value })} className={inputCls} placeholder="Nome" />
+                <input value={editData.cpfCnpj || ''} onChange={(e) => setEditData({ ...editData, cpfCnpj: e.target.value.replace(/\D/g, '').slice(0, 14) })} className={inputCls} placeholder="CPF / CNPJ" inputMode="numeric" />
+                <input value={editData.endereco || ''} onChange={(e) => setEditData({ ...editData, endereco: e.target.value })} className={inputCls} placeholder="Endereço" />
+                <div className="grid grid-cols-[5rem_1fr] gap-2">
+                  <select value={editData.estado || 'MA'} onChange={(e) => { setEditData({ ...editData, estado: e.target.value, cidade: '' }); fetchCidades(e.target.value); }} className={inputCls}>
+                    {ESTADOS.map(uf => <option key={uf} value={uf}>{uf}</option>)}
+                  </select>
+                  <div>
+                    <input value={editData.cidade || ''} onChange={(e) => setEditData({ ...editData, cidade: e.target.value })} className={inputCls} list="modal-edit-cidades" placeholder="Cidade" />
+                    <datalist id="modal-edit-cidades">{cidades.map(c => <option key={c} value={c} />)}</datalist>
+                  </div>
+                </div>
+                {editContatos.map((c, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input value={c} onChange={(e) => { const arr = [...editContatos]; arr[i] = formatContato(e.target.value); setEditContatos(arr); }} className={inputCls} placeholder="Contato" inputMode="tel" />
+                    {editContatos.length > 1 && (
+                      <button onClick={() => setEditContatos(editContatos.filter((_, j) => j !== i))} className="rounded-lg px-2 text-red-500/60 hover:text-red-500"><X size={16} /></button>
+                    )}
+                  </div>
+                ))}
+                <button onClick={() => setEditContatos([...editContatos, ''])} className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300">
+                  <Plus size={14} /> Adicionar contato
+                </button>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button onClick={() => setEditing(false)} className="rounded-lg border border-border-subtle bg-elevated py-2 text-sm font-medium text-content-secondary transition hover:bg-border-medium">Cancelar</button>
+                  <button onClick={saveEdit} disabled={saving}
+                    className="rounded-lg bg-gradient-to-r from-green-600 to-emerald-500 py-2 text-sm font-semibold text-white transition hover:from-green-500 hover:to-emerald-400 active:scale-[0.98] disabled:opacity-30 flex items-center justify-center gap-1.5">
+                    <Check size={16} /> {saving ? 'Salvando...' : 'Salvar'}
+                  </button>
+                </div>
+              </div>
             )}
           </div>
+
+          {/* Compartilhar */}
+          {podeCompartilhar && onShare && vendedores.length > 0 && (
+            <div className="rounded-lg bg-elevated p-2.5">
+              <div className="flex items-center gap-1.5 text-content-muted mb-1.5"><Share2 size={12} /><span className="text-[10px] font-medium">Compartilhar com vendedores</span></div>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {vendedores.map(v => {
+                  const uid = v.uid || v.id;
+                  const checked = compartilhados.includes(uid);
+                  return (
+                    <label key={uid} className="flex items-center gap-2.5 rounded-md p-1.5 hover:bg-surface cursor-pointer transition-colors">
+                      <button type="button" role="switch" aria-checked={checked} onClick={() => toggleCompartilhar(uid)}
+                        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${checked ? 'bg-purple-500' : 'bg-border-medium'}`}>
+                        <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
+                      </button>
+                      <span className="text-xs">{v.nome}</span>
+                      <span className="text-[10px] text-content-muted ml-auto">@{v.username}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Gráfico */}
           {clienteVendas.length > 0 && (
@@ -225,6 +364,19 @@ export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda }: Prop
                 </table>
               </div>
             </div>
+          )}
+          {/* Suspender cliente */}
+          {isAdmin && (
+            <label className="flex items-center justify-between rounded-lg bg-elevated p-2.5 cursor-pointer">
+              <div className="flex items-center gap-1.5">
+                <Ban size={13} className={suspenso ? 'text-red-400' : 'text-content-muted'} />
+                <span className="text-xs font-medium">{suspenso ? 'Cliente suspenso' : 'Suspender cliente'}</span>
+              </div>
+              <button type="button" role="switch" aria-checked={suspenso} onClick={toggleSuspender}
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${suspenso ? 'bg-red-500' : 'bg-border-medium'}`}>
+                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${suspenso ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
+              </button>
+            </label>
           )}
         </div>
       </div>
