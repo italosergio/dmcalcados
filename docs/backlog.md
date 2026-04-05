@@ -94,7 +94,48 @@ Backlog de desenvolvimento com status e prioridade.
   - [ ] Incluir no sitemap: rota, arquivo, doc correspondente, roles com acesso
 - **Prioridade:** Média
 
-### - [ ] 8. Documentação e manual do sistema + tutoriais guiados
+### - [ ] 8. Página de Pagamentos — Acompanhamento de vendas a prazo
+- **Rota:** `/pagamentos`
+- **Escopo:**
+  - [ ] Listar todas as vendas a prazo com parcelas e datas de vencimento
+  - [ ] Classificar status de cada parcela por proximidade/atraso:
+    - 🟢 **Em dia** — vencimento ainda distante
+    - 🟡 **Próximo** — vencimento nos próximos X dias
+    - 🟠 **Vencido recente** — passou pouco do vencimento
+    - 🔴 **Atrasado** — atraso significativo
+    - ⚫ **Crítico** — atraso muito grande (definir threshold)
+  - [ ] Permitir marcar parcela como paga (registrar data de pagamento)
+  - [ ] Filtros: por status, por cliente, por vendedor, por período
+  - [ ] Cards resumo: total a receber, vencendo em breve, atrasados, críticos
+  - [ ] Acesso: admin/superadmin vê tudo, vendedor vê apenas suas vendas
+- **Decisões pendentes:**
+  - [ ] Definir thresholds de dias para cada faixa de status (ex: próximo = 7 dias, vencido recente = 1-15 dias, atrasado = 16-60 dias, crítico = 60+ dias)
+  - [ ] Notificações/alertas automáticos para parcelas próximas do vencimento?
+  - [ ] Histórico de pagamentos recebidos?
+- **Prioridade:** Alta
+
+### - [ ] 9. Sistema de Notificações
+- **Escopo:**
+  - [ ] Criar nó `notificacoes/{userId}` no Realtime Database para armazenar notificações por usuário
+  - [ ] Modelo: `{ id, tipo, titulo, mensagem, lida, criadoEm, dados? }`
+  - [ ] Service `notificacoes.service.ts` com: `getNotificacoes(userId)`, `marcarComoLida(id)`, `marcarTodasComoLidas(userId)`, `criarNotificacao(userId, data)`
+  - [ ] Listener realtime no AuthContext ou Layout para contar não-lidas
+  - [ ] Ícone de sino no Header com badge de contagem
+  - [ ] Dropdown/painel com lista de notificações ao clicar no sino
+  - [ ] Marcar como lida ao clicar na notificação
+- **Eventos que geram notificação:**
+  - [ ] Admin cria/edita/fecha ciclo do vendedor → notifica vendedor
+  - [ ] Admin altera role do usuário → notifica usuário
+  - [ ] Admin altera status do usuário (suspenso/inativo) → notifica usuário
+  - [ ] Admin exclui venda do vendedor → notifica vendedor
+  - [ ] Admin exclui despesa do vendedor → notifica vendedor
+- **Eventos futuros (avaliar):**
+  - [ ] Parcela próxima do vencimento → notifica vendedor (depende da tarefa #8)
+  - [ ] Estoque baixo de produto no ciclo → notifica vendedor
+  - [ ] Promoção automática de nível → notifica vendedor (depende da tarefa #6)
+- **Prioridade:** Alta
+
+### - [ ] 10. Documentação e manual do sistema + tutoriais guiados
 - **Escopo:**
   - [ ] Criar página `/manual` acessível por todos os usuários autenticados
   - [ ] Manual do Vendedor:
@@ -129,17 +170,17 @@ Backlog de desenvolvimento com status e prioridade.
 
 ## 🔍 Aguardando validação / teste
 
-### - [ ] 9. Fix layout mobile dvh
+### - [ ] 11. Fix layout mobile dvh
 - **Arquivo:** `Layout.tsx`
 - **Status:** Código aplicado, não testado em dispositivos reais
 - [ ] Testar em iOS Safari e Android Chrome, validar que `dvh` resolve o problema de altura
 
-### - [ ] 10. Estoque admin — ciclos antigos agrupados por vendedor
+### - [ ] 12. Estoque admin — ciclos antigos agrupados por vendedor
 - **Página:** `/produtos` (visão admin dos ciclos)
 - **Status:** Provavelmente já funciona, precisa confirmar
 - [ ] Verificar se ciclos encerrados aparecem corretamente agrupados por vendedor na interface admin
 
-### - [ ] 11. Fix venda sem vendedor
+### - [ ] 13. Fix venda sem vendedor
 - **Status:** Código corrigido, não testado em produção
 - [ ] Simular cenário onde `vendedorId` poderia ser nulo e confirmar que o fix previne o erro
 
