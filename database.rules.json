@@ -45,6 +45,10 @@
       ".read": "auth != null",
       ".write": "auth != null"
     },
+    "pagamentos": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
     "analytics": {
       ".read": "auth != null",
       ".write": "auth != null",

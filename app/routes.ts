@@ -22,6 +22,7 @@ export default [
     route("historico", "routes/historico.tsx"),
     route("ciclos", "routes/ciclos.tsx"),
     route("meu-estoque", "routes/meu-estoque.tsx"),
+    route("pagamentos", "routes/pagamentos.tsx"),
     route("conta", "routes/conta.tsx"),
     route("analytics", "routes/analytics.tsx"),
   ]),

@@ -1,10 +1,10 @@
 import { Link, useLocation } from 'react-router';
-import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, History, LogOut, X, UserCircle, Home, Package, RefreshCw, Plus, ArrowRightLeft, Loader2, Activity } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, History, LogOut, X, UserCircle, Home, Package, RefreshCw, Plus, ArrowRightLeft, Loader2, Activity, CreditCard } from 'lucide-react';
 import { logout } from '~/services/auth.service';
 import { useNavigate } from 'react-router';
 import { useAuth } from '~/contexts/AuthContext';
 import { useEffect, useState } from 'react';
-import { userIsVendedor, userIsAdmin, getUserRoles, isVendedor } from '~/models';
+import { userIsVendedor, userIsAdmin, getUserRoles, isVendedor, userCanAccessAdmin } from '~/models';
 import { RoleBadge } from '~/utils/roles';
 import { getSavedAccounts, hasStoredCredential, type SavedAccount } from '~/utils/accounts';
 
@@ -94,6 +94,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   }
 
   links.push({ to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' });
+
+  if (user && userCanAccessAdmin(user)) {
+    links.push({ to: '/pagamentos', icon: CreditCard, label: 'Pagamentos' });
+  }
 
   if (user && userIsAdmin(user)) {
     links.push({ to: '/historico', icon: History, label: 'Histórico' });
