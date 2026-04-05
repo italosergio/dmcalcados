@@ -9,7 +9,7 @@ export async function getDespesas(): Promise<Despesa[]> {
   const userData = await get(ref(db, `users/${user.uid}`));
   const uData = userData.val();
   const roles: string[] = uData?.roles?.length ? uData.roles : [uData?.role];
-  const isAdmin = roles.some(r => r === 'admin' || r === 'superadmin');
+  const isAdmin = roles.some(r => r === 'admin' || r === 'superadmin' || r === 'desenvolvedor');
 
   const [snapshot, usersSnap] = await Promise.all([
     get(ref(db, 'despesas')),
@@ -95,6 +95,8 @@ export async function createDespesa(data: Omit<Despesa, 'id' | 'createdAt'>): Pr
     };
 
     if (data.imagemUrl) despesaData.imagemUrl = data.imagemUrl;
+    if (data.imagensUrls && data.imagensUrls.length > 0) despesaData.imagensUrls = data.imagensUrls;
+    if (data.semImagemJustificativa) despesaData.semImagemJustificativa = data.semImagemJustificativa;
     if (data.descricao) despesaData.descricao = data.descricao;
     if (data.rateio && data.rateio.length > 0) despesaData.rateio = data.rateio;
 

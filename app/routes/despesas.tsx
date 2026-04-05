@@ -1,19 +1,22 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router';
-import { Plus, Trash2, Undo2, Receipt, UserCircle, Fuel, UtensilsCrossed, BedDouble, ImageIcon, X, Wrench, HelpCircle, Calendar, LayoutGrid, List, type LucideIcon } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router';
+import { Plus, Trash2, Undo2, Receipt, UserCircle, Fuel, UtensilsCrossed, BedDouble, ImageIcon, ImageOff, X, Wrench, HelpCircle, Calendar, LayoutGrid, List, FileText, type LucideIcon } from 'lucide-react';
 import { auth } from '~/services/firebase';
 import { ImageLightbox } from '~/components/common/ImageLightbox';
 import { Card } from '~/components/common/Card';
-import { useDespesas } from '~/hooks/useRealtime';
+import { useDespesas, useUsers } from '~/hooks/useRealtime';
 import { getTiposDespesa } from '~/services/despesas.service';
 import { getIconeForTipo } from '~/components/despesas/DespesaForm';
 import { formatCurrency, formatDate } from '~/utils/format';
 import type { Despesa } from '~/models';
 
-type Periodo = 'hoje' | '7dias' | '30dias' | 'ano' | 'tudo';
+type Periodo = 'hoje' | '7dias' | '30dias' | 'mes' | 'ano' | 'tudo';
 
 export default function DespesasPage() {
   const { despesas, loading: despesasLoading } = useDespesas();
+  const { users } = useUsers();
+  const userNomeMap = new Map(users.map(u => [u.uid || u.id, u.nome]));
+  const resolveUser = (id: string, fallback: string) => userNomeMap.get(id) || fallback;
   const [tiposMeta, setTiposMeta] = useState<{ nome: string; icone?: string }[]>([]);
   const [tiposLoading, setTiposLoading] = useState(true);
   const loading = despesasLoading || tiposLoading;
@@ -30,6 +33,16 @@ export default function DespesasPage() {
     return 'cards';
   });
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Ler período da URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const p = params.get('periodo');
+    if (p && ['hoje', '7dias', '30dias', 'mes', 'ano', 'tudo'].includes(p)) {
+      setPeriodo(p as Periodo);
+    }
+  }, [location.search]);
 
   const changeViewMode = (mode: 'cards' | 'tabela') => {
     setViewMode(mode);
@@ -48,11 +61,26 @@ export default function DespesasPage() {
 
   const [currentUserNome, setCurrentUserNome] = useState('');
 
+  // Limpar loading quando dados atualizam
+  useEffect(() => {
+    setActionLoading({});
+  }, [despesas]);
+
+  // Sincronizar modal com dados realtime
+  useEffect(() => {
+    if (!despesaSelecionada) return;
+    const atualizada = despesas.find(d => d.id === despesaSelecionada.id);
+    if (atualizada) setDespesaSelecionada(atualizada);
+  }, [despesas]);
+
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+
   const handleDelete = useCallback((id: string) => {
     const clicks = (deleteClicks[id] || 0) + 1;
     clearTimeout(deleteTimers.current[id]);
     if (clicks >= 3) {
       setDeleteClicks(prev => { const n = { ...prev }; delete n[id]; return n; });
+      setActionLoading(prev => ({ ...prev, [id]: true }));
       import('~/services/despesas.service').then(m => m.deleteDespesa(id));
     } else {
       setDeleteClicks(prev => ({ ...prev, [id]: clicks }));
@@ -70,6 +98,7 @@ export default function DespesasPage() {
   };
 
   const handleRestore = useCallback((id: string) => {
+    setActionLoading(prev => ({ ...prev, [id]: true }));
     import('~/services/despesas.service').then(m => m.restoreDespesa(id));
   }, []);
 
@@ -82,6 +111,7 @@ export default function DespesasPage() {
       if (periodo === 'hoje') inicio.setHours(0, 0, 0, 0);
       else if (periodo === '7dias') inicio.setDate(agora.getDate() - 7);
       else if (periodo === '30dias') inicio.setDate(agora.getDate() - 30);
+      else if (periodo === 'mes') { inicio.setDate(1); inicio.setHours(0, 0, 0, 0); }
       else if (periodo === 'ano') inicio.setFullYear(agora.getFullYear(), 0, 1);
       if (new Date(d.data) < inicio) return false;
     }
@@ -120,7 +150,7 @@ export default function DespesasPage() {
       ? `a partir de ${new Date(filtroDataInicio + 'T00:00:00').toLocaleDateString('pt-BR')}`
       : filtroDataFim
         ? `até ${new Date(filtroDataFim + 'T00:00:00').toLocaleDateString('pt-BR')}`
-        : { hoje: 'hoje', '7dias': 'últimos 7 dias', '30dias': 'últimos 30 dias', ano: 'do ano', tudo: '' }[periodo];
+        : { hoje: 'hoje', '7dias': 'últimos 7 dias', '30dias': 'últimos 30 dias', mes: 'do mês', ano: 'do ano', tudo: '' }[periodo];
 
   return (
     <div className={viewMode === 'tabela' ? 'flex flex-col h-[calc(100vh-4rem)] overflow-hidden' : ''}>
@@ -135,31 +165,31 @@ export default function DespesasPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:contents">
           <Card className="col-span-2 sm:col-span-1 bg-gradient-to-r from-red-900/20 to-rose-900/20 border-red-800 !py-2 !px-2.5 sm:!px-3 sm:flex-1 sm:min-w-0">
             <p className="text-[10px] text-content-secondary font-medium leading-tight truncate">Total {periodoLabel}</p>
-            <p className="text-base sm:text-2xl font-bold text-red-400 leading-tight">{formatCurrency(totalDespesas)}</p>
+            <p className="text-xs sm:text-base font-bold text-red-400 leading-tight">{formatCurrency(totalDespesas)}</p>
             <p className="text-[10px] text-content-muted leading-tight">{filtered.length} despesa(s)</p>
           </Card>
           {totalCombustivel > 0 && (
             <Card className="bg-gradient-to-r from-orange-900/20 to-amber-900/20 border-orange-800 !py-2 !px-2.5 sm:!px-3">
               <div className="flex items-center gap-1 mb-0.5"><Fuel size={10} className="text-orange-400" /><p className="text-[10px] text-content-secondary font-medium leading-tight">Combustível</p></div>
-              <p className="text-base sm:text-2xl font-bold text-orange-400 leading-tight">{formatCurrency(totalCombustivel)}</p>
+              <p className="text-xs sm:text-base font-bold text-orange-400 leading-tight">{formatCurrency(totalCombustivel)}</p>
             </Card>
           )}
           {totalAlimentacao > 0 && (
             <Card className="bg-gradient-to-r from-yellow-900/20 to-amber-900/20 border-yellow-800 !py-2 !px-2.5 sm:!px-3">
               <div className="flex items-center gap-1 mb-0.5"><UtensilsCrossed size={10} className="text-yellow-400" /><p className="text-[10px] text-content-secondary font-medium leading-tight">Alimentação</p></div>
-              <p className="text-base sm:text-2xl font-bold text-yellow-400 leading-tight">{formatCurrency(totalAlimentacao)}</p>
+              <p className="text-xs sm:text-base font-bold text-yellow-400 leading-tight">{formatCurrency(totalAlimentacao)}</p>
             </Card>
           )}
           {totalHospedagem > 0 && (
             <Card className="bg-gradient-to-r from-purple-900/20 to-violet-900/20 border-purple-800 !py-2 !px-2.5 sm:!px-3">
               <div className="flex items-center gap-1 mb-0.5"><BedDouble size={10} className="text-purple-400" /><p className="text-[10px] text-content-secondary font-medium leading-tight">Hospedagem</p></div>
-              <p className="text-base sm:text-2xl font-bold text-purple-400 leading-tight">{formatCurrency(totalHospedagem)}</p>
+              <p className="text-xs sm:text-base font-bold text-purple-400 leading-tight">{formatCurrency(totalHospedagem)}</p>
             </Card>
           )}
           {totalManutencao > 0 && (
             <Card className="bg-gradient-to-r from-cyan-900/20 to-teal-900/20 border-cyan-800 !py-2 !px-2.5 sm:!px-3">
               <div className="flex items-center gap-1 mb-0.5"><Wrench size={10} className="text-cyan-400" /><p className="text-[10px] text-content-secondary font-medium leading-tight">Manutenção</p></div>
-              <p className="text-base sm:text-2xl font-bold text-cyan-400 leading-tight">{formatCurrency(totalManutencao)}</p>
+              <p className="text-xs sm:text-base font-bold text-cyan-400 leading-tight">{formatCurrency(totalManutencao)}</p>
             </Card>
           )}
         </div>
@@ -171,6 +201,7 @@ export default function DespesasPage() {
           { value: 'hoje', label: 'Hoje' },
           { value: '7dias', label: '7 dias' },
           { value: '30dias', label: '30 dias' },
+          { value: 'mes', label: 'Mês' },
           { value: 'ano', label: 'Ano' },
           { value: 'tudo', label: 'Tudo' },
         ] as { value: Periodo; label: string }[]).map(opt => (
@@ -242,7 +273,7 @@ export default function DespesasPage() {
       {!loading && filtered.length === 0 && filtroTipos.length === 0 && !filtroDataInicio && !filtroDataFim && despesas.length > 0 && (
         <div className="rounded-xl border border-border-subtle bg-surface p-6 sm:p-8 text-center">
           <Receipt size={40} className="mx-auto mb-3 text-content-muted opacity-40" />
-          <p className="mb-2 text-sm sm:text-base font-medium">Nenhuma despesa registrada {periodo === 'hoje' ? 'hoje' : periodo === '7dias' ? 'nos últimos 7 dias' : periodo === '30dias' ? 'nos últimos 30 dias' : 'no ano'}</p>
+          <p className="mb-2 text-sm sm:text-base font-medium">Nenhuma despesa registrada {periodo === 'hoje' ? 'hoje' : periodo === '7dias' ? 'nos últimos 7 dias' : periodo === '30dias' ? 'nos últimos 30 dias' : periodo === 'mes' ? 'neste mês' : 'no ano'}</p>
           <button onClick={() => setPeriodo('tudo')}
             className="rounded-lg border border-border-subtle bg-elevated px-4 py-2 text-sm font-medium text-content-secondary transition hover:bg-border-medium">
             Ver todas as despesas
@@ -271,8 +302,14 @@ export default function DespesasPage() {
                       {getTipoIcone(despesa.tipo)}
                       {despesa.tipo}
                     </span>
-                    {(despesa as any).imagemUrl && (
+                    {((despesa as any).imagemUrl || (despesa as any).imagensUrls?.length) && (
                       <ImageIcon size={13} className="text-blue-400 shrink-0" />
+                    )}
+                    {!(despesa as any).imagemUrl && !(despesa as any).imagensUrls?.length && (despesa as any).semImagemJustificativa && (
+                      <ImageOff size={13} className="text-red-400 shrink-0" />
+                    )}
+                    {despesa.descricao && (
+                      <FileText size={13} className="text-content-muted/60 shrink-0" />
                     )}
                   </div>
                   {(despesa as any).deletedAt && (
@@ -281,9 +318,9 @@ export default function DespesasPage() {
                   <p className={`text-lg sm:text-xl font-bold ${ (despesa as any).deletedAt ? 'text-red-400 line-through' : 'text-red-400' }`}>{formatCurrency(despesa.valor)}</p>
                   <div className="mt-1 flex items-center gap-1 text-xs text-content-muted">
                     <UserCircle size={14} />
-                    <span className="truncate">{despesa.usuarioNome}</span>
+                    <span className="truncate">{resolveUser(despesa.usuarioId, despesa.usuarioNome)}</span>
                     {despesa.rateio && despesa.rateio.length > 0 && (
-                      <span className="text-content-muted/60">· inclui {despesa.rateio.map(r => r.usuarioNome).join(', ')}</span>
+                      <span className="text-content-muted/60">· inclui {despesa.rateio.map(r => resolveUser(r.usuarioId, r.usuarioNome)).join(', ')}</span>
                     )}
                   </div>
                   {despesa.descricao && (
@@ -319,7 +356,7 @@ export default function DespesasPage() {
                     <td className="px-3 py-2">
                       <span className="inline-flex items-center gap-1 text-xs">{getTipoIcone(despesa.tipo)} {despesa.tipo}</span>
                     </td>
-                    <td className="px-3 py-2 text-xs text-content-secondary truncate max-w-[120px] hidden sm:table-cell">{despesa.usuarioNome}</td>
+                    <td className="px-3 py-2 text-xs text-content-secondary truncate max-w-[120px] hidden sm:table-cell">{resolveUser(despesa.usuarioId, despesa.usuarioNome)}</td>
                     <td className="px-3 py-2 text-[11px] text-content-muted truncate max-w-[160px] hidden sm:table-cell">{despesa.descricao || '—'}</td>
                     <td className={`px-3 py-2 text-xs font-semibold text-right whitespace-nowrap ${ (despesa as any).deletedAt ? 'text-red-400 line-through' : 'text-red-400' }`}>{formatCurrency(despesa.valor)}</td>
                     <td className="px-3 py-2 text-[11px] text-content-muted text-right whitespace-nowrap">{formatDate(new Date(despesa.data))}</td>
@@ -355,10 +392,10 @@ export default function DespesasPage() {
                   </div>
                   <div className="rounded-lg bg-elevated p-2.5">
                     <div className="flex items-center gap-1.5 text-content-muted mb-0.5"><UserCircle size={12} /><span className="text-[10px]">Registrado por</span></div>
-                    <p className="text-xs font-semibold">{d.usuarioNome}</p>
+                    <p className="text-xs font-semibold">{resolveUser(d.usuarioId, d.usuarioNome)}</p>
                     {d.rateio && d.rateio.length > 0 && (
                       <div className="mt-1">
-                        <p className="text-[10px] text-content-muted">Inclui também: <span className="text-blue-400">{d.rateio.map(r => r.usuarioNome).join(', ')}</span></p>
+                        <p className="text-[10px] text-content-muted">Inclui também: <span className="text-blue-400">{d.rateio.map(r => resolveUser(r.usuarioId, r.usuarioNome)).join(', ')}</span></p>
                       </div>
                     )}
                   </div>
@@ -369,11 +406,21 @@ export default function DespesasPage() {
                     <p className="text-xs">{d.descricao}</p>
                   </div>
                 )}
-                {(d as any).imagemUrl && (
+                {((d as any).imagensUrls?.length > 0 || (d as any).imagemUrl) && (
                   <div>
-                    <p className="text-[10px] text-content-muted mb-1.5">Comprovante</p>
-                    <img src={(d as any).imagemUrl} alt="Comprovante" className="rounded-lg border border-border-subtle max-h-48 object-contain cursor-pointer hover:opacity-80 transition"
-                      onClick={() => { setDespesaSelecionada(null); setImagemAberta((d as any).imagemUrl); }} />
+                    <p className="text-[10px] text-content-muted mb-1.5">Comprovante{(d as any).imagensUrls?.length > 1 ? 's' : ''}</p>
+                    <div className="flex gap-2 flex-wrap">
+                      {((d as any).imagensUrls || [(d as any).imagemUrl]).filter(Boolean).map((url: string, i: number) => (
+                        <img key={i} src={url} alt={`Comprovante ${i + 1}`} className="rounded-lg border border-border-subtle max-h-48 object-contain cursor-pointer hover:opacity-80 transition"
+                          onClick={() => { setDespesaSelecionada(null); setImagemAberta(url); }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {(d as any).semImagemJustificativa && (
+                  <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-2.5">
+                    <div className="flex items-center gap-1.5 text-red-400 mb-0.5"><ImageOff size={12} /><span className="text-[10px] font-medium">Sem comprovante</span></div>
+                    <p className="text-xs text-red-300">{(d as any).semImagemJustificativa}</p>
                   </div>
                 )}
                 <p className="text-[10px] text-content-muted text-center">Registrado em {new Date(d.createdAt).toLocaleString('pt-BR')}</p>
@@ -387,10 +434,11 @@ export default function DespesasPage() {
                     <button
                       type="button"
                       onClick={() => handleRestore(d.id)}
-                      className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/20 transition-colors"
+                      disabled={actionLoading[d.id]}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/20 transition-colors disabled:opacity-40"
                     >
                       <Undo2 size={13} />
-                      Desfazer exclusão
+                      {actionLoading[d.id] ? 'Aguarde...' : 'Desfazer exclusão'}
                     </button>
                   </div>
                 )}
@@ -399,16 +447,19 @@ export default function DespesasPage() {
                 <button
                   type="button"
                   onClick={() => handleDelete(d.id)}
-                  className={`w-full flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
-                    (deleteClicks[d.id] || 0) === 0
-                      ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
-                      : (deleteClicks[d.id] || 0) === 1
-                        ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                        : 'bg-red-600/30 text-red-300 hover:bg-red-600/40'
+                  disabled={actionLoading[d.id]}
+                  className={`w-full flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors disabled:opacity-40 ${
+                    actionLoading[d.id]
+                      ? 'bg-elevated text-content-muted'
+                      : (deleteClicks[d.id] || 0) === 0
+                        ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
+                        : (deleteClicks[d.id] || 0) === 1
+                          ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                          : 'bg-red-600/30 text-red-300 hover:bg-red-600/40'
                   }`}
                 >
                   <Trash2 size={14} />
-                  {deleteLabel(d.id)}
+                  {actionLoading[d.id] ? 'Aguarde...' : deleteLabel(d.id)}
                 </button>
                 )}
               </div>
