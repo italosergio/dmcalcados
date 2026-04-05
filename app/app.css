@@ -54,6 +54,21 @@ body {
   box-shadow: 0 0 24px rgba(201, 168, 76, 0.35);
 }
 
+.cta-button-silver {
+  cursor: pointer;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+.cta-button-silver:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 24px rgba(180, 180, 200, 0.35);
+}
+
+.cta-bg-silver {
+  background: linear-gradient(135deg, #6b6b78 0%, #a0a0ab 50%, #6b6b78 100%);
+  background-size: 200% 200%;
+  animation: cta-gradient 3s ease infinite;
+}
+
 .cta-bg {
   background: linear-gradient(135deg, #b8963f 0%, #c9a84c 50%, #b8963f 100%);
   background-size: 200% 200%;
@@ -79,5 +94,23 @@ body {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-2px); }
   75% { transform: translateX(2px); }
+}
+
+@keyframes logo-pulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(201, 168, 76, 0.15); }
+  50% { box-shadow: 0 0 14px rgba(201, 168, 76, 0.35); }
+}
+
+.logo-glow {
+  animation: logo-pulse 3s ease-in-out infinite;
+}
+
+@keyframes landing-fade {
+  0%, 100% { color: var(--color-content-secondary); }
+  50% { color: var(--color-content-muted); }
+}
+
+.landing-fade-text {
+  animation: landing-fade 4s ease-in-out infinite;
 }
 
