@@ -272,27 +272,29 @@ export default function ClientesPage() {
 
       {/* Cards */}
       {!loading && filtered.length > 0 && viewMode === 'cards' && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {filtered.map(cliente => (
-            <div key={cliente.id} className="rounded-xl border border-border-subtle bg-surface p-3 cursor-pointer hover:border-border-medium transition-colors flex flex-col justify-between" onClick={() => setClienteSelecionado(cliente)}>
-              <div className="min-w-0">
-                <h3 className="text-xs sm:text-sm font-semibold truncate">
+            <div key={cliente.id} className="aspect-square rounded-xl border border-border-subtle bg-surface p-3 cursor-pointer hover:border-border-medium hover:shadow-lg transition-all flex flex-col justify-between" onClick={() => setClienteSelecionado(cliente)}>
+              <div className="min-w-0 flex-1 flex flex-col">
+                <h3 className="text-sm font-semibold truncate mb-1">
                   {cliente.nome}
                 </h3>
-                <div className="flex flex-wrap gap-1 mt-0.5">
-                  {isNovo(cliente) && <span className="text-[9px] bg-green-500/15 text-green-400 px-1 py-0.5 rounded font-medium">Novo</span>}
-                  {cliente.suspenso && <span className="text-[9px] bg-red-500/15 text-red-400 px-1 py-0.5 rounded font-medium">Suspenso</span>}
-                  {isInativo(cliente) && !cliente.suspenso && <span className="text-[9px] bg-yellow-500/15 text-yellow-400 px-1 py-0.5 rounded font-medium">Inativo</span>}
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {isNovo(cliente) && <span className="text-[9px] bg-green-500/15 text-green-400 px-1.5 py-0.5 rounded font-medium">Novo</span>}
+                  {cliente.suspenso && <span className="text-[9px] bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded font-medium">Suspenso</span>}
+                  {isInativo(cliente) && !cliente.suspenso && <span className="text-[9px] bg-yellow-500/15 text-yellow-400 px-1.5 py-0.5 rounded font-medium">Inativo</span>}
                 </div>
-                {(cliente.endereco || cliente.cidade) && (
-                  <p className="text-[10px] text-content-muted truncate flex items-center gap-1 mt-1"><MapPin size={10} className="shrink-0" />{[cliente.cidade, cliente.estado].filter(Boolean).join('/')}</p>
-                )}
-                {(cliente.contatos?.length ? cliente.contatos : cliente.contato ? [cliente.contato] : []).slice(0, 1).map((c, i) => (
-                  <p key={i} className="text-[10px] text-content-muted truncate flex items-center gap-1"><Phone size={10} className="shrink-0" />{c}</p>
-                ))}
+                <div className="space-y-0.5 flex-1">
+                  {(cliente.cidade || cliente.estado) && (
+                    <p className="text-[10px] text-content-muted truncate flex items-center gap-1"><MapPin size={10} className="shrink-0" />{[cliente.cidade, cliente.estado].filter(Boolean).join('/')}</p>
+                  )}
+                  {(cliente.contatos?.length ? cliente.contatos : cliente.contato ? [cliente.contato] : []).slice(0, 1).map((c, i) => (
+                    <p key={i} className="text-[10px] text-content-muted truncate flex items-center gap-1"><Phone size={10} className="shrink-0" />{c}</p>
+                  ))}
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-bold text-green-400">{formatCurrency(clienteTotals[cliente.id] || 0)}</p>
+              <div className="border-t border-border-subtle pt-2 mt-2">
+                <p className="text-base font-bold text-green-400">{formatCurrency(clienteTotals[cliente.id] || 0)}</p>
                 <p className="text-[10px] text-content-muted">{clienteVendasCount[cliente.id] || 0} compra(s)</p>
               </div>
             </div>

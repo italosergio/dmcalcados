@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, MapPin, Phone, Calendar, User, ShoppingBag, TrendingUp, Award, UserCircle, CreditCard, Package, ExternalLink, Pencil, Check, Plus, Share2, Ban } from 'lucide-react';
+import { X, MapPin, Phone, Calendar, User, ShoppingBag, TrendingUp, Award, UserCircle, CreditCard, Package, ExternalLink, Pencil, Check, Plus, Share2, Ban, ChevronDown } from 'lucide-react';
 import { suspenderCliente } from '~/services/clientes.service';
 import { formatCurrency } from '~/utils/format';
 import type { Cliente, Venda, User as UserType } from '~/models';
@@ -43,6 +43,7 @@ export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda, user, 
 
   // Share state
   const [compartilhados, setCompartilhados] = useState<string[]>(cliente.compartilhadoCom || []);
+  const [shareExpanded, setShareExpanded] = useState(false);
 
   // Suspender state
   const [suspenso, setSuspenso] = useState(!!cliente.suspenso);
@@ -254,23 +255,32 @@ export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda, user, 
           {/* Compartilhar */}
           {podeCompartilhar && onShare && vendedores.length > 0 && (
             <div className="rounded-lg bg-elevated p-2.5">
-              <div className="flex items-center gap-1.5 text-content-muted mb-1.5"><Share2 size={12} /><span className="text-[10px] font-medium">Compartilhar com vendedores</span></div>
-              <div className="space-y-1 max-h-32 overflow-y-auto">
-                {vendedores.map(v => {
-                  const uid = v.uid || v.id;
-                  const checked = compartilhados.includes(uid);
-                  return (
-                    <label key={uid} className="flex items-center gap-2.5 rounded-md p-1.5 hover:bg-surface cursor-pointer transition-colors">
-                      <button type="button" role="switch" aria-checked={checked} onClick={() => toggleCompartilhar(uid)}
-                        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${checked ? 'bg-purple-500' : 'bg-border-medium'}`}>
-                        <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
-                      </button>
-                      <span className="text-xs">{v.nome}</span>
-                      <span className="text-[10px] text-content-muted ml-auto">@{v.username}</span>
-                    </label>
-                  );
-                })}
-              </div>
+              <button onClick={() => setShareExpanded(!shareExpanded)} className="w-full flex items-center justify-between text-content-muted hover:text-content transition-colors">
+                <div className="flex items-center gap-1.5">
+                  <Share2 size={12} />
+                  <span className="text-[10px] font-medium">Compartilhar com vendedores</span>
+                  {compartilhados.length > 0 && <span className="text-[9px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">{compartilhados.length}</span>}
+                </div>
+                <ChevronDown size={14} className={`transition-transform ${shareExpanded ? 'rotate-180' : ''}`} />
+              </button>
+              {shareExpanded && (
+                <div className="space-y-1 max-h-32 overflow-y-auto mt-2 pt-2 border-t border-border-subtle">
+                  {vendedores.map(v => {
+                    const uid = v.uid || v.id;
+                    const checked = compartilhados.includes(uid);
+                    return (
+                      <label key={uid} className="flex items-center gap-2.5 rounded-md p-1.5 hover:bg-surface cursor-pointer transition-colors">
+                        <button type="button" role="switch" aria-checked={checked} onClick={() => toggleCompartilhar(uid)}
+                          className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${checked ? 'bg-purple-500' : 'bg-border-medium'}`}>
+                          <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
+                        </button>
+                        <span className="text-xs">{v.nome}</span>
+                        <span className="text-[10px] text-content-muted ml-auto">@{v.username}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
