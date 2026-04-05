@@ -1,13 +1,18 @@
 export type UserRole = 'admin' | 'vendedor' | 'vendedor1' | 'vendedor2' | 'vendedor3' | 'financeiro' | 'desenvolvedor' | 'superadmin';
 
+export type UserStatus = 'ativo' | 'inativo' | 'suspenso';
+
 export interface User {
   id: string;
   uid?: string;
   username: string;
   nome: string;
   foto?: string;
-  role: UserRole;        // role principal (legado + compatibilidade)
-  roles?: UserRole[];    // todas as roles do usuário
+  contato?: string;
+  role: UserRole;
+  roles?: UserRole[];
+  status?: UserStatus;
+  suspensaoMotivo?: string;
   createdAt: Date;
   deletedAt?: Date;
 }
@@ -27,7 +32,7 @@ export function userIsVendedor(user: User): boolean {
 }
 
 export function userIsAdmin(user: User): boolean {
-  return getUserRoles(user).some(r => r === 'admin' || r === 'superadmin');
+  return getUserRoles(user).some(r => r === 'admin' || r === 'superadmin' || r === 'desenvolvedor');
 }
 
 export function userCanAccessAdmin(user: User): boolean {
@@ -57,6 +62,7 @@ export interface Cliente {
   donoId?: string;
   donoNome?: string;
   compartilhadoCom?: string[];
+  suspenso?: boolean;
   createdAt: Date;
 }
 
@@ -105,6 +111,8 @@ export interface Despesa {
   usuarioNome: string;
   descricao?: string;
   imagemUrl?: string;
+  imagensUrls?: string[];
+  semImagemJustificativa?: string;
   rateio?: { usuarioId: string; usuarioNome: string; valor: number }[];
   createdAt: Date;
   deletedAt?: Date;

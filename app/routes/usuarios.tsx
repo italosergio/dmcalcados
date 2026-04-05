@@ -1,43 +1,23 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Shield, User, Trash2, Plus, X, LayoutGrid, List } from 'lucide-react';
-import { getUsers, updateUserRoles, deleteUser } from '~/services/users.service';
+import { Shield, User, Trash2, Plus, X, ShieldAlert, ShieldOff, KeyRound } from 'lucide-react';
+import { updateUserRoles, deleteUser, updateUserStatus, resetUserPassword } from '~/services/users.service';
 import { register } from '~/services/auth.service';
 import { useAuth } from '~/contexts/AuthContext';
 import type { User as UserType, UserRole } from '~/models';
 import { getUserRoles } from '~/models';
+import { ROLE_LABELS, ROLE_COLORS, RoleBadge } from '~/utils/roles';
+import { useUsers } from '~/hooks/useRealtime';
 
 const input = "w-full rounded-lg border border-border-subtle bg-elevated px-3 py-2.5 text-sm text-content focus:outline-none focus:border-border-medium focus:ring-1 focus:ring-blue-500/30 transition-colors";
 
-const ROLE_LABELS: Record<UserRole, string> = {
-  vendedor: 'Vendedor',
-  vendedor1: 'Vendedor I',
-  vendedor2: 'Vendedor II',
-  vendedor3: 'Vendedor III',
-  admin: 'Admin',
-  financeiro: 'Financeiro',
-  desenvolvedor: 'Desenvolvedor',
-  superadmin: 'Super Admin',
-};
-
-const ROLE_COLORS: Record<UserRole, string> = {
-  vendedor:     'bg-blue-900/60 text-blue-300',
-  vendedor1:    'bg-blue-900/60 text-blue-300',
-  vendedor2:    'bg-cyan-900/60 text-cyan-300',
-  vendedor3:    'bg-indigo-900/60 text-indigo-300',
-  admin:        'bg-red-900/60 text-red-300',
-  financeiro:   'bg-yellow-900/60 text-yellow-300',
-  desenvolvedor:'bg-purple-900/60 text-purple-300',
-  superadmin:   'bg-purple-900/80 text-purple-200',
-};
-
-const ROLE_ICON_COLOR: Record<UserRole, string> = {
-  vendedor:     'text-blue-400',
-  vendedor1:    'text-blue-400',
-  vendedor2:    'text-cyan-400',
-  vendedor3:    'text-indigo-400',
+const ROLE_ICON_COLOR: Record<string, string> = {
+  vendedor:     'text-green-400',
+  vendedor1:    'text-green-400',
+  vendedor2:    'text-green-400',
+  vendedor3:    'text-green-400',
   admin:        'text-red-400',
   financeiro:   'text-yellow-400',
-  desenvolvedor:'text-purple-400',
+  desenvolvedor:'text-blue-400',
   superadmin:   'text-purple-300',
 };
 
@@ -50,11 +30,7 @@ function RoleTags({ user }: { user: UserType }) {
   const roles = getUserRoles(user);
   return (
     <div className="flex flex-wrap gap-1">
-      {roles.map(r => (
-        <span key={r} className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold ${ROLE_COLORS[r] ?? 'bg-blue-900/60 text-blue-300'}`}>
-          {ROLE_LABELS[r] ?? r}
-        </span>
-      ))}
+      {roles.map(r => <RoleBadge key={r} role={r} />)}
     </div>
   );
 }
@@ -63,40 +39,45 @@ function primaryIconColor(user: UserType): string {
   const roles = getUserRoles(user);
   if (roles.includes('superadmin')) return 'text-purple-300';
   if (roles.includes('admin')) return 'text-red-400';
-  return ROLE_ICON_COLOR[roles[0]] ?? 'text-blue-400';
+  return ROLE_ICON_COLOR[roles[0]] ?? 'text-green-400';
 }
 
 export default function UsuariosPage() {
-  const [users, setUsers] = useState<UserType[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { users, loading } = useUsers();
   const [deleteClicks, setDeleteClicks] = useState<Record<string, number>>({});
   const deleteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [showForm, setShowForm] = useState(false);
   const [novoNome, setNovoNome] = useState('');
   const [novoUsername, setNovoUsername] = useState('');
-  const [novoSenha, setNovoSenha] = useState('');
   const [novoRoles, setNovoRoles] = useState<UserRole[]>(['vendedor1']);
   const [formLoading, setFormLoading] = useState(false);
   const [formErro, setFormErro] = useState('');
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [modalUser, setModalUser] = useState<UserType | null>(null);
   const [modalRoles, setModalRoles] = useState<UserRole[]>([]);
   const [savingRoles, setSavingRoles] = useState(false);
+  const [rolesSalvas, setRolesSalvas] = useState(false);
+  const [showSuspend, setShowSuspend] = useState(false);
+  const [suspendMotivo, setSuspendMotivo] = useState('');
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [showResetPw, setShowResetPw] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwMsg, setPwMsg] = useState('');
   const { user: currentUser } = useAuth();
 
-  const isSuperAdmin = currentUser?.role === 'superadmin';
+  const isDev = currentUser?.role === 'desenvolvedor';
+  const isSuperAdmin = isDev || currentUser?.role === 'superadmin';
   const selectableRoles: UserRole[] = isSuperAdmin
     ? [...ADMIN_ROLES, ...SUPERADMIN_ONLY_ROLES]
     : ADMIN_ROLES;
 
-  useEffect(() => {
-    if (currentUser?.role !== 'admin' && currentUser?.role !== 'superadmin') return;
-    getUsers().then(setUsers).finally(() => setLoading(false));
-  }, [currentUser]);
+  useEffect(() => {}, [currentUser]);
 
   const openModal = (u: UserType) => {
     setModalUser(u);
     setModalRoles(getUserRoles(u));
+    setShowSuspend(false); setSuspendMotivo('');
+    setShowResetPw(false); setNewPassword(''); setPwMsg('');
   };
 
   const toggleModalRole = (role: UserRole) => {
@@ -110,8 +91,9 @@ export default function UsuariosPage() {
     setSavingRoles(true);
     try {
       await updateUserRoles(modalUser.id, modalRoles);
-      setUsers(prev => prev.map(u => u.id === modalUser.id ? { ...u, roles: modalRoles, role: modalRoles[0] } : u));
       setModalUser(prev => prev ? { ...prev, roles: modalRoles, role: modalRoles[0] } : null);
+      setRolesSalvas(true);
+      setTimeout(() => setRolesSalvas(false), 2000);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Erro ao salvar roles');
     } finally { setSavingRoles(false); }
@@ -123,7 +105,7 @@ export default function UsuariosPage() {
     if (clicks >= 3) {
       setDeleteClicks(prev => { const n = { ...prev }; delete n[id]; return n; });
       deleteUser(id)
-        .then(() => { setUsers(prev => prev.filter(u => u.id !== id)); setModalUser(null); })
+        .then(() => { setModalUser(null); })
         .catch(err => alert(err.message));
     } else {
       setDeleteClicks(prev => ({ ...prev, [id]: clicks }));
@@ -138,44 +120,84 @@ export default function UsuariosPage() {
   };
 
   const handleRegister = async () => {
-    if (!novoNome.trim() || !novoUsername.trim() || !novoSenha.trim()) { setFormErro('Preencha todos os campos'); return; }
-    if (novoSenha.length < 6) { setFormErro('Senha deve ter pelo menos 6 caracteres'); return; }
+    if (!novoNome.trim() || !novoUsername.trim()) { setFormErro('Preencha todos os campos'); return; }
     if (novoRoles.length === 0) { setFormErro('Selecione ao menos uma role'); return; }
     setFormErro(''); setFormLoading(true);
     try {
       // role principal para o register (compatibilidade)
       const primaryRole = novoRoles[0];
-      await register(novoUsername, novoSenha, novoNome, primaryRole);
-      // se tiver múltiplas roles, salvar o array
+      const senha = novoUsername.trim() + '123';
+      await register(novoUsername, senha, novoNome, primaryRole);
       if (novoRoles.length > 1) {
+        // Aguardar realtime atualizar e pegar o novo user
+        const { getUsers } = await import('~/services/users.service');
         const updated = await getUsers();
         const newUser = updated.find(u => u.username === novoUsername);
         if (newUser) await updateUserRoles(newUser.id, novoRoles);
       }
-      const updated = await getUsers();
-      setUsers(updated);
       setShowForm(false);
-      setNovoNome(''); setNovoUsername(''); setNovoSenha(''); setNovoRoles(['vendedor1']);
+      setNovoNome(''); setNovoUsername(''); setNovoRoles(['vendedor1']);
     } catch (err: any) {
       setFormErro(err.code === 'auth/email-already-in-use' ? 'Usuário já existe. Altere o nome de usuário.' : 'Erro ao criar usuário');
     } finally { setFormLoading(false); }
   };
 
-  if (currentUser?.role !== 'admin' && currentUser?.role !== 'superadmin') {
+  if (currentUser?.role !== 'admin' && currentUser?.role !== 'superadmin' && currentUser?.role !== 'desenvolvedor') {
     return <div className="p-8 text-center text-red-400">Acesso negado</div>;
   }
 
-  const isSuperAdminUser = (u: UserType) => getUserRoles(u).includes('superadmin');
+  const isSuperAdminUser = (u: UserType) => getUserRoles(u).includes('superadmin') || getUserRoles(u).includes('desenvolvedor');
+
+  const getHierarchy = (u: UserType) => {
+    const r = getUserRoles(u);
+    if (r.includes('desenvolvedor')) return 3;
+    if (r.includes('superadmin')) return 2;
+    if (r.includes('admin')) return 1;
+    return 0;
+  };
+  const myHierarchy = currentUser ? getHierarchy(currentUser as UserType) : 0;
+  const canManageUser = (u: UserType) => myHierarchy > getHierarchy(u);
+
+  const handleSuspend = async () => {
+    if (!modalUser) return;
+    setStatusLoading(true);
+    try { await updateUserStatus(modalUser.id, 'suspenso', suspendMotivo.trim() || undefined); setShowSuspend(false); }
+    catch (e: any) { alert(e.message); }
+    finally { setStatusLoading(false); }
+  };
+
+  const handleToggleStatus = async (status: 'ativo' | 'inativo') => {
+    if (!modalUser) return;
+    setStatusLoading(true);
+    try { await updateUserStatus(modalUser.id, status); }
+    catch (e: any) { alert(e.message); }
+    finally { setStatusLoading(false); }
+  };
+
+  const handleResetPassword = async () => {
+    if (!modalUser || !newPassword.trim()) return;
+    if (newPassword.length < 6) { setPwMsg('Mínimo 6 caracteres'); return; }
+    setPwLoading(true); setPwMsg('');
+    try { await resetUserPassword(modalUser.id, newPassword); setPwMsg('Senha alterada!'); setNewPassword(''); setTimeout(() => setPwMsg(''), 2000); }
+    catch (e: any) { setPwMsg(e.message); }
+    finally { setPwLoading(false); }
+  };
+
+  const rolePriority: Record<string, number> = {
+    superadmin: 0, admin: 1, desenvolvedor: 2, financeiro: 3,
+    vendedor3: 4, vendedor2: 5, vendedor1: 6, vendedor: 7,
+  };
+  const sortedUsers = [...users].sort((a, b) => {
+    const ra = Math.min(...getUserRoles(a).map(r => rolePriority[r] ?? 99));
+    const rb = Math.min(...getUserRoles(b).map(r => rolePriority[r] ?? 99));
+    return ra - rb;
+  });
 
   return (
     <div>
-      <div className="mb-4 sm:mb-6 flex items-center justify-between gap-3">
-        <div className="flex rounded-lg border border-border-subtle overflow-hidden">
-          <button onClick={() => setViewMode('cards')} className={`p-2 transition-colors ${viewMode === 'cards' ? 'bg-elevated text-content' : 'text-content-muted hover:text-content'}`}><LayoutGrid size={16} /></button>
-          <button onClick={() => setViewMode('table')} className={`p-2 transition-colors ${viewMode === 'table' ? 'bg-elevated text-content' : 'text-content-muted hover:text-content'}`}><List size={16} /></button>
-        </div>
+      <div className="mb-4 sm:mb-6">
         <button onClick={() => setShowForm(!showForm)}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-green-500/20 transition hover:from-green-500 hover:to-emerald-400 active:scale-95">
+          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-green-500/20 transition hover:from-green-500 hover:to-emerald-400 active:scale-95">
           <Plus size={18} /> Novo Usuário
         </button>
       </div>
@@ -187,10 +209,8 @@ export default function UsuariosPage() {
             <button onClick={() => { setShowForm(false); setFormErro(''); }} className="text-content-muted hover:text-content"><X size={18} /></button>
           </div>
           <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} className={input} placeholder="Nome completo" />
-          <div className="grid grid-cols-2 gap-2">
-            <input value={novoUsername} onChange={(e) => setNovoUsername(e.target.value)} className={input} placeholder="Usuário" />
-            <input type="password" value={novoSenha} onChange={(e) => setNovoSenha(e.target.value)} className={input} placeholder="Senha" />
-          </div>
+          <input value={novoUsername} onChange={(e) => setNovoUsername(e.target.value)} className={input} placeholder="Usuário" />
+          <p className="text-[10px] text-content-muted">Senha padrão: <span className="font-mono text-content-secondary">{novoUsername.trim() ? novoUsername.trim() + '123' : 'usuário123'}</span></p>
           <div>
             <p className="text-xs text-content-muted mb-2">Roles (pode selecionar múltiplas)</p>
             <div className="flex flex-wrap gap-2">
@@ -218,9 +238,9 @@ export default function UsuariosPage() {
         </div>
       )}
 
-      {loading ? <p>Carregando...</p> : viewMode === 'cards' ? (
+      {loading ? <p>Carregando...</p> : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {users.map(u => (
+          {sortedUsers.map(u => (
             <button key={u.id} onClick={() => openModal(u)}
               className="rounded-xl border border-border-subtle bg-surface p-4 text-left hover:border-border-medium transition-colors">
               <div className="flex items-center gap-2.5 mb-3">
@@ -232,32 +252,13 @@ export default function UsuariosPage() {
                   <p className="text-xs text-content-muted truncate">@{u.username}</p>
                 </div>
               </div>
-              <RoleTags user={u} />
+              <div className="flex items-center gap-2">
+                <RoleTags user={u} />
+                {u.status === 'suspenso' && <span className="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded font-medium">Suspenso</span>}
+                {u.status === 'inativo' && <span className="text-[9px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded font-medium">Inativo</span>}
+              </div>
             </button>
           ))}
-        </div>
-      ) : (
-        <div className="rounded-xl border border-border-subtle overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border-subtle bg-surface">
-                <th className="px-4 py-2.5 text-left text-xs text-content-muted font-medium">Nome</th>
-                <th className="px-4 py-2.5 text-left text-xs text-content-muted font-medium hidden sm:table-cell">Usuário</th>
-                <th className="px-4 py-2.5 text-left text-xs text-content-muted font-medium">Roles</th>
-                <th className="px-4 py-2.5 text-right text-xs text-content-muted font-medium">Ação</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map(u => (
-                <tr key={u.id} className="border-b border-border-subtle last:border-0 hover:bg-surface/50 cursor-pointer" onClick={() => openModal(u)}>
-                  <td className="px-4 py-2.5 font-medium">{u.nome}</td>
-                  <td className="px-4 py-2.5 text-content-muted hidden sm:table-cell">@{u.username}</td>
-                  <td className="px-4 py-2.5"><RoleTags user={u} /></td>
-                  <td className="px-4 py-2.5 text-right text-xs text-blue-400 hover:text-blue-300">Gerenciar</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       )}
 
@@ -279,10 +280,21 @@ export default function UsuariosPage() {
               <button onClick={() => setModalUser(null)} className="text-content-muted hover:text-content"><X size={20} /></button>
             </div>
             <div className="p-5 space-y-4">
-              {isSuperAdminUser(modalUser) ? (
-                <p className="text-xs text-purple-400 text-center py-2">Super Admin — roles não podem ser alteradas</p>
+              {/* Status badge */}
+              {modalUser.status && modalUser.status !== 'ativo' && (
+                <div className={`rounded-lg px-3 py-2 text-center text-xs font-medium ${
+                  modalUser.status === 'suspenso' ? 'bg-red-500/10 border border-red-500/20 text-red-400' : 'bg-yellow-500/10 border border-yellow-500/20 text-yellow-400'
+                }`}>
+                  {modalUser.status === 'suspenso' ? 'Usuário suspenso' : 'Usuário inativo'}
+                  {modalUser.suspensaoMotivo && <p className="text-[10px] mt-0.5 opacity-70">{modalUser.suspensaoMotivo}</p>}
+                </div>
+              )}
+
+              {!canManageUser(modalUser) ? (
+                <p className="text-xs text-purple-400 text-center py-2">Sem permissão para gerenciar este usuário</p>
               ) : (
                 <>
+                  {/* Roles */}
                   <div>
                     <p className="text-xs text-content-muted mb-2">Roles (múltipla seleção)</p>
                     <div className="flex flex-wrap gap-2">
@@ -297,18 +309,83 @@ export default function UsuariosPage() {
                         </button>
                       ))}
                     </div>
-                    {modalRoles.length === 0 && (
-                      <p className="text-xs text-red-400 mt-1">Selecione ao menos uma role</p>
+                    {modalRoles.length === 0 && <p className="text-xs text-red-400 mt-1">Selecione ao menos uma role</p>}
+                  </div>
+
+                  <button onClick={saveModalRoles} disabled={savingRoles || modalRoles.length === 0}
+                    className="w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors">
+                    {savingRoles ? 'Salvando...' : rolesSalvas ? '✓ Salvo!' : 'Salvar roles'}
+                  </button>
+                  {rolesSalvas && <p className="text-xs text-green-400 text-center">Roles atualizadas com sucesso</p>}
+
+                  {/* Status actions */}
+                  <div className="border-t border-border-subtle pt-3 space-y-2">
+                    {modalUser.status === 'suspenso' && (
+                      <button onClick={() => handleToggleStatus('ativo')} disabled={statusLoading}
+                        className="w-full flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors disabled:opacity-40">
+                        <ShieldOff size={14} /> {statusLoading ? 'Aguarde...' : 'Reativar usuário'}
+                      </button>
+                    )}
+                    {modalUser.status === 'inativo' && (
+                      <button onClick={() => handleToggleStatus('ativo')} disabled={statusLoading}
+                        className="w-full flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors disabled:opacity-40">
+                        <ShieldOff size={14} /> {statusLoading ? 'Aguarde...' : 'Ativar usuário'}
+                      </button>
+                    )}
+                    {(!modalUser.status || modalUser.status === 'ativo') && (
+                      <>
+                        <button onClick={() => handleToggleStatus('inativo')} disabled={statusLoading}
+                          className="w-full flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 transition-colors disabled:opacity-40">
+                          <ShieldOff size={14} /> {statusLoading ? 'Aguarde...' : 'Inativar usuário'}
+                        </button>
+                        {!showSuspend ? (
+                          <button onClick={() => setShowSuspend(true)}
+                            className="w-full flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors">
+                            <ShieldAlert size={14} /> Suspender usuário
+                          </button>
+                        ) : (
+                          <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3 space-y-2">
+                            <input value={suspendMotivo} onChange={e => setSuspendMotivo(e.target.value)}
+                              className={`${input} text-xs`} placeholder="Motivo da suspensão (opcional)" />
+                            <div className="grid grid-cols-2 gap-2">
+                              <button onClick={() => setShowSuspend(false)} className="rounded-lg border border-border-subtle bg-elevated py-1.5 text-xs text-content-secondary">Cancelar</button>
+                              <button onClick={handleSuspend} disabled={statusLoading}
+                                className="rounded-lg bg-red-600 py-1.5 text-xs font-medium text-white disabled:opacity-40">
+                                {statusLoading ? 'Aguarde...' : 'Confirmar'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
 
-                  <button
-                    onClick={saveModalRoles}
-                    disabled={savingRoles || modalRoles.length === 0}
-                    className="w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors">
-                    {savingRoles ? 'Salvando...' : 'Salvar roles'}
-                  </button>
+                  {/* Reset password - só dev */}
+                  {isDev && (
+                    <div className="border-t border-border-subtle pt-3">
+                      {!showResetPw ? (
+                        <button onClick={() => setShowResetPw(true)}
+                          className="w-full flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors">
+                          <KeyRound size={14} /> Alterar senha
+                        </button>
+                      ) : (
+                        <div className="space-y-2">
+                          <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                            className={`${input} text-xs`} placeholder="Nova senha (mín. 6 caracteres)" />
+                          {pwMsg && <p className={`text-[10px] ${pwMsg.includes('alterada') ? 'text-green-400' : 'text-red-400'}`}>{pwMsg}</p>}
+                          <div className="grid grid-cols-2 gap-2">
+                            <button onClick={() => { setShowResetPw(false); setNewPassword(''); setPwMsg(''); }} className="rounded-lg border border-border-subtle bg-elevated py-1.5 text-xs text-content-secondary">Cancelar</button>
+                            <button onClick={handleResetPassword} disabled={pwLoading}
+                              className="rounded-lg bg-blue-600 py-1.5 text-xs font-medium text-white disabled:opacity-40">
+                              {pwLoading ? 'Aguarde...' : 'Salvar senha'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
+                  {/* Delete */}
                   <button onClick={() => handleDelete(modalUser.id)}
                     className={`w-full flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium transition-colors ${
                       (deleteClicks[modalUser.id] || 0) === 0 ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
