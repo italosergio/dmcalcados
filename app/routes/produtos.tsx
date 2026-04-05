@@ -6,8 +6,16 @@ import { useProdutos } from '~/hooks/useRealtime';
 import { deleteProduto } from '~/services/produtos.service';
 import { formatCurrency } from '~/utils/format';
 import type { Produto } from '~/models';
+import { useAuth } from '~/contexts/AuthContext';
+import { userIsAdmin } from '~/models';
 
 export default function ProdutosPage() {
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const allowed = !authLoading && user && userIsAdmin(user);
+
+  useEffect(() => { if (!authLoading && !allowed) navigate('/vendas'); }, [authLoading, allowed]);
+
   const { produtos, loading } = useProdutos();
   const [search, setSearch] = useState('');
   const [produtoSelecionado, setProdutoSelecionado] = useState<Produto | null>(null);
@@ -17,7 +25,8 @@ export default function ProdutosPage() {
     if (typeof window !== 'undefined') return (localStorage.getItem('produtos-list-view') as 'cards' | 'tabela') || 'cards';
     return 'cards';
   });
-  const navigate = useNavigate();
+
+  if (!allowed) return null;
 
   const changeViewMode = (mode: 'cards' | 'tabela') => {
     setViewMode(mode);
