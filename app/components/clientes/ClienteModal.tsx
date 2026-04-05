@@ -39,6 +39,7 @@ export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda, user, 
   const [editContatos, setEditContatos] = useState<string[]>([]);
   const [cidades, setCidades] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [editErro, setEditErro] = useState('');
 
   // Share state
   const [compartilhados, setCompartilhados] = useState<string[]>(cliente.compartilhadoCom || []);
@@ -58,6 +59,7 @@ export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda, user, 
 
   const startEdit = () => {
     setEditing(true);
+    setEditErro('');
     setEditData({ nome: cliente.nome, endereco: cliente.endereco, cidade: cliente.cidade || '', estado: cliente.estado || 'MA', cpfCnpj: cliente.cpfCnpj });
     setEditContatos(cliente.contatos?.length ? [...cliente.contatos] : cliente.contato ? [cliente.contato] : ['']);
     fetchCidades(cliente.estado || 'MA');
@@ -66,10 +68,13 @@ export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda, user, 
   const saveEdit = async () => {
     if (!onEdit) return;
     setSaving(true);
+    setEditErro('');
     try {
       const contatosFiltrados = editContatos.filter(c => c.trim());
       await onEdit(cliente.id, { ...editData, contato: contatosFiltrados[0] || '', contatos: contatosFiltrados });
       setEditing(false);
+    } catch (err) {
+      setEditErro(err instanceof Error ? err.message : 'Erro ao salvar');
     } finally { setSaving(false); }
   };
 
@@ -188,7 +193,7 @@ export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda, user, 
           {/* Dados do cliente */}
           <div className="rounded-lg bg-elevated p-2.5 space-y-1 relative group">
             {onEdit && !editing && (
-              <button onClick={startEdit} className="absolute top-2 right-2 rounded-md p-1 text-content-muted/40 hover:text-blue-400 hover:bg-blue-500/10 opacity-0 group-hover:opacity-100 transition-all" title="Editar">
+              <button onClick={startEdit} className="absolute top-2 right-2 rounded-md p-1 text-content-muted/40 hover:text-blue-400 hover:bg-blue-500/10 transition-all" title="Editar">
                 <Pencil size={13} />
               </button>
             )}
@@ -206,10 +211,10 @@ export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda, user, 
                 )}
               </>
             ) : (
-              <div className="space-y-2">
+              <form onSubmit={(e) => { e.preventDefault(); saveEdit(); }} onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false); }} className="space-y-2">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-semibold text-blue-400">Editando</span>
-                  <button onClick={() => setEditing(false)} className="text-content-muted hover:text-content"><X size={16} /></button>
+                  <button type="button" onClick={() => setEditing(false)} className="text-content-muted hover:text-content"><X size={16} /></button>
                 </div>
                 <input value={editData.nome || ''} onChange={(e) => setEditData({ ...editData, nome: e.target.value })} className={inputCls} placeholder="Nome" />
                 <input value={editData.cpfCnpj || ''} onChange={(e) => setEditData({ ...editData, cpfCnpj: e.target.value.replace(/\D/g, '').slice(0, 14) })} className={inputCls} placeholder="CPF / CNPJ" inputMode="numeric" />
@@ -234,14 +239,15 @@ export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda, user, 
                 <button onClick={() => setEditContatos([...editContatos, ''])} className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300">
                   <Plus size={14} /> Adicionar contato
                 </button>
+                {editErro && <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">{editErro}</div>}
                 <div className="grid grid-cols-2 gap-2 pt-1">
-                  <button onClick={() => setEditing(false)} className="rounded-lg border border-border-subtle bg-elevated py-2 text-sm font-medium text-content-secondary transition hover:bg-border-medium">Cancelar</button>
-                  <button onClick={saveEdit} disabled={saving}
+                  <button type="button" onClick={() => setEditing(false)} className="rounded-lg border border-border-subtle bg-elevated py-2 text-sm font-medium text-content-secondary transition hover:bg-border-medium">Cancelar</button>
+                  <button type="submit" disabled={saving}
                     className="rounded-lg bg-gradient-to-r from-green-600 to-emerald-500 py-2 text-sm font-semibold text-white transition hover:from-green-500 hover:to-emerald-400 active:scale-[0.98] disabled:opacity-30 flex items-center justify-center gap-1.5">
                     <Check size={16} /> {saving ? 'Salvando...' : 'Salvar'}
                   </button>
                 </div>
-              </div>
+              </form>
             )}
           </div>
 

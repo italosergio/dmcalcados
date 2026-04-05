@@ -11,6 +11,12 @@ import type { Cliente, Venda, User } from '~/models';
 import { userIsAdmin, userIsVendedor } from '~/models';
 
 export default function ClientesPage() {
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const allowed = !authLoading && user && userIsAdmin(user);
+
+  useEffect(() => { if (!authLoading && !allowed) navigate('/vendas'); }, [authLoading, allowed]);
+
   const { clientes: clientesRaw, loading: clientesLoading } = useClientes();
   const { vendas, loading: vendasLoading } = useVendas();
   const { users, loading: usersLoading } = useUsers();
@@ -22,8 +28,6 @@ export default function ClientesPage() {
     if (typeof window !== 'undefined') return (localStorage.getItem('clientes-view') as 'cards' | 'tabela') || 'cards';
     return 'cards';
   });
-  const { user } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const [filtroNovos, setFiltroNovos] = useState(false);
   const [ordenacao, setOrdenacao] = useState<'nome' | '+compras' | '-compras'>('nome');
@@ -32,6 +36,8 @@ export default function ClientesPage() {
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
   const modeloRef = useRef<HTMLDivElement>(null);
+
+  if (!allowed) return null;
 
   useEffect(() => {
     const h = (e: MouseEvent) => { if (modeloRef.current && !modeloRef.current.contains(e.target as Node)) setModeloDropdown(false); };

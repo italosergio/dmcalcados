@@ -63,6 +63,21 @@ export async function createCliente(data: Omit<Cliente, 'id' | 'createdAt'>): Pr
 }
 
 export async function updateCliente(clienteId: string, data: Partial<Omit<Cliente, 'id' | 'createdAt'>>): Promise<void> {
+  const snapshot = await get(ref(db, 'clientes'));
+  if (snapshot.exists()) {
+    const all = snapshot.val();
+    const nomeNovo = data.nome?.trim().toLowerCase();
+    const cpfNovo = data.cpfCnpj?.trim();
+    for (const [key, c] of Object.entries(all) as [string, any][]) {
+      if (key === clienteId || c.deletedAt) continue;
+      if (nomeNovo && c.nome?.trim().toLowerCase() === nomeNovo) {
+        throw new Error('Já existe um cliente com esse nome');
+      }
+      if (cpfNovo && c.cpfCnpj?.trim() === cpfNovo) {
+        throw new Error('Já existe um cliente com esse CPF/CNPJ');
+      }
+    }
+  }
   await update(ref(db, `clientes/${clienteId}`), data);
 }
 
