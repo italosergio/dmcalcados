@@ -24,6 +24,7 @@ export default [
     route("meu-estoque", "routes/meu-estoque.tsx"),
     route("pagamentos", "routes/pagamentos.tsx"),
     route("conta", "routes/conta.tsx"),
+    route("rotas", "routes/rotas.tsx"),
     route("analytics", "routes/analytics.tsx"),
   ]),
 ] satisfies RouteConfig;
