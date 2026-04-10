@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router';
-import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, History, LogOut, X, UserCircle, Home, Package, RefreshCw, Plus, ArrowRightLeft, Loader2, Activity, CreditCard } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, History, LogOut, X, UserCircle, Home, Package, RefreshCw, Plus, ArrowRightLeft, Loader2, Activity, CreditCard, Navigation, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { logout } from '~/services/auth.service';
 import { useNavigate } from 'react-router';
 import { useAuth } from '~/contexts/AuthContext';
@@ -25,9 +25,11 @@ function shortName(nome?: string) {
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export function Sidebar({ isOpen, onClose }: SidebarProps) {
+export function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, switching, switchAccount } = useAuth();
@@ -97,6 +99,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   if (user && userCanAccessAdmin(user)) {
     links.push({ to: '/pagamentos', icon: CreditCard, label: 'Pagamentos' });
+    links.push({ to: '/rotas', icon: Navigation, label: 'Rotas' });
   }
 
   if (user && userIsAdmin(user)) {
@@ -109,14 +112,16 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const isActive = (path: string) => location.pathname.startsWith(path);
   const otherAccounts = savedAccounts.filter(a => a.username !== user?.username);
+  const isDev = user ? getUserRoles(user).includes('desenvolvedor') : false;
+  const sz = isDev ? { text: 'text-xs', py: 'py-1.5', icon: 16 } : { text: 'text-sm', py: 'py-2', icon: 18 };
 
   return (
     <>
       {isOpen && <div className="fixed inset-0 z-40 bg-black/60 lg:hidden" onClick={onClose} />}
 
-      <aside className={`fixed lg:static inset-y-0 right-0 z-50 flex w-64 flex-col border-l border-border-subtle bg-surface transition-transform duration-300 lg:translate-x-0 lg:border-l-0 lg:border-r lg:left-0 lg:right-auto ${
+      <aside className={`fixed lg:static inset-y-0 right-0 z-50 flex w-64 flex-col border-l border-border-subtle bg-surface transition-all duration-300 lg:translate-x-0 lg:border-l-0 lg:border-r lg:left-0 lg:right-auto ${
         isOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
-      }`}>
+      } ${collapsed ? 'lg:!w-16 lg:overflow-hidden' : ''}`}>
 
         {switching && (
           <div className="absolute inset-0 z-10 bg-surface/90 flex flex-col items-center justify-center gap-2">
@@ -125,13 +130,15 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
         )}
 
-        <div className="flex items-center justify-between px-5 py-4 lg:py-3">
-          <Link to="/" className="hidden lg:flex items-center gap-3">
-            <img src="/logo-dmcalcados.png" alt="DM Calçados" className="h-7 w-7 object-contain logo-glow" />
-            <div className="flex flex-col">
-              <h1 style={{ fontFamily: '"Playfair Display", serif' }} className="text-base font-semibold leading-tight uppercase tracking-wide">DM Calçados</h1>
-              {user && <div className="flex flex-wrap gap-0.5">{getUserRoles(user).map(r => <RoleBadge key={r} role={r} size="sm" />)}</div>}
-            </div>
+        <div className={`flex items-center justify-between px-5 py-4 lg:py-3 ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}>
+          <Link to="/" className={`hidden lg:flex items-center gap-3 ${collapsed ? 'lg:justify-center' : ''}`}>
+            <img src="/logo-dmcalcados.png" alt="DM Calçados" className="h-7 w-7 object-contain logo-glow shrink-0" />
+            {!collapsed && (
+              <div className="flex flex-col">
+                <h1 style={{ fontFamily: '"Playfair Display", serif' }} className="text-base font-semibold leading-tight uppercase tracking-wide">DM Calçados</h1>
+                {user && <div className="flex flex-wrap gap-0.5">{getUserRoles(user).map(r => <RoleBadge key={r} role={r} size="sm" />)}</div>}
+              </div>
+            )}
           </Link>
           <div className="flex lg:hidden items-center gap-2.5 flex-1 min-w-0">
             <Link to="/conta" className="shrink-0">
@@ -192,16 +199,17 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
         )}
 
-        <nav className="flex-1 space-y-0.5 px-3 overflow-y-auto">
+        <nav className={`flex-1 space-y-0.5 px-3 overflow-y-auto ${collapsed ? 'lg:px-2' : ''}`}>
           {links.map(({ to, icon: Icon, label }) => (
             <Link key={to} to={to}
-              className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+              className={`flex items-center gap-3 rounded-lg px-3 ${sz.py} ${sz.text} transition-colors ${collapsed ? 'lg:justify-center lg:px-0' : ''} ${
                 isActive(to) ? 'bg-blue-600/10 text-blue-400' : 'text-content-secondary hover:bg-surface-hover hover:text-content'
-              }`}>
-              <div className="flex items-center gap-3"><Icon size={18} /><span>{label}</span></div>
-              {quickAdd[to] && (
+              }`}
+              title={collapsed ? label : undefined}>
+              <div className={`flex items-center gap-3 ${collapsed ? 'lg:gap-0' : ''}`}><Icon size={sz.icon} />{!collapsed && <span>{label}</span>}{collapsed && <span className="lg:hidden">{label}</span>}</div>
+              {!collapsed && quickAdd[to] && (
                 <Link to={quickAdd[to]} onClick={(e) => e.stopPropagation()}
-                  className="rounded-md p-0.5 text-green-400 hover:bg-green-500/15 transition-colors"
+                  className="ml-auto rounded-md p-0.5 text-green-400 hover:bg-green-500/15 transition-colors"
                   title={`Nova ${label.slice(0, -1).toLowerCase()}`}>
                   <Plus size={14} />
                 </Link>
@@ -210,31 +218,40 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           ))}
         </nav>
 
-        <div className="m-3 lg:mt-1 space-y-0.5">
+        <div className={`m-3 lg:mt-1 space-y-0.5 ${collapsed ? 'lg:mx-2' : ''}`}>
+          {/* Collapse toggle - desktop only */}
+          <button onClick={onToggleCollapse}
+            className={`hidden lg:flex w-full items-center gap-3 rounded-lg px-3 ${sz.py} ${sz.text} text-content-secondary hover:bg-surface-hover hover:text-content transition-colors ${collapsed ? 'justify-center px-0' : ''}`}
+            title={collapsed ? 'Expandir menu' : 'Minimizar menu'}>
+            {collapsed ? <PanelLeftOpen size={sz.icon} /> : <><PanelLeftClose size={sz.icon} /> <span>Minimizar</span></>}
+          </button>
           <Link to="/conta"
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+            className={`flex items-center gap-3 rounded-lg px-3 ${sz.py} ${sz.text} transition-colors ${collapsed ? 'lg:justify-center lg:px-0' : ''} ${
               isActive('/conta') ? 'bg-blue-600/10 text-blue-400' : 'text-content-secondary hover:bg-surface-hover hover:text-content'
-            }`}>
-            <UserCircle size={18} /> <span>Conta</span>
+            }`}
+            title={collapsed ? 'Conta' : undefined}>
+            <UserCircle size={sz.icon} /> {!collapsed && <span>Conta</span>}{collapsed && <span className="lg:hidden">Conta</span>}
           </Link>
           <Link to="/"
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-content-secondary hover:bg-surface-hover hover:text-content transition-colors">
-            <Home size={18} /> <span>Página Inicial</span>
+            className={`flex items-center gap-3 rounded-lg px-3 ${sz.py} ${sz.text} text-content-secondary hover:bg-surface-hover hover:text-content transition-colors ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}
+            title={collapsed ? 'Página Inicial' : undefined}>
+            <Home size={sz.icon} /> {!collapsed && <span>Página Inicial</span>}{collapsed && <span className="lg:hidden">Página Inicial</span>}
           </Link>
           <button onClick={handleLogout}
-            className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-content-secondary hover:bg-red-600/10 hover:text-red-400 transition-colors">
-            <LogOut size={18} /> <span>Sair</span>
+            className={`w-full flex items-center gap-3 rounded-lg px-3 ${sz.py} ${sz.text} text-content-secondary hover:bg-red-600/10 hover:text-red-400 transition-colors ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}
+            title={collapsed ? 'Sair' : undefined}>
+            <LogOut size={sz.icon} /> {!collapsed && <span>Sair</span>}{collapsed && <span className="lg:hidden">Sair</span>}
           </button>
-          {otherAccounts.length > 0 && (
+          {!collapsed && otherAccounts.length > 0 && (
             <button onClick={() => setShowAccounts(!showAccounts)}
-              className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-content-secondary hover:bg-surface-hover hover:text-content transition-colors">
-              <ArrowRightLeft size={18} /> <span>Trocar conta</span>
+              className={`w-full flex items-center gap-3 rounded-lg px-3 ${sz.py} ${sz.text} text-content-secondary hover:bg-surface-hover hover:text-content transition-colors`}>
+              <ArrowRightLeft size={sz.icon} /> <span>Trocar conta</span>
             </button>
           )}
-          {otherAccounts.length === 0 && (
+          {!collapsed && otherAccounts.length === 0 && (
             <button onClick={handleAddAccount}
-              className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-content-secondary hover:bg-surface-hover hover:text-content transition-colors">
-              <Plus size={18} /> <span>Adicionar conta</span>
+              className={`w-full flex items-center gap-3 rounded-lg px-3 ${sz.py} ${sz.text} text-content-secondary hover:bg-surface-hover hover:text-content transition-colors`}>
+              <Plus size={sz.icon} /> <span>Adicionar conta</span>
             </button>
           )}
         </div>

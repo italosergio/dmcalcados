@@ -36,6 +36,10 @@ function LoadingScreen() {
 export default function Layout() {
   const { user, loading, switching } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('sidebar_collapsed') === 'true';
+  });
   const location = useLocation();
   const prevPath = useRef<string>();
 
@@ -94,10 +98,10 @@ export default function Layout() {
   return (
     <div className="flex relative bg-cover bg-center bg-no-repeat" style={{ backgroundImage: 'url(/home-background.png)', minHeight: '100dvh', height: '100dvh' }}>
       <div className="absolute inset-0 bg-[#1a1a1e]/75" />
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(v => { const n = !v; localStorage.setItem('sidebar_collapsed', String(n)); return n; })} />
       <div className="relative z-10 flex flex-1 flex-col overflow-hidden">
         <Header onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col relative">
           <Outlet />
         </main>
       </div>
