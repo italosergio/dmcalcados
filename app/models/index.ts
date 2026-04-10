@@ -63,6 +63,7 @@ export interface Cliente {
   donoNome?: string;
   compartilhadoCom?: string[];
   suspenso?: boolean;
+  localizacao?: { lat: number; lon: number };
   createdAt: Date;
 }
 

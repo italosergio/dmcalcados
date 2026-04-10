@@ -49,6 +49,20 @@
       ".read": "auth != null",
       ".write": "auth != null"
     },
+    "rotas": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["usuarioId", "createdAt"]
+    },
+    "rotas_meta": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["usuarioId", "createdAt"]
+    },
+    "rotas_gpx": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
     "analytics": {
       ".read": "auth != null",
       ".write": "auth != null",
