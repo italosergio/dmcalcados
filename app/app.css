@@ -114,3 +114,37 @@ body {
   animation: landing-fade 4s ease-in-out infinite;
 }
 
+
+/* Leaflet zoom controls */
+.leaflet-top.leaflet-left {
+  top: 10px !important;
+}
+.leaflet-control-zoom a {
+  background-color: #fff !important;
+  color: #333 !important;
+  border-color: #ccc !important;
+}
+.leaflet-control-zoom a:hover {
+  background-color: #f4f4f4 !important;
+}
+.dark-map .leaflet-control-zoom a {
+  background-color: #232328 !important;
+  color: #f0f0f2 !important;
+  border-color: #2e2e36 !important;
+}
+.dark-map .leaflet-control-zoom a:hover {
+  background-color: #2e2e36 !important;
+}
+
+/* Speed HUD tooltip on animated marker */
+.speed-hud {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: -0.5px;
+}
+.speed-hud::before {
+  display: none !important;
+}
