@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import { Plus, Package, Warehouse, PackageOpen, Footprints, X, Pencil, Trash2, Calendar, Tag, TrendingUp, TrendingDown, CheckCircle2, AlertCircle, Search } from 'lucide-react';
+import { Plus, Package, Warehouse, PackageOpen, Footprints, X, Pencil, Trash2, Calendar, Tag, TrendingUp, TrendingDown, CheckCircle2, AlertCircle, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useProdutos, useVendas, useEntradas } from '~/hooks/useRealtime';
 import { createEntrada, migrarEntradasExistentes } from '~/services/entradas.service';
 import { createProduto, updateProduto as updateProdutoService, deleteProduto } from '~/services/produtos.service';
@@ -43,6 +43,19 @@ export default function ProdutosPage() {
   const [npValor, setNpValor] = useState('');
   const [npSaving, setNpSaving] = useState(false);
   const navigate = useNavigate();
+
+  type SortKey = 'modelo' | 'referencia' | 'pacotes' | 'estoque' | 'total';
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }
+    else { setSortKey(key); setSortDir(key === 'modelo' || key === 'referencia' ? 'asc' : 'desc'); }
+  };
+
+  const SortIcon = ({ k }: { k: SortKey }) => sortKey === k
+    ? (sortDir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />)
+    : <ArrowUpDown size={11} className="opacity-30" />;
 
   const modeloDup = npModelo.trim() && produtos.some(p => p.modelo.toLowerCase() === npModelo.trim().toLowerCase());
   const refDup = npReferencia.trim() && produtos.some(p => p.referencia.toLowerCase() === npReferencia.trim().toLowerCase());
@@ -242,6 +255,21 @@ export default function ProdutosPage() {
     return produtos.filter(p => !idsComEntrada.has(p.id) && p.estoque > 0);
   }, [produtos, entradas]);
 
+  const produtosOrdenados = useMemo(() => {
+    if (!sortKey) return produtos;
+    const m = sortDir === 'asc' ? 1 : -1;
+    return [...produtos].sort((a, b) => {
+      switch (sortKey) {
+        case 'modelo': return m * a.modelo.localeCompare(b.modelo);
+        case 'referencia': return m * a.referencia.localeCompare(b.referencia);
+        case 'pacotes': return m * (Math.floor(a.estoque / 15) - Math.floor(b.estoque / 15));
+        case 'estoque': return m * (a.estoque - b.estoque);
+        case 'total': return m * (a.valor * a.estoque - b.valor * b.estoque);
+        default: return 0;
+      }
+    });
+  }, [produtos, sortKey, sortDir]);
+
   const handleMigrar = async () => {
     setMigrando(true);
     await migrarEntradasExistentes();
@@ -259,8 +287,13 @@ export default function ProdutosPage() {
     <>
     <div className="flex flex-col lg:h-full" style={{ zoom: 0.8 }}>
       {!loading && produtos.length > 0 && (
-        <div className="mb-4 sm:mb-6 space-y-2 shrink-0">
-          <div className="grid grid-cols-3 gap-2">
+        <div className="mb-4 sm:mb-6 shrink-0">
+          <div className="flex flex-col lg:flex-row gap-2">
+            <button onClick={() => { setEntradaBusca(''); setEntradaDropdown(false); setNpModal(false); setModalEntrada(true); }}
+              className="order-last lg:order-first inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-400 px-4 py-2.5 lg:py-0 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:from-blue-400 hover:to-blue-300 active:scale-[0.98]">
+              <Plus size={16} /> Registrar Entrada
+            </button>
+            <div className="grid grid-cols-3 gap-2 flex-1">
             <div className="rounded-xl border border-border-subtle bg-surface p-2 sm:p-3 flex items-center gap-2">
               <div className="rounded-lg bg-green-500/10 p-1.5 shrink-0"><Warehouse size={16} className="text-green-400" /></div>
               <div className="min-w-0">
@@ -282,11 +315,8 @@ export default function ProdutosPage() {
                 <p className="text-xs sm:text-sm font-bold text-orange-400">{totalPares}</p>
               </div>
             </div>
+            </div>
           </div>
-          <button onClick={() => { setEntradaBusca(''); setEntradaDropdown(false); setNpModal(false); setModalEntrada(true); }}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-400 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:from-blue-400 hover:to-blue-300 active:scale-[0.98]">
-            <Plus size={16} /> Registrar Entrada
-          </button>
         </div>
       )}
 
@@ -307,7 +337,7 @@ export default function ProdutosPage() {
       {!loading && produtos.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:min-h-0 lg:flex-1">
           {/* Lado esquerdo - Estoque */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 flex flex-col min-h-0">
             {/* Histórico de entradas */}
             <div className="rounded-xl border border-border-subtle bg-surface p-4 mb-4">
               <div className="flex items-center gap-2 mb-2">
@@ -337,22 +367,22 @@ export default function ProdutosPage() {
               )}
             </div>
 
-            <div className="rounded-xl border border-border-subtle">
-                <p className="text-xs font-semibold text-content-muted px-4 py-2 bg-surface border-b border-border-subtle">Estoque por Produtos</p>
-                <div className="lg:max-h-[15rem] overflow-y-auto">
+            <div className="rounded-xl border border-border-subtle flex flex-col min-h-0 lg:flex-1">
+                <p className="text-xs font-semibold text-content-muted px-4 py-2 bg-surface border-b border-border-subtle shrink-0">Estoque por Produtos</p>
+                <div className="overflow-y-auto flex-1">
                   <table className="min-w-full divide-y divide-border-subtle">
                     <thead className="bg-surface sticky top-0 z-10">
                       <tr>
                         <TableHeader>Foto</TableHeader>
-                        <TableHeader>Modelo</TableHeader>
-                        <TableHeader className="hidden sm:table-cell">Referência</TableHeader>
-                        <TableHeader>Pacotes</TableHeader>
-                        <TableHeader>Sandálias</TableHeader>
-                        <TableHeader className="hidden sm:table-cell">Total</TableHeader>
+                        <TableHeader><button onClick={() => toggleSort('modelo')} className="inline-flex items-center gap-1">Modelo <SortIcon k="modelo" /></button></TableHeader>
+                        <TableHeader className="hidden sm:table-cell"><button onClick={() => toggleSort('referencia')} className="inline-flex items-center gap-1">Referência <SortIcon k="referencia" /></button></TableHeader>
+                        <TableHeader><button onClick={() => toggleSort('pacotes')} className="inline-flex items-center gap-1">Pacotes <SortIcon k="pacotes" /></button></TableHeader>
+                        <TableHeader><button onClick={() => toggleSort('estoque')} className="inline-flex items-center gap-1">Sandálias <SortIcon k="estoque" /></button></TableHeader>
+                        <TableHeader className="hidden sm:table-cell"><button onClick={() => toggleSort('total')} className="inline-flex items-center gap-1">Total <SortIcon k="total" /></button></TableHeader>
                       </tr>
                     </thead>
                     <TableBody>
-                      {produtos.map(produto => (
+                      {produtosOrdenados.map(produto => (
                         <TableRow key={produto.id} onClick={() => setProdutoSelecionado(produto)}>
                           <TableCell>
                             {produto.foto ? (

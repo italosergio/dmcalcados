@@ -31,7 +31,7 @@ export async function getCiclos(): Promise<Ciclo[]> {
       const c = data[key];
       return { id: key, ...c, produtos: normalizeProdutos(c.produtos) };
     })
-    .filter(c => c.createdAt && c.vendedorId)
+    .filter(c => c.createdAt && c.vendedorId && !c.deletedAt)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
@@ -215,6 +215,35 @@ export async function editarCiclo(
   }
 
   await update(ref(db, `ciclos/${cicloId}`), { produtos: novosProds });
+}
+
+export async function deleteCiclo(cicloId: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Usuário não autenticado');
+
+  const snap = await get(ref(db, `ciclos/${cicloId}`));
+  if (!snap.exists()) throw new Error('Ciclo não encontrado');
+  const cicloData = snap.val();
+  if (cicloData.status !== 'fechado') throw new Error('Só é possível apagar ciclos fechados');
+
+  // Devolver peças vendidas ao estoque (as restantes já foram devolvidas ao fechar)
+  const produtos = normalizeProdutos(cicloData.produtos);
+  for (const p of produtos) {
+    const vendidas = p.pecasInicial - p.pecasAtual;
+    if (vendidas > 0) {
+      const estoqueSnap = await get(ref(db, `produtos/${p.produtoId}/estoque`));
+      const atual = estoqueSnap.val() || 0;
+      await update(ref(db, `produtos/${p.produtoId}`), {
+        estoque: atual + vendidas,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  await update(ref(db, `ciclos/${cicloId}`), {
+    deletedAt: new Date().toISOString(),
+    deletedBy: user.uid,
+  });
 }
 
 /** Chamado pela venda: desconta peças do ciclo ativo do vendedor */

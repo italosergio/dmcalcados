@@ -153,5 +153,7 @@ export interface Ciclo {
   fechadoPorNome?: string;
   createdAt: string;
   closedAt?: string;
+  deletedAt?: string;
+  deletedBy?: string;
 }
 

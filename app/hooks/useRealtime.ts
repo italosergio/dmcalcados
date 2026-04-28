@@ -141,7 +141,7 @@ export function useCiclos() {
           : [];
         return { id: key, ...c, produtos: prods };
       })
-      .filter(c => c.createdAt && c.vendedorId)
+      .filter(c => c.createdAt && c.vendedorId && !c.deletedAt)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   });
 

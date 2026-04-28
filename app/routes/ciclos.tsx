@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '~/contexts/AuthContext';
 import { Navigate } from 'react-router';
-import { createCiclo, fecharCiclo, editarCiclo } from '~/services/ciclos.service';
+import { createCiclo, fecharCiclo, editarCiclo, deleteCiclo } from '~/services/ciclos.service';
 import { formatCurrency } from '~/utils/format';
 import type { Ciclo, CicloProduto, Produto, User } from '~/models';
 import { userIsAdmin, userIsVendedor, userCanAccessAdmin } from '~/models';
 import { useProdutos, useCiclos, useUsers } from '~/hooks/useRealtime';
-import { Plus, Minus, X, Package, ChevronDown, ChevronRight, Lock, Unlock, Pencil } from 'lucide-react';
+import { Plus, Minus, X, Package, ChevronDown, ChevronRight, Lock, Unlock, Pencil, Trash2 } from 'lucide-react';
 
 const input = "w-full rounded-lg border border-border-subtle bg-elevated px-3 py-2.5 text-sm text-content focus:outline-none focus:border-border-medium focus:ring-1 focus:ring-blue-500/30 transition-colors";
 const PECAS_POR_PACOTE = 15;
@@ -28,6 +28,9 @@ export default function CiclosPage() {
   const [fecharClicks, setFecharClicks] = useState(0);
   const [fecharTimer, setFecharTimer] = useState<ReturnType<typeof setTimeout>>();
   const [fecharLoading, setFecharLoading] = useState(false);
+  const [deleteClicks, setDeleteClicks] = useState(0);
+  const [deleteTimer, setDeleteTimer] = useState<ReturnType<typeof setTimeout>>();
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [editCicloId, setEditCicloId] = useState<string | null>(null);
   const [editItens, setEditItens] = useState<{ produtoId: string; pacotes: number }[]>([]);
   const [editSaving, setEditSaving] = useState(false);
@@ -156,6 +159,28 @@ export default function CiclosPage() {
   };
 
   const fecharLabel = fecharLoading ? 'Aguarde...' : fecharClicks === 0 ? 'Fechar ciclo' : fecharClicks === 1 ? 'Tem certeza?' : 'Confirmar!';
+
+  const handleDelete = async (cicloId: string) => {
+    const clicks = deleteClicks + 1;
+    clearTimeout(deleteTimer);
+    if (clicks >= 3) {
+      setDeleteClicks(0);
+      setDeleteLoading(true);
+      try {
+        await deleteCiclo(cicloId);
+        setModalCiclo(null);
+      } catch (e: any) {
+        setErro(e.message);
+      } finally {
+        setDeleteLoading(false);
+      }
+    } else {
+      setDeleteClicks(clicks);
+      setDeleteTimer(setTimeout(() => setDeleteClicks(0), 3000));
+    }
+  };
+
+  const deleteLabel = deleteLoading ? 'Aguarde...' : deleteClicks === 0 ? 'Apagar ciclo' : deleteClicks === 1 ? 'Tem certeza?' : 'Confirmar!';
 
   const prods = (c: Ciclo) => c.produtos || [];
   const totalPecas = (c: Ciclo) => prods(c).reduce((s, p) => s + p.pecasAtual, 0);
@@ -483,7 +508,7 @@ export default function CiclosPage() {
                     <div className="space-y-1.5">
                       <span className="text-xs text-content-muted">Fechados</span>
                       {v.fechados.map(c => (
-                        <button key={c.id} onClick={() => { setModalCiclo(c); setFecharClicks(0); }}
+                        <button key={c.id} onClick={() => { setModalCiclo(c); setFecharClicks(0); setDeleteClicks(0); }}
                           className="w-full rounded-lg bg-elevated p-2 text-left hover:bg-border-medium transition-colors">
                           <div className="flex items-center justify-between text-xs">
                             <span>{new Date(c.createdAt).toLocaleDateString('pt-BR')} — {c.closedAt ? new Date(c.closedAt).toLocaleDateString('pt-BR') : ''}</span>
@@ -539,6 +564,19 @@ export default function CiclosPage() {
                 </tbody>
               </table>
             </div>
+            {userIsAdmin(user) && (
+              <button
+                onClick={() => handleDelete(modalCiclo.id)}
+                disabled={deleteLoading}
+                className={`w-full rounded-lg py-2.5 text-xs font-medium transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5 ${
+                  deleteClicks === 0 ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
+                  : deleteClicks === 1 ? 'bg-red-500/20 text-red-400'
+                  : 'bg-red-600/30 text-red-300'
+                }`}
+              >
+                <Trash2 size={13} /> {deleteLabel}
+              </button>
+            )}
           </div>
         </div>
       )}
