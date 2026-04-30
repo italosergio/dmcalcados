@@ -4,7 +4,7 @@ import { Plus, Users, Search, LayoutGrid, List, MapPin, Phone, ArrowUpDown, Chev
 import { Card } from '~/components/common/Card';
 import { ClienteModal } from '~/components/clientes/ClienteModal';
 import { useClientes, useVendas, useUsers } from '~/hooks/useRealtime';
-import { updateCliente, compartilharCliente } from '~/services/clientes.service';
+import { updateCliente, compartilharCliente, deleteCliente } from '~/services/clientes.service';
 import { useAuth } from '~/contexts/AuthContext';
 import { formatCurrency } from '~/utils/format';
 import type { Cliente, Venda, User } from '~/models';
@@ -359,7 +359,7 @@ export default function ClientesPage() {
         <ClienteModal cliente={clienteSelecionado} vendas={vendas} onClose={() => setClienteSelecionado(null)}
           onNavigateVenda={(vendaId) => navigate('/vendas', { state: { vendaId } })}
           user={user} vendedores={vendedores}
-          onEdit={handleSaveEdit} onShare={handleCompartilhar} pagamentos={pagamentos} />
+          onEdit={handleSaveEdit} onShare={handleCompartilhar} onDelete={(id) => { deleteCliente(id); setClienteSelecionado(null); }} pagamentos={pagamentos} />
       )}
     </div>
   );

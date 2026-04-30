@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { createCliente, getClientes } from '~/services/clientes.service';
 import { useCachedState, clearFormCache } from '~/hooks/useFormCache';
 import { useAuth } from '~/contexts/AuthContext';
+import { userIsAdmin } from '~/models';
 import { Plus, X } from 'lucide-react';
 
 const input = "w-full rounded-lg border border-border-subtle bg-elevated px-3 py-2.5 text-sm text-content focus:outline-none focus:border-border-medium focus:ring-1 focus:ring-blue-500/30 transition-colors";
@@ -12,6 +13,7 @@ const ESTADOS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG
 export function ClienteForm() {
   const FK = 'cliente';
   const { user } = useAuth();
+  const isAdmin = user ? userIsAdmin(user) : false;
   const [nome, setNome] = useCachedState(FK, 'nome', '');
   const [endereco, setEndereco] = useCachedState(FK, 'endereco', '');
   const [cidade, setCidade] = useCachedState(FK, 'cidade', '');
@@ -129,23 +131,23 @@ export function ClienteForm() {
     }
   };
 
-  const cpfCnpjOk = cpfCnpj.length === 11 ? validarCpf(cpfCnpj) : cpfCnpj.length === 14 ? validarCnpj(cpfCnpj) : false;
-  const cpfCnpjDuplicado = cpfCnpjOk && cpfsExistentes.includes(cpfCnpj.trim());
+  const cpfCnpjOk = cpfCnpj.length === 0 ? isAdmin : cpfCnpj.length === 11 ? validarCpf(cpfCnpj) : cpfCnpj.length === 14 ? validarCnpj(cpfCnpj) : false;
+  const cpfCnpjDuplicado = cpfCnpj.length > 0 && cpfCnpjOk && cpfsExistentes.includes(cpfCnpj.trim());
 
   const nomeDuplicado = nome.trim().length >= 3 && nomesExistentes.includes(nome.trim().toLowerCase());
   const nomeOk = nome.trim().length >= 3 && !nomeDuplicado;
-  const enderecoOk = endereco.trim().length >= 3;
+  const enderecoOk = endereco.trim().length >= 3 || isAdmin;
   const cidadeOk = cidade.trim().length >= 2 && cidades.includes(cidade.trim());
-  const contatosOk = contatos.every(c => contatoValido(c));
+  const contatosOk = contatos.every(c => contatoValido(c)) || (isAdmin && contatos.every(c => !c.replace(/\D/g, '').length || contatoValido(c)));
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!nome.trim() || !cpfCnpj.trim() || !endereco.trim() || !cidade.trim() || !contatos[0]?.trim()) {
+    if (!nome.trim() || (!isAdmin && (!cpfCnpj.trim() || !endereco.trim() || !contatos[0]?.trim())) || !cidade.trim()) {
       setErro('Preencha todos os campos obrigatórios');
       return;
     }
     if (nomeDuplicado) { setErro('Já existe um cliente com esse nome'); return; }
-    if (!cpfCnpjOk) { setErro('CPF ou CNPJ inválido'); return; }
+    if (cpfCnpj.trim() && !cpfCnpjOk) { setErro('CPF ou CNPJ inválido'); return; }
     if (cpfCnpjDuplicado) { setErro('Já existe um cliente com esse CPF/CNPJ'); return; }
     if (!contatosOk) { setErro('Todos os contatos devem ter 11 dígitos'); return; }
     setErro(''); setLoading(true);
@@ -179,20 +181,20 @@ export function ClienteForm() {
         <input
           value={cpfCnpj}
           onChange={(e) => handleCpfCnpjChange(e.target.value)}
-          className={`${input} ${cpfCnpjErro || cpfCnpjDuplicado ? 'border-red-500/50 focus:ring-red-500/30' : cpfCnpjOk ? 'border-green-500/50 focus:ring-green-500/30' : ''}`}
+          className={`${input} ${cpfCnpjErro || cpfCnpjDuplicado ? 'border-red-500/50 focus:ring-red-500/30' : cpfCnpjOk && cpfCnpj.length > 0 ? 'border-green-500/50 focus:ring-green-500/30' : ''}`}
           placeholder="11 dígitos (CPF) ou 14 dígitos (CNPJ)"
-          required
+          required={!isAdmin}
           inputMode="numeric"
         />
         {cpfCnpjErro && <p className="text-xs text-red-400 mt-1">{cpfCnpjErro}</p>}
         {cpfCnpjDuplicado && <p className="text-xs text-red-400 mt-1">Já existe um cliente com esse CPF/CNPJ</p>}
-        {cpfCnpjOk && !cpfCnpjDuplicado && <p className="text-xs text-green-400 mt-1">{cpfCnpj.length === 11 ? 'CPF válido ✓' : 'CNPJ válido ✓'}</p>}
+        {cpfCnpjOk && !cpfCnpjDuplicado && cpfCnpj.length > 0 && <p className="text-xs text-green-400 mt-1">{cpfCnpj.length === 11 ? 'CPF válido ✓' : 'CNPJ válido ✓'}</p>}
       </div>
       <div>
         <label className="text-xs text-content-muted mb-1 block">Endereço</label>
         <input value={endereco} onChange={(e) => setEndereco(e.target.value)}
           className={`${input} ${enderecoOk ? 'border-green-500/50 focus:ring-green-500/30' : ''}`}
-          placeholder="Rua, número, bairro ou povoado" required />
+          placeholder="Rua, número, bairro ou povoado" required={!isAdmin} />
         {enderecoOk && <p className="text-xs text-green-400 mt-1">✓</p>}
       </div>
       <div className="grid grid-cols-[5rem_1fr] gap-2">
@@ -233,7 +235,7 @@ export function ClienteForm() {
                 onChange={() => {}}
                 className={`${input} ${contatoValido(c) ? 'border-green-500/50 focus:ring-green-500/30' : c && contatoDigitos(c) > 0 ? 'border-red-500/50 focus:ring-red-500/30' : ''}`}
                 placeholder="(00) 9 0000-0000"
-                required
+                required={!isAdmin}
                 inputMode="tel"
               />
               {contatoValido(c) && <p className="text-xs text-green-400 mt-0.5">Contato válido ✓</p>}
