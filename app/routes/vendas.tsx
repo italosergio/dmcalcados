@@ -1,13 +1,17 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router';
-import { UserCircle, Trash2, Undo2, Plus, ShoppingBag, X, Calendar, CreditCard, MapPin, Phone, Package, User, LayoutGrid, List, ImageIcon, FileText } from 'lucide-react';
+import { UserCircle, Trash2, Undo2, Plus, ShoppingBag, X, Calendar, CreditCard, MapPin, Phone, Package, User, LayoutGrid, List, ImageIcon, FileText, Pencil, Search, ArrowUp, ArrowDown } from 'lucide-react';
 import { ImageLightbox } from '~/components/common/ImageLightbox';
 import { Button } from '~/components/common/Button';
 import { Card } from '~/components/common/Card';
 import { Input } from '~/components/common/Input';
-import { useVendas, useClientes, useUsers } from '~/hooks/useRealtime';
+import { useVendas, useClientes, useUsers, useProdutos } from '~/hooks/useRealtime';
 import { auth } from '~/services/firebase';
 import { formatCurrency } from '~/utils/format';
+import { useAuth } from '~/contexts/AuthContext';
+import { userIsAdmin, userCanEditVenda } from '~/models';
+import { VendaEditModal } from '~/components/vendas/VendaEditModal';
+import { VendaForm } from '~/components/vendas/VendaForm';
 import type { Venda, Cliente, CondicaoPagamento } from '~/models';
 
 const condicaoLabel: Record<string, string> = {
@@ -47,7 +51,19 @@ export default function VendasPage() {
   const { vendas, loading: vendasLoading } = useVendas();
   const { clientes, loading: clientesLoading } = useClientes();
   const { users } = useUsers();
+  const { user } = useAuth();
+  const isAdmin = user ? userIsAdmin(user) : false;
+  const canEdit = user ? userCanEditVenda(user) : false;
+  const { produtos } = useProdutos();
   const [vendaSelecionada, setVendaSelecionada] = useState<Venda | null>(null);
+  const [editandoData, setEditandoData] = useState(false);
+  const [editandoVenda, setEditandoVenda] = useState(false);
+  const [criandoVenda, setCriandoVenda] = useState(false);
+  const novaVendaBtnRef = useRef<HTMLButtonElement>(null);
+  const fecharCriandoVenda = useCallback(() => {
+    setCriandoVenda(false);
+    setTimeout(() => novaVendaBtnRef.current?.focus(), 50);
+  }, []);
   const [filteredVendas, setFilteredVendas] = useState<Venda[]>([]);
   const loading = vendasLoading || clientesLoading;
   const clienteNomeMap = new Map(clientes.map(c => [c.id, c.nome]));
@@ -55,6 +71,7 @@ export default function VendasPage() {
   const resolveCliente = (id: string, fallback: string) => clienteNomeMap.get(id) || fallback;
   const resolveUser = (id: string, fallback: string) => userNomeMap.get(id) || fallback;
   const [searchVendedor, setSearchVendedor] = useState('');
+  const [searchPedido, setSearchPedido] = useState('');
   const [filtroCondicao, setFiltroCondicao] = useState<string[]>([]);
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
@@ -67,6 +84,12 @@ export default function VendasPage() {
     if (typeof window !== 'undefined') return (localStorage.getItem('vendas-view') as 'cards' | 'tabela') || 'cards';
     return 'cards';
   });
+  const [sortCol, setSortCol] = useState<'pedido' | 'data' | 'cliente' | 'vendedor' | 'valor'>('data');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const toggleSort = (col: typeof sortCol) => {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(col); setSortDir(col === 'valor' ? 'desc' : 'asc'); }
+  };
 
   const changeViewMode = (mode: 'cards' | 'tabela') => {
     setViewMode(mode);
@@ -74,6 +97,22 @@ export default function VendasPage() {
   };
   const navigate = useNavigate();
   const location = useLocation();
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Lock body scroll + focus trap when modal is open
+  useEffect(() => {
+    const modal = criandoVenda || vendaSelecionada || editandoVenda;
+    if (!modal) return;
+    document.body.style.overflow = 'hidden';
+    const timer = setTimeout(() => {
+      const el = modalRef.current;
+      if (el) {
+        const focusable = el.querySelector<HTMLElement>('input, select, textarea, button');
+        focusable?.focus();
+      }
+    }, 50);
+    return () => { document.body.style.overflow = ''; clearTimeout(timer); };
+  }, [criandoVenda, vendaSelecionada, editandoVenda]);
 
   // Ler período da URL
   useEffect(() => {
@@ -111,6 +150,12 @@ export default function VendasPage() {
   const handleRestore = useCallback((vendaId: string) => {
     setActionLoading(prev => ({ ...prev, [vendaId]: true }));
     import('~/services/vendas.service').then(m => m.restoreVenda(vendaId));
+  }, []);
+
+  const handleEditSave = useCallback((vendaId: string, updates: Partial<Venda>) => {
+    import('~/services/vendas.service').then(m => m.updateVenda(vendaId, updates));
+    setVendaSelecionada(null);
+    setEditandoVenda(false);
   }, []);
 
   // Limpar loading quando dados atualizam
@@ -166,6 +211,9 @@ export default function VendasPage() {
     if (filtroDataFim) {
       result = result.filter(v => new Date(v.data) <= new Date(filtroDataFim + 'T23:59:59'));
     }
+    if (searchPedido.trim()) {
+      result = result.filter(v => String(v.pedidoNumero).includes(searchPedido.trim()));
+    }
     if (searchVendedor.trim()) {
       result = result.filter(v => v.vendedorNome?.toLowerCase().includes(searchVendedor.toLowerCase()));
     }
@@ -180,7 +228,7 @@ export default function VendasPage() {
       });
     }
     setFilteredVendas(result);
-  }, [searchVendedor, filtroCondicao, periodoFiltro, filtroDataInicio, filtroDataFim, vendas]);
+  }, [searchPedido, searchVendedor, filtroCondicao, periodoFiltro, filtroDataInicio, filtroDataFim, vendas]);
 
   // Calcula quanto de cada venda entra em cada card, baseado nos filtros ativos
   const f = filtroCondicao;
@@ -283,7 +331,8 @@ export default function VendasPage() {
             {/* Mobile: botão + total na mesma linha */}
             <div className="flex items-stretch gap-2 sm:contents">
               <button
-                onClick={() => navigate('/vendas/nova')}
+                ref={novaVendaBtnRef}
+                onClick={() => setCriandoVenda(true)}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-green-500/20 transition hover:from-green-500 hover:to-emerald-400 active:scale-95 shrink-0"
               >
                 <Plus size={18} /> <span className="hidden sm:inline">Nova Venda</span><span className="sm:hidden">Venda</span>
@@ -315,6 +364,17 @@ export default function VendasPage() {
 
       {/* Filtros: Período + Datas + Condição */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Nº pedido"
+            value={searchPedido}
+            onChange={(e) => { setSearchPedido(e.target.value); if (e.target.value) setPeriodoFiltro('tudo'); }}
+            className={`rounded-lg border bg-elevated pl-8 pr-2 py-1.5 text-xs focus:outline-none focus:border-border-medium w-24 transition-colors ${searchPedido ? 'border-green-600/30 text-content' : 'border-border-subtle text-content-muted'}`}
+          />
+        </div>
+        <span className="hidden lg:inline text-content-muted/30">│</span>
         {([
           { value: 'hoje', label: 'Hoje' },
           { value: '7dias', label: '7 dias' },
@@ -389,7 +449,7 @@ export default function VendasPage() {
           <p className="mb-1 text-base sm:text-lg font-semibold">Nenhuma venda registrada</p>
           <p className="mb-6 text-sm text-content-muted">Comece registrando sua primeira venda</p>
           <button
-            onClick={() => navigate('/vendas/nova')}
+            onClick={() => setCriandoVenda(true)}
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-green-500/20 transition hover:from-green-500 hover:to-emerald-400 active:scale-95"
           >
             <Plus size={20} />
@@ -503,24 +563,39 @@ export default function VendasPage() {
         </div>
       )}
 
-      {!loading && filteredVendas.length > 0 && viewMode === 'tabela' && (
+      {!loading && filteredVendas.length > 0 && viewMode === 'tabela' && (() => {
+        const sorted = [...filteredVendas].sort((a, b) => {
+          let cmp = 0;
+          if (sortCol === 'pedido') cmp = (a.pedidoNumero || 0) - (b.pedidoNumero || 0);
+          else if (sortCol === 'data') cmp = new Date(a.data).getTime() - new Date(b.data).getTime();
+          else if (sortCol === 'cliente') cmp = resolveCliente(a.clienteId, a.clienteNome).localeCompare(resolveCliente(b.clienteId, b.clienteNome));
+          else if (sortCol === 'vendedor') cmp = resolveUser(a.vendedorId, a.vendedorNome).localeCompare(resolveUser(b.vendedorId, b.vendedorNome));
+          else if (sortCol === 'valor') cmp = a.valorTotal - b.valorTotal;
+          return sortDir === 'asc' ? cmp : -cmp;
+        });
+        const SortIcon = ({ col }: { col: typeof sortCol }) => sortCol === col
+          ? (sortDir === 'asc' ? <ArrowUp size={10} className="inline ml-0.5" /> : <ArrowDown size={10} className="inline ml-0.5" />)
+          : null;
+        return (
         <div className="rounded-xl border border-border-subtle bg-surface overflow-hidden flex flex-col min-h-0 flex-1">
           <table className="w-full">
             <thead>
               <tr className="border-b border-border-subtle bg-elevated/50">
-                <th className="px-3 py-2.5 text-left text-[10px] font-medium uppercase tracking-wide text-content-muted">Data</th>
-                <th className="px-3 py-2.5 text-left text-[10px] font-medium uppercase tracking-wide text-content-muted">Cliente</th>
-                <th className="px-3 py-2.5 text-left text-[10px] font-medium uppercase tracking-wide text-content-muted hidden sm:table-cell">Vendedor</th>
+                <th onClick={() => toggleSort('pedido')} className="px-3 py-2.5 text-left text-[10px] font-medium uppercase tracking-wide text-content-muted cursor-pointer hover:text-content select-none w-16">#<SortIcon col="pedido" /></th>
+                <th onClick={() => toggleSort('data')} className="px-3 py-2.5 text-left text-[10px] font-medium uppercase tracking-wide text-content-muted cursor-pointer hover:text-content select-none">Data<SortIcon col="data" /></th>
+                <th onClick={() => toggleSort('cliente')} className="px-3 py-2.5 text-left text-[10px] font-medium uppercase tracking-wide text-content-muted cursor-pointer hover:text-content select-none">Cliente<SortIcon col="cliente" /></th>
+                <th onClick={() => toggleSort('vendedor')} className="px-3 py-2.5 text-left text-[10px] font-medium uppercase tracking-wide text-content-muted cursor-pointer hover:text-content select-none hidden sm:table-cell">Vendedor<SortIcon col="vendedor" /></th>
                 <th className="px-3 py-2.5 text-center text-[10px] font-medium uppercase tracking-wide text-content-muted hidden sm:table-cell">Tipo</th>
-                <th className="px-3 py-2.5 text-right text-[10px] font-medium uppercase tracking-wide text-content-muted">Valor</th>
+                <th onClick={() => toggleSort('valor')} className="px-3 py-2.5 text-right text-[10px] font-medium uppercase tracking-wide text-content-muted cursor-pointer hover:text-content select-none">Valor<SortIcon col="valor" /></th>
               </tr>
             </thead>
           </table>
           <div className="overflow-y-auto flex-1">
             <table className="w-full">
               <tbody className="divide-y divide-border-subtle">
-                {filteredVendas.map(venda => (
+                {sorted.map(venda => (
                   <tr key={venda.id} onClick={() => setVendaSelecionada(venda)} className={`cursor-pointer transition-colors ${ (venda as any).deletedAt ? 'bg-red-950/20 opacity-70 hover:opacity-90' : 'hover:bg-surface-hover' }`}>
+                    <td className="px-3 py-2.5 text-xs font-mono text-content-muted whitespace-nowrap">{venda.pedidoNumero ? `#${venda.pedidoNumero}` : ''}</td>
                     <td className="px-3 py-2.5 text-xs text-content-muted whitespace-nowrap">{new Date(venda.data).toLocaleDateString('pt-BR')}</td>
                     <td className="px-3 py-2.5 text-sm truncate max-w-[140px] sm:max-w-none">{resolveCliente(venda.clienteId, venda.clienteNome)}</td>
                     <td className="px-3 py-2.5 text-sm text-content-secondary truncate max-w-[120px] hidden sm:table-cell">{resolveUser(venda.vendedorId, venda.vendedorNome)}</td>
@@ -532,7 +607,8 @@ export default function VendasPage() {
             </table>
           </div>
         </div>
-      )}
+        );
+      })()}
       {/* Modal detalhe */}
       {imagemAberta && <ImageLightbox src={imagemAberta} onClose={() => setImagemAberta(null)} />}
 
@@ -542,9 +618,9 @@ export default function VendasPage() {
         const condicao = v.condicaoPagamento;
         const temEntrada = condicao?.includes('_entrada');
         return (
-          <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={() => setVendaSelecionada(null)}>
+          <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={() => { setVendaSelecionada(null); setEditandoData(false); }}>
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <div className="relative w-full max-w-lg rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">
                 <div className="flex items-center gap-2">
                   {v.pedidoNumero && <span className="text-xs bg-elevated px-2.5 py-1 rounded-md font-mono font-semibold">#{v.pedidoNumero}</span>}
@@ -556,9 +632,26 @@ export default function VendasPage() {
                 <p className="text-2xl font-bold text-green-400">{formatCurrency(v.valorTotal)}</p>
 
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-lg bg-elevated p-2.5">
-                    <div className="flex items-center gap-1.5 text-content-muted mb-0.5"><Calendar size={12} /><span className="text-[10px]">Data da venda</span></div>
-                    <p className="text-xs font-semibold">{new Date(v.data).toLocaleDateString('pt-BR')}</p>
+                  <div className={`rounded-lg bg-elevated p-2.5 ${isAdmin && !editandoData ? 'cursor-pointer hover:bg-border-subtle transition-colors' : ''}`}
+                    onClick={() => { if (isAdmin && !editandoData) setEditandoData(true); }}>
+                    <div className="flex items-center gap-1.5 text-content-muted mb-0.5"><Calendar size={12} /><span className="text-[10px]">Data da venda</span>{isAdmin && !editandoData && <span className="text-[9px] text-blue-400 ml-auto">editar</span>}</div>
+                    {editandoData ? (
+                      <input type="date" defaultValue={new Date(v.data).toISOString().slice(0, 10)}
+                        className="w-full rounded border border-border-subtle bg-surface px-2 py-1 text-xs text-content focus:outline-none focus:border-blue-500"
+                        autoFocus
+                        onBlur={(e) => {
+                          const val = e.target.value;
+                          if (val && val !== new Date(v.data).toISOString().slice(0, 10)) {
+                            import('~/services/vendas.service').then(m => m.updateVendaData(v.id, new Date(val + 'T12:00:00')));
+                            setVendaSelecionada({ ...v, data: new Date(val + 'T12:00:00') });
+                          }
+                          setEditandoData(false);
+                        }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditandoData(false); }}
+                      />
+                    ) : (
+                      <p className="text-xs font-semibold">{new Date(v.data).toLocaleDateString('pt-BR')}</p>
+                    )}
                   </div>
                   <div className="rounded-lg bg-elevated p-2.5">
                     <div className="flex items-center gap-1.5 text-content-muted mb-0.5"><UserCircle size={12} /><span className="text-[10px]">Vendedor</span></div>
@@ -612,12 +705,28 @@ export default function VendasPage() {
                 <div className="rounded-lg bg-elevated p-2.5">
                   <div className="flex items-center gap-1.5 text-content-muted mb-1.5"><CreditCard size={12} /><span className="text-[10px] font-medium">Pagamento</span></div>
                   {condicao === 'avista' && (
-                    <p className="text-xs">Total à vista: <span className="font-bold text-green-400">{formatCurrency(v.valorTotal)}</span></p>
+                    <div className="space-y-1 text-xs">
+                      <p>Total à vista: <span className="font-bold text-green-400">{formatCurrency(v.valorTotal)}</span></p>
+                      {(v as any).entradaForma && (
+                        <p className="text-content-muted">
+                          {(v as any).entradaForma === 'misto'
+                            ? `Pix ${formatCurrency((v as any).valorPix || 0)} · Dinheiro ${formatCurrency((v as any).valorDinheiro || 0)}`
+                            : (v as any).entradaForma === 'pix' ? 'Pix' : 'Dinheiro'}
+                        </p>
+                      )}
+                    </div>
                   )}
                   {condicao !== 'avista' && (
                     <div className="space-y-1 text-xs">
                       {temEntrada && (v.valorAvista || 0) > 0 && (
                         <div className="flex justify-between"><span className="text-content-secondary">Entrada</span><span className="font-semibold text-blue-400">{formatCurrency(v.valorAvista)}</span></div>
+                      )}
+                      {temEntrada && (v as any).entradaForma && (
+                        <p className="text-[10px] text-content-muted">
+                          {(v as any).entradaForma === 'misto'
+                            ? `Pix ${formatCurrency((v as any).valorPix || 0)} · Dinheiro ${formatCurrency((v as any).valorDinheiro || 0)}`
+                            : (v as any).entradaForma === 'pix' ? 'Pix' : 'Dinheiro'}
+                        </p>
                       )}
                       {(v.valorPrazo || 0) > 0 && (
                         <div className="flex justify-between">
@@ -652,6 +761,13 @@ export default function VendasPage() {
                   </div>
                 )}
                 <p className="text-[10px] text-content-muted text-center">Registrado em {new Date(v.createdAt).toLocaleString('pt-BR')}</p>
+
+                {canEdit && !(v as any).deletedAt && (
+                  <button type="button" onClick={() => { setEditandoVenda(true); }}
+                    className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 px-3 py-2 text-xs font-medium transition-colors">
+                    <Pencil size={14} /> Editar venda
+                  </button>
+                )}
 
                 {(v as any).deletedAt && (
                   <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-center">
@@ -695,6 +811,30 @@ export default function VendasPage() {
           </div>
         );
       })()}
+      {editandoVenda && vendaSelecionada && (
+        <VendaEditModal
+          venda={vendaSelecionada}
+          clientes={clientes}
+          users={users}
+          produtos={produtos}
+          onClose={() => setEditandoVenda(false)}
+          onSave={handleEditSave}
+        />
+      )}
+      {criandoVenda && (
+        <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={fecharCriandoVenda}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div ref={modalRef} className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">
+              <span className="text-sm font-semibold">Nova Venda</span>
+              <button onClick={fecharCriandoVenda} className="text-content-muted hover:text-content transition-colors"><X size={20} /></button>
+            </div>
+            <div className="p-5">
+              <VendaForm onClose={fecharCriandoVenda} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

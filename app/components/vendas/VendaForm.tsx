@@ -8,7 +8,7 @@ import { getCicloAtivo } from '~/services/ciclos.service';
 import { uploadImage } from '~/services/cloudinary.service';
 import { useAuth } from '~/contexts/AuthContext';
 import { useCachedState, clearFormCache } from '~/hooks/useFormCache';
-import type { Cliente, Produto, VendaProduto, CondicaoPagamento, User, Ciclo } from '~/models';
+import type { Cliente, Produto, VendaProduto, CondicaoPagamento, EntradaForma, User, Ciclo } from '~/models';
 import { isVendedor, userIsAdmin, userIsVendedor } from '~/models';
 import { formatCurrency } from '~/utils/format';
 import { Pencil, Trash2, Plus, Minus, ShoppingBag, X, Check, Package, ImagePlus } from 'lucide-react';
@@ -17,7 +17,7 @@ const PECAS_POR_PACOTE = 15;
 
 const input = "w-full rounded-lg border border-border-subtle bg-elevated px-3 py-2.5 text-sm text-content focus:outline-none focus:border-border-medium focus:ring-1 focus:ring-blue-500/30 transition-colors";
 
-export function VendaForm() {
+export function VendaForm({ onClose }: { onClose?: () => void } = {}) {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const FK = 'venda';
@@ -30,11 +30,16 @@ export function VendaForm() {
   const [produtoBusca, setProdutoBusca] = useState('');
   const [produtoDropdown, setProdutoDropdown] = useState(false);
   const produtoRef = useRef<HTMLDivElement>(null);
+  const produtoInputRef = useRef<HTMLInputElement>(null);
   const [quantidade, setQuantidade] = useState('1');
   const [precoUnitario, setPrecoUnitario] = useState('');
   const [tipoProduto, setTipoProduto] = useState<'pacote' | 'unidade'>('pacote');
   const [condicao, setCondicao] = useCachedState<CondicaoPagamento>(FK, 'condicao', 'avista');
   const [comEntrada, setComEntrada] = useCachedState(FK, 'comEntrada', false);
+  const [entradaForma, setEntradaForma] = useCachedState<'pix' | 'dinheiro' | 'misto'>(FK, 'entradaForma', 'dinheiro');
+  const [valorPix, setValorPix] = useCachedState(FK, 'valorPix', '');
+  const [valorDinheiro, setValorDinheiro] = useCachedState(FK, 'valorDinheiro', '');
+  const [desconto, setDesconto] = useCachedState(FK, 'desconto', '');
   const [valorAvista, setValorAvista] = useCachedState(FK, 'valorAvista', '');
   const [valorPrazo, setValorPrazo] = useCachedState(FK, 'valorPrazo', '');
   const [parcelas, setParcelas] = useCachedState(FK, 'parcelas', 2);
@@ -66,6 +71,7 @@ export function VendaForm() {
   const [imagemPreview, setImagemPreview] = useState<string | null>(null);
   const [cicloAtivo, setCicloAtivo] = useState<Ciclo | null>(null);
   const [cicloChecked, setCicloChecked] = useState(false);
+  const [ciclosAbertos, setCiclosAbertos] = useState<Ciclo[]>([]);
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user ? userIsAdmin(user) : false;
@@ -100,6 +106,8 @@ export function VendaForm() {
         }
       } else {
         setClientes(clientesData);
+        import('~/services/ciclos.service').then(m => m.getCiclosAbertos()).then(setCiclosAbertos);
+        setCicloChecked(true);
       }
       setProdutos(produtosData);
     });
@@ -180,12 +188,12 @@ export function VendaForm() {
     return (resto < 2 ? 0 : 11 - resto) === parseInt(cnpj[13]);
   };
 
-  const ncCpfCnpjOk = ncCpfCnpj.length === 11 ? validarCpf(ncCpfCnpj) : ncCpfCnpj.length === 14 ? validarCnpj(ncCpfCnpj) : false;
+  const ncCpfCnpjOk = ncCpfCnpj.length === 0 ? isAdmin : ncCpfCnpj.length === 11 ? validarCpf(ncCpfCnpj) : ncCpfCnpj.length === 14 ? validarCnpj(ncCpfCnpj) : false;
   const ncCpfCnpjErro = ncCpfCnpj.length === 11 && !validarCpf(ncCpfCnpj) ? 'CPF inválido' : ncCpfCnpj.length === 14 && !validarCnpj(ncCpfCnpj) ? 'CNPJ inválido' : ncCpfCnpj.length > 0 && ncCpfCnpj.length < 11 ? `Faltam ${11 - ncCpfCnpj.length} dígito(s)` : ncCpfCnpj.length > 11 && ncCpfCnpj.length < 14 ? `Faltam ${14 - ncCpfCnpj.length} dígito(s) para CNPJ` : '';
 
   const ncCidadeOk = ncCidade.trim().length >= 2 && ncCidades.includes(ncCidade.trim());
 
-  const ncFormOk = ncNome.trim().length >= 3 && ncCpfCnpjOk && ncEndereco.trim().length >= 3 && ncCidadeOk && ncContatos.every(c => ncContatoValido(c));
+  const ncFormOk = ncNome.trim().length >= 3 && ncCpfCnpjOk && (ncEndereco.trim().length >= 3 || isAdmin) && ncCidadeOk && (ncContatos.every(c => ncContatoValido(c)) || (isAdmin && ncContatos.every(c => !c.replace(/\D/g, '').length || ncContatoValido(c))));
 
   const salvarNovoCliente = async () => {
     if (!ncFormOk) return;
@@ -222,6 +230,7 @@ export function VendaForm() {
     setProdutoId(p.id);
     setProdutoBusca(p.modelo + (p.referencia ? ` (${p.referencia})` : ''));
     setProdutoDropdown(false);
+    setTipoProduto(p.modelo.toLowerCase().includes('expositor') ? 'unidade' : 'pacote');
   };
 
   const npFormOk = npModelo.trim().length > 0 && npReferencia.trim().length > 0 && (parseFloat(npValor) || 0) > 0;
@@ -276,6 +285,7 @@ export function VendaForm() {
       quantidade: qtd, tipo: tipoProduto, valorSugerido: produto.valor, valorUnitario: preco, valorTotal: preco * totalPecas
     }]);
     setProdutoId(''); setProdutoBusca(''); setQuantidade('1'); setPrecoUnitario(''); setTipoProduto('pacote');
+    setTimeout(() => produtoInputRef.current?.focus(), 0);
   };
 
   const handleDelete = useCallback((index: number) => {
@@ -320,23 +330,33 @@ export function VendaForm() {
     return 'Confirmar!';
   };
 
-  const total = produtosSelecionados.reduce((sum, p) => sum + p.valorTotal, 0);
+  const subtotal = produtosSelecionados.reduce((sum, p) => sum + p.valorTotal, 0);
+  const descontoVal = parseFloat(desconto) || 0;
+  const total = Math.max(0, subtotal - descontoVal);
+
+  const gerarDatasParcelas = (n: number) => {
+    const hoje = new Date();
+    return Array.from({ length: n }, (_, i) => {
+      const d = new Date(hoje);
+      d.setDate(d.getDate() + 30 * (i + 1));
+      return d.toISOString().slice(0, 10);
+    });
+  };
 
   useEffect(() => {
     if (condicao === 'avista') { setValorAvista(total.toString()); setValorPrazo('0'); setDatasParcelas([]); setComEntrada(false); }
     else if (condicao === '1x') {
       setParcelas(1);
       if (!comEntrada) { setValorAvista(''); setValorPrazo(total.toString()); }
-      setDatasParcelas(prev => prev.length >= 1 ? prev.slice(0, 1) : ['']);
+      setDatasParcelas(prev => prev.length === 1 && prev[0] ? prev : gerarDatasParcelas(1));
     }
     else if (condicao === '2x' || condicao === '3x') {
       const n = condicao === '2x' ? 2 : 3;
       setParcelas(n);
       if (!comEntrada) { setValorAvista(''); setValorPrazo(total.toString()); }
       setDatasParcelas(prev => {
-        const arr = [...prev];
-        while (arr.length < n) arr.push('');
-        return arr.slice(0, n);
+        if (prev.length === n && prev.every(d => d)) return prev;
+        return gerarDatasParcelas(n);
       });
     }
   }, [condicao, total, comEntrada]);
@@ -375,14 +395,24 @@ export function VendaForm() {
         valorTotal: total, condicaoPagamento: condicaoFinal,
         valorAvista: vAvista, valorPrazo: vPrazo, parcelas: condicao === 'avista' ? 0 : parcelas,
         datasParcelas: condicao !== 'avista' ? datasParcelas : [],
+        ...(condicao === 'avista' || comEntrada ? {
+          entradaForma,
+          ...(entradaForma === 'misto' ? { valorPix: parseFloat(valorPix) || 0, valorDinheiro: parseFloat(valorDinheiro) || 0 } : {}),
+        } : {}),
+        ...(descontoVal > 0 ? { desconto: descontoVal } : {}),
         ...(descricao.trim() ? { descricao: descricao.trim() } : {}),
         ...(imagemUrl ? { imagemUrl } : {}),
         data: new Date(dataVenda + 'T12:00:00')
       };
       if (alvoVendedor) vendaPayload.registradoPorNome = user.nome;
+      // Ciclo: auto-detectar baseado no vendedor e data
+      const { findCicloParaUsuario } = await import('~/services/ciclos.service');
+      const allCiclos = isAdmin ? ciclosAbertos : (cicloAtivo ? [cicloAtivo] : []);
+      const cicloMatch = findCicloParaUsuario(allCiclos, vendedorId, dataVenda);
+      if (cicloMatch) vendaPayload.cicloId = cicloMatch.id;
       await createVenda(vendaPayload);
       clearFormCache(FK);
-      navigate('/vendas');
+      if (onClose) onClose(); else navigate('/vendas');
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       setErro(`Firebase write error: ${msg}`);
@@ -437,8 +467,8 @@ export function VendaForm() {
                 {ncNome.trim().length >= 3 && <p className="text-xs text-green-400 mt-0.5">✓</p>}
               </div>
               <div>
-                <input value={ncCpfCnpj} onChange={(e) => setNcCpfCnpj(e.target.value.replace(/\D/g, '').slice(0, 14))} className={`${input} ${ncCpfCnpjOk ? 'border-green-500/50' : ncCpfCnpjErro ? 'border-red-500/50' : ''}`} placeholder="CPF / CNPJ" inputMode="numeric" />
-                {ncCpfCnpjOk && <p className="text-xs text-green-400 mt-0.5">{ncCpfCnpj.length === 11 ? 'CPF válido' : 'CNPJ válido'} ✓</p>}
+                <input value={ncCpfCnpj} onChange={(e) => setNcCpfCnpj(e.target.value.replace(/\D/g, '').slice(0, 14))} className={`${input} ${ncCpfCnpjOk && ncCpfCnpj.length > 0 ? 'border-green-500/50' : ncCpfCnpjErro ? 'border-red-500/50' : ''}`} placeholder="CPF / CNPJ" inputMode="numeric" />
+                {ncCpfCnpjOk && ncCpfCnpj.length > 0 && <p className="text-xs text-green-400 mt-0.5">{ncCpfCnpj.length === 11 ? 'CPF válido' : 'CNPJ válido'} ✓</p>}
                 {ncCpfCnpjErro && <p className="text-xs text-red-400 mt-0.5">{ncCpfCnpjErro}</p>}
               </div>
               <div>
@@ -548,6 +578,7 @@ export function VendaForm() {
           ) : (
             <div ref={produtoRef} className="relative">
               <input
+                ref={produtoInputRef}
                 value={produtoBusca}
                 onChange={(e) => { setProdutoBusca(e.target.value); setProdutoDropdown(true); if (!e.target.value) setProdutoId(''); }}
                 onFocus={() => setProdutoDropdown(true)}
@@ -608,6 +639,7 @@ export function VendaForm() {
           </div>
           <div className="flex items-end">
             <button type="button" onClick={adicionarProduto} disabled={!produtoId || !precoUnitario || maxQuantidade() <= 0}
+              onKeyDown={(e) => { if (e.key === 'Tab') { e.preventDefault(); produtoInputRef.current?.focus(); } }}
               className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-white text-sm font-medium transition hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
               <Plus size={16} /> Adicionar
             </button>
@@ -679,6 +711,17 @@ export function VendaForm() {
           ))}
 
           {/* Total */}
+          {descontoVal > 0 && (
+            <div className="flex justify-between items-center text-xs text-content-muted px-4">
+              <span>Subtotal</span>
+              <span>{formatCurrency(subtotal)}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2 px-4">
+            <label className="text-xs text-content-muted whitespace-nowrap">Desconto</label>
+            <input type="number" step="0.01" min="0" max={subtotal} value={desconto} onChange={(e) => setDesconto(e.target.value)}
+              className={`${input} max-w-[8rem] text-right`} placeholder="0,00" />
+          </div>
           <div className="flex justify-between items-center rounded-lg bg-green-500/10 border border-green-500/20 px-4 py-3">
             <span className="text-sm font-semibold">Total</span>
             <span className="text-lg font-bold text-green-400">{formatCurrency(total)}</span>
@@ -702,7 +745,32 @@ export function VendaForm() {
           </div>
 
           {condicao === 'avista' && (
-            <p className="text-xs text-content-muted text-center">Pagamento total à vista: <span className="text-green-400 font-semibold">{formatCurrency(total)}</span></p>
+            <div className="space-y-2">
+              <p className="text-xs text-content-muted text-center">Pagamento total à vista: <span className="text-green-400 font-semibold">{formatCurrency(total)}</span></p>
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-xs text-content-muted">Forma:</span>
+                {(['dinheiro', 'pix', 'misto'] as const).map(f => (
+                  <button key={f} type="button" onClick={() => setEntradaForma(f)}
+                    className={`rounded-lg px-3 py-1 text-xs font-medium transition ${entradaForma === f ? 'bg-blue-600 text-white' : 'bg-elevated text-content-secondary hover:bg-border-medium'}`}>
+                    {f === 'dinheiro' ? 'Dinheiro' : f === 'pix' ? 'Pix' : 'Misto'}
+                  </button>
+                ))}
+              </div>
+              {entradaForma === 'misto' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-content-muted mb-1 block">Pix</label>
+                    <input type="number" step="0.01" min="0" value={valorPix} className={input} placeholder="0.00"
+                      onChange={(e) => { setValorPix(e.target.value); setValorDinheiro(String(Math.max(0, total - (parseFloat(e.target.value) || 0)).toFixed(2))); }} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-content-muted mb-1 block">Dinheiro</label>
+                    <input type="number" step="0.01" min="0" value={valorDinheiro} className={input} placeholder="0.00"
+                      onChange={(e) => { setValorDinheiro(e.target.value); setValorPix(String(Math.max(0, total - (parseFloat(e.target.value) || 0)).toFixed(2))); }} />
+                  </div>
+                </div>
+              )}
+            </div>
           )}
           {condicao === '1x' && (
             <div className="space-y-2">
@@ -727,6 +795,33 @@ export function VendaForm() {
                     <label className="text-xs text-content-muted mb-1 block">Restante</label>
                     <input type="number" step="0.01" value={valorPrazo} className={`${input} opacity-60`} disabled />
                   </div>
+                </div>
+              )}
+              {comEntrada && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-xs text-content-muted">Forma da entrada:</span>
+                    {(['dinheiro', 'pix', 'misto'] as const).map(f => (
+                      <button key={f} type="button" onClick={() => setEntradaForma(f)}
+                        className={`rounded-lg px-3 py-1 text-xs font-medium transition ${entradaForma === f ? 'bg-blue-600 text-white' : 'bg-elevated text-content-secondary hover:bg-border-medium'}`}>
+                        {f === 'dinheiro' ? 'Dinheiro' : f === 'pix' ? 'Pix' : 'Misto'}
+                      </button>
+                    ))}
+                  </div>
+                  {entradaForma === 'misto' && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-content-muted mb-1 block">Pix</label>
+                        <input type="number" step="0.01" min="0" value={valorPix} className={input} placeholder="0.00"
+                          onChange={(e) => { const va = parseFloat(valorAvista) || 0; setValorPix(e.target.value); setValorDinheiro(String(Math.max(0, va - (parseFloat(e.target.value) || 0)).toFixed(2))); }} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-content-muted mb-1 block">Dinheiro</label>
+                        <input type="number" step="0.01" min="0" value={valorDinheiro} className={input} placeholder="0.00"
+                          onChange={(e) => { const va = parseFloat(valorAvista) || 0; setValorDinheiro(e.target.value); setValorPix(String(Math.max(0, va - (parseFloat(e.target.value) || 0)).toFixed(2))); }} />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               <div>
@@ -764,6 +859,33 @@ export function VendaForm() {
                     <label className="text-xs text-content-muted mb-1 block">Restante ({parcelas}x de {formatCurrency((parseFloat(valorPrazo) || 0) / parcelas)})</label>
                     <input type="number" step="0.01" value={valorPrazo} className={`${input} opacity-60`} disabled />
                   </div>
+                </div>
+              )}
+              {comEntrada && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-xs text-content-muted">Forma da entrada:</span>
+                    {(['dinheiro', 'pix', 'misto'] as const).map(f => (
+                      <button key={f} type="button" onClick={() => setEntradaForma(f)}
+                        className={`rounded-lg px-3 py-1 text-xs font-medium transition ${entradaForma === f ? 'bg-blue-600 text-white' : 'bg-elevated text-content-secondary hover:bg-border-medium'}`}>
+                        {f === 'dinheiro' ? 'Dinheiro' : f === 'pix' ? 'Pix' : 'Misto'}
+                      </button>
+                    ))}
+                  </div>
+                  {entradaForma === 'misto' && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-content-muted mb-1 block">Pix</label>
+                        <input type="number" step="0.01" min="0" value={valorPix} className={input} placeholder="0.00"
+                          onChange={(e) => { const va = parseFloat(valorAvista) || 0; setValorPix(e.target.value); setValorDinheiro(String(Math.max(0, va - (parseFloat(e.target.value) || 0)).toFixed(2))); }} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-content-muted mb-1 block">Dinheiro</label>
+                        <input type="number" step="0.01" min="0" value={valorDinheiro} className={input} placeholder="0.00"
+                          onChange={(e) => { const va = parseFloat(valorAvista) || 0; setValorDinheiro(e.target.value); setValorPix(String(Math.max(0, va - (parseFloat(e.target.value) || 0)).toFixed(2))); }} />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               <div className={`grid gap-2 ${condicao === '3x' ? 'grid-cols-3' : 'grid-cols-2'}`}>
@@ -832,7 +954,7 @@ export function VendaForm() {
 
       {/* Ações */}
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={() => navigate('/vendas')}
+        <button type="button" onClick={() => onClose ? onClose() : navigate('/vendas')}
           className="rounded-lg border border-border-subtle bg-elevated py-2.5 text-sm font-medium text-content-secondary transition hover:bg-border-medium">
           Cancelar
         </button>
