@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '~/contexts/AuthContext';
 import { Navigate } from 'react-router';
-import { createCiclo, fecharCiclo, editarCiclo, deleteCiclo } from '~/services/ciclos.service';
+import { createCiclo, fecharCiclo, editarCiclo, deleteCiclo, reabrirCiclo, updateCicloDatas, updateCicloMeta } from '~/services/ciclos.service';
 import { formatCurrency } from '~/utils/format';
 import type { Ciclo, CicloProduto, Produto, User } from '~/models';
 import { userIsAdmin, userIsVendedor, userCanAccessAdmin } from '~/models';
-import { useProdutos, useCiclos, useUsers } from '~/hooks/useRealtime';
+import { useProdutos, useCiclos, useUsers, useVendas, useDespesas, useDepositos, useVales } from '~/hooks/useRealtime';
 import { Plus, Minus, X, Package, ChevronDown, ChevronRight, Lock, Unlock, Pencil, Trash2 } from 'lucide-react';
+import { CicloDashboard } from '~/components/ciclos/CicloDashboard';
 
 const input = "w-full rounded-lg border border-border-subtle bg-elevated px-3 py-2.5 text-sm text-content focus:outline-none focus:border-border-medium focus:ring-1 focus:ring-blue-500/30 transition-colors";
 const PECAS_POR_PACOTE = 15;
@@ -16,6 +17,10 @@ export default function CiclosPage() {
   const { ciclos, loading: ciclosLoading } = useCiclos();
   const { users: allUsers, loading: usersLoading } = useUsers();
   const { produtos, loading: produtosLoading } = useProdutos();
+  const { vendas } = useVendas();
+  const { despesas } = useDespesas();
+  const { depositos } = useDepositos();
+  const { valeCards } = useVales();
   const vendedores = allUsers.filter(u => userIsVendedor(u));
   const loading = ciclosLoading || usersLoading || produtosLoading;
   const [showForm, setShowForm] = useState(false);
@@ -31,10 +36,18 @@ export default function CiclosPage() {
   const [deleteClicks, setDeleteClicks] = useState(0);
   const [deleteTimer, setDeleteTimer] = useState<ReturnType<typeof setTimeout>>();
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [editMetaOpen, setEditMetaOpen] = useState(false);
+  const [metaDataInicio, setMetaDataInicio] = useState('');
+  const [metaDataFim, setMetaDataFim] = useState('');
+  const [metaParticipantes, setMetaParticipantes] = useState<string[]>([]);
+  const [metaSaving, setMetaSaving] = useState(false);
   const [editCicloId, setEditCicloId] = useState<string | null>(null);
   const [editItens, setEditItens] = useState<{ produtoId: string; pacotes: number }[]>([]);
   const [editSaving, setEditSaving] = useState(false);
   const [editErro, setEditErro] = useState('');
+  const [dataInicio, setDataInicio] = useState(new Date().toISOString().slice(0, 10));
+  const [dataFim, setDataFim] = useState('');
+  const [participantesIds, setParticipantesIds] = useState<string[]>([]);
   const [vendedorDropdown, setVendedorDropdown] = useState(false);
   const [vendedorBusca, setVendedorBusca] = useState('');
   const vendedorRef = useRef<HTMLDivElement>(null);
@@ -61,11 +74,32 @@ export default function CiclosPage() {
     const uid = v.uid || v.id;
     const ciclosV = ciclos.filter(c => c.vendedorId === uid);
     const ativo = ciclosV.find(c => c.status === 'ativo');
-    const fechados = ciclosV.filter(c => c.status === 'fechado');
-    return { ...v, uid, ativo, fechados, total: ciclosV.length };
-  });
+    const fechados = ciclosV.filter(c => c.status === 'fechado').sort((a, b) => (b.dataInicio || b.createdAt).localeCompare(a.dataInicio || a.createdAt));
+    const maisRecente = ativo?.createdAt || fechados[0]?.createdAt || '';
+    const todosC = [...(ativo ? [ativo] : []), ...fechados];
+    const ids = new Set([uid, ...todosC.flatMap(c => (c.participantes || []).map(p => p.id))]);
+    const totalVendido = vendas.filter(vv => {
+      if ((vv as any).deletedAt) return false;
+      if (todosC.some(c => (vv as any).cicloId === c.id)) return true;
+      if (!ids.has(vv.vendedorId)) return false;
+      return todosC.some(c => {
+        const d = new Date(vv.data).toISOString().slice(0, 10);
+        if (c.dataInicio && d < c.dataInicio) return false;
+        if (c.dataFim && d > c.dataFim) return false;
+        return true;
+      });
+    }).reduce((s, vv) => s + vv.valorTotal, 0);
+    return { ...v, uid, ativo, fechados, total: ciclosV.length, maisRecente, totalVendido };
+  }).sort((a, b) => b.maisRecente.localeCompare(a.maisRecente));
 
-  const addItem = () => setItensCiclo([...itensCiclo, { produtoId: '', pacotes: 1 }]);
+  const addItem = () => {
+    setItensCiclo(prev => [...prev, { produtoId: '', pacotes: 1 }]);
+    const idx = itensCiclo.length;
+    setTimeout(() => {
+      const el = produtoRefs.current[idx];
+      if (el) { const inp = el.querySelector('input'); if (inp) inp.focus(); }
+    }, 100);
+  };
   const removeItem = (i: number) => setItensCiclo(itensCiclo.filter((_, j) => j !== i));
   const updateItem = (i: number, field: 'produtoId' | 'pacotes', value: string | number) => {
     setItensCiclo(itensCiclo.map((item, j) => j === i ? { ...item, [field]: value } : item));
@@ -96,10 +130,16 @@ export default function CiclosPage() {
     setSaving(true);
     setErro('');
     try {
-      await createCiclo(vendedorId, vendedor.nome, prodsCiclo);
+      await createCiclo(vendedorId, vendedor.nome, prodsCiclo, dataInicio || undefined, dataFim || undefined,
+        participantesIds.length > 0 ? participantesIds.map(pid => { const u = allUsers.find(x => (x.uid || x.id) === pid); return { id: pid, nome: u?.nome || '' }; }) : undefined
+      );
       setShowForm(false);
       setVendedorId('');
       setItensCiclo([]);
+      setDataInicio(new Date().toISOString().slice(0, 10));
+      setDataFim('');
+      setParticipantesIds([]);
+      setExpandedVendedor(null);
     } catch (e: any) {
       setErro(e.message || 'Erro ao criar ciclo');
     } finally { setSaving(false); }
@@ -257,6 +297,39 @@ export default function CiclosPage() {
             {vendedorTemCicloAtivo && <p className="text-xs text-red-400 mt-1">Este vendedor já possui um ciclo ativo.</p>}
           </div>
 
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-content-muted mb-1 block">Data início</label>
+              <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className={input} />
+            </div>
+            <div>
+              <label className="text-xs text-content-muted mb-1 block">Data fim (opcional)</label>
+              <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className={input} />
+            </div>
+          </div>
+
+          {/* Participantes adicionais */}
+          <div>
+            <label className="text-xs text-content-muted mb-1 block">Participantes adicionais (opcional)</label>
+            <div className="flex flex-wrap gap-1.5 mb-1.5">
+              {participantesIds.map(pid => {
+                const u = allUsers.find(x => (x.uid || x.id) === pid);
+                return (
+                  <span key={pid} className="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 text-xs px-2 py-1 rounded-lg">
+                    {u?.nome || pid}
+                    <button type="button" onClick={() => setParticipantesIds(prev => prev.filter(x => x !== pid))} className="hover:text-red-400"><X size={12} /></button>
+                  </span>
+                );
+              })}
+            </div>
+            <select value="" onChange={e => { if (e.target.value && !participantesIds.includes(e.target.value)) setParticipantesIds([...participantesIds, e.target.value]); e.target.value = ''; }} className={input}>
+              <option value="">Adicionar pessoa...</option>
+              {allUsers.filter(u => !u.deletedAt && (u.uid || u.id) !== vendedorId && !participantesIds.includes(u.uid || u.id)).map(u => (
+                <option key={u.uid || u.id} value={u.uid || u.id}>{u.nome}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="space-y-2">
             <label className="text-xs text-content-muted block">Produtos (em pacotes de 15)</label>
             {itensCiclo.map((item, i) => {
@@ -366,7 +439,7 @@ export default function CiclosPage() {
                   <div className="text-left">
                     <span className="text-sm font-medium">{v.nome}</span>
                     <p className="text-xs text-content-muted">
-                      {v.ativo ? 'Ciclo ativo' : 'Sem ciclo ativo'} · {v.fechados.length} fechado{v.fechados.length !== 1 ? 's' : ''}
+                      {v.ativo ? 'Ciclo ativo' : 'Sem ciclo ativo'} · {v.fechados.length} fechado{v.fechados.length !== 1 ? 's' : ''} · <span className="text-green-400">{formatCurrency(v.totalVendido)}</span>
                     </p>
                   </div>
                 </div>
@@ -374,150 +447,65 @@ export default function CiclosPage() {
               </button>
 
               {expandedVendedor === v.uid && (
-                <div className="border-t border-border-subtle p-3 space-y-3">
+                <div className="border-t border-border-subtle p-3 space-y-1.5">
                   {/* Ciclo ativo */}
-                  {v.ativo && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-green-400">Ciclo ativo</span>
-                        <div className="flex items-center gap-2">
-                          {editCicloId !== v.ativo.id && (
-                            <button onClick={() => startEdit(v.ativo!)} className="text-blue-400 hover:text-blue-300 transition-colors" title="Editar ciclo">
-                              <Pencil size={13} />
-                            </button>
-                          )}
-                          <span className="text-[10px] text-content-muted">Desde {new Date(v.ativo.createdAt).toLocaleDateString('pt-BR')}</span>
+                  {v.ativo && (() => {
+                    const ca = v.ativo!;
+                    const ids = new Set([ca.vendedorId, ...(ca.participantes || []).map(p => p.id)]);
+                    const cv = vendas.filter(vv => {
+                      if ((vv as any).deletedAt) return false;
+                      if ((vv as any).cicloId === ca.id) return true;
+                      if (!ids.has(vv.vendedorId)) return false;
+                      const d = new Date(vv.data).toISOString().slice(0, 10);
+                      if (ca.dataInicio && d < ca.dataInicio) return false;
+                      if (ca.dataFim && d > ca.dataFim) return false;
+                      return true;
+                    });
+                    const cvTotal = cv.reduce((s, vv) => s + vv.valorTotal, 0);
+                    const cvPecas = cv.reduce((s, vv) => s + vv.produtos.reduce((ss, p) => ss + ((p as any).tipo === 'unidade' ? p.quantidade : p.quantidade * PECAS_POR_PACOTE), 0), 0);
+                    return (
+                    <button onClick={() => { setModalCiclo(ca); setFecharClicks(0); setDeleteClicks(0); }}
+                      className="w-full rounded-lg bg-green-500/5 border border-green-500/20 p-2 text-left hover:bg-green-500/10 transition-colors">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                          <span className="text-green-400 font-medium">Ativo</span>
+                          <span className="text-content-muted">{ca.dataInicio ? new Date(ca.dataInicio + 'T00:00:00').toLocaleDateString('pt-BR') : new Date(ca.createdAt).toLocaleDateString('pt-BR')} — em aberto</span>
                         </div>
+                        <span className="text-green-400 font-medium">{formatCurrency(cvTotal)} · {Math.floor(cvPecas / PECAS_POR_PACOTE)}/{totalPacotesInicial(ca)} pct</span>
                       </div>
-
-                      {editCicloId === v.ativo.id ? (
-                        <div className="rounded-lg border border-blue-500/30 bg-elevated p-3 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-blue-400">Editando ciclo</span>
-                            <button onClick={cancelEdit} className="text-content-muted hover:text-content"><X size={14} /></button>
-                          </div>
-                          {editItens.map((item, i) => {
-                            const prod = produtos.find(p => p.id === item.produtoId);
-                            const cicloP = v.ativo!.produtos.find(p => p.produtoId === item.produtoId);
-                            const vendidas = cicloP ? cicloP.pecasInicial - cicloP.pecasAtual : 0;
-                            const minPacotes = Math.ceil(vendidas / PECAS_POR_PACOTE);
-                            const estoqueGeral = prod ? prod.estoque : 0;
-                            const pecasOriginais = cicloP ? cicloP.pecasInicial : 0;
-                            const maxPecas = estoqueGeral + pecasOriginais;
-                            const maxPacotes = Math.floor(maxPecas / PECAS_POR_PACOTE);
-                            const jaUsados = editItens.filter((it, j) => j !== i && it.produtoId).map(it => it.produtoId);
-                            const produtosDisp = produtos.filter(p => p.estoque >= 15 || p.id === item.produtoId).filter(p => !jaUsados.includes(p.id));
-                            return (
-                              <div key={i} className="rounded-lg border border-border-subtle bg-surface p-2.5 space-y-2">
-                                <div className="flex items-center gap-2">
-                                  <select value={item.produtoId} onChange={e => editUpdateItem(i, 'produtoId', e.target.value)}
-                                    className={`${input} flex-1 text-xs !py-2`}>
-                                    <option value="">Produto...</option>
-                                    {produtosDisp.map(p => (
-                                      <option key={p.id} value={p.id}>{p.modelo} ({p.referencia})</option>
-                                    ))}
-                                  </select>
-                                  {editItens.length > 1 && (
-                                    <button onClick={() => editRemoveItem(i)} className="text-red-500/40 hover:text-red-500"><X size={14} /></button>
-                                  )}
-                                </div>
-                                {item.produtoId && (
-                                  <div className="flex items-center gap-3">
-                                    <div className="flex items-center gap-0">
-                                      <button type="button" onClick={() => editUpdateItem(i, 'pacotes', Math.max(minPacotes || 1, item.pacotes - 1))}
-                                        className="rounded-l-lg border border-border-subtle bg-elevated px-2 py-1.5 text-content-secondary hover:bg-border-medium transition-colors"><Minus size={12} /></button>
-                                      <span className="border-y border-border-subtle bg-elevated px-3 py-1.5 text-xs font-semibold min-w-[2.5rem] text-center">{item.pacotes}</span>
-                                      <button type="button" onClick={() => editUpdateItem(i, 'pacotes', Math.min(maxPacotes, item.pacotes + 1))}
-                                        className="rounded-r-lg border border-border-subtle bg-elevated px-2 py-1.5 text-content-secondary hover:bg-border-medium transition-colors"><Plus size={12} /></button>
-                                    </div>
-                                    <span className="text-[10px] text-content-muted">pct · {item.pacotes * 15} pçs</span>
-                                    {vendidas > 0 && <span className="text-[10px] text-yellow-400">mín {minPacotes} pct ({vendidas} vendidas)</span>}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                          <button onClick={editAddItem} className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300">
-                            <Plus size={14} /> Adicionar produto
-                          </button>
-                          {editErro && <p className="text-xs text-red-400">{editErro}</p>}
-                          <div className="grid grid-cols-2 gap-2">
-                            <button onClick={cancelEdit} className="rounded-lg border border-border-subtle bg-elevated py-2 text-xs font-medium text-content-secondary hover:bg-border-medium transition">Cancelar</button>
-                            <button onClick={handleEditar} disabled={editSaving || editItens.every(i => !i.produtoId)}
-                              className="rounded-lg bg-blue-600 py-2 text-xs font-medium text-white hover:bg-blue-500 transition disabled:opacity-30">
-                              {editSaving ? 'Salvando...' : 'Salvar alterações'}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="grid grid-cols-2 gap-2 text-center">
-                        <div className="rounded-lg bg-elevated p-2">
-                          <p className="text-xs text-content-muted">Vendido</p>
-                          <p className="text-sm font-bold text-green-400">{totalVendidoPacotes(v.ativo)}/{totalPacotesInicial(v.ativo)} pct</p>
-                          <p className="text-[10px] text-content-muted">{totalVendidoPecas(v.ativo)} pçs</p>
-                        </div>
-                        <div className="rounded-lg bg-elevated p-2">
-                          <p className="text-xs text-content-muted">Valor vendido</p>
-                          <p className="text-sm font-bold text-green-400">{formatCurrency(totalVendidoValor(v.ativo))}</p>
-                        </div>
-                      </div>
-                      <div className="overflow-x-auto rounded-lg border border-border-subtle">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="border-b border-border-subtle bg-elevated text-left text-content-muted">
-                              <th className="px-2 py-1.5">Modelo</th>
-                              <th className="px-2 py-1.5 text-center">Vendido</th>
-                              <th className="px-2 py-1.5 text-right">Valor</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {v.ativo.produtos.map((p, i) => {
-                              const vendidoPecas = p.pecasInicial - p.pecasAtual;
-                              const vendidoPct = Math.floor(vendidoPecas / PECAS_POR_PACOTE);
-                              const avulsos = vendidoPecas % PECAS_POR_PACOTE;
-                              return (
-                                <tr key={i} className="border-b border-border-subtle last:border-0">
-                                  <td className="px-2 py-1.5 font-medium">{p.modelo}</td>
-                                  <td className="px-2 py-1.5 text-center text-green-400">{vendidoPct}/{p.pacotesInicial} pct{avulsos > 0 ? <span className="text-content-muted"> +{avulsos}</span> : ''}</td>
-                                  <td className="px-2 py-1.5 text-right text-green-400">{formatCurrency(vendidoPecas * p.valorUnitario)}</td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                      <button
-                        onClick={() => handleFechar(v.ativo!.id)}
-                        disabled={fecharLoading}
-                        className={`w-full rounded-lg py-2 text-xs font-medium transition-colors disabled:opacity-40 ${
-                          fecharClicks === 0 ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
-                          : fecharClicks === 1 ? 'bg-red-500/20 text-red-400'
-                          : 'bg-red-600/30 text-red-300'
-                        }`}
-                      >
-                        {fecharLabel}
-                      </button>
-                        </>
-                      )}
-                    </div>
-                  )}
+                    </button>
+                    );
+                  })()}
 
                   {/* Ciclos fechados */}
-                  {v.fechados.length > 0 && (
-                    <div className="space-y-1.5">
-                      <span className="text-xs text-content-muted">Fechados</span>
-                      {v.fechados.map(c => (
-                        <button key={c.id} onClick={() => { setModalCiclo(c); setFecharClicks(0); setDeleteClicks(0); }}
-                          className="w-full rounded-lg bg-elevated p-2 text-left hover:bg-border-medium transition-colors">
-                          <div className="flex items-center justify-between text-xs">
-                            <span>{new Date(c.createdAt).toLocaleDateString('pt-BR')} — {c.closedAt ? new Date(c.closedAt).toLocaleDateString('pt-BR') : ''}</span>
-                            <span className="text-green-400 font-medium">{formatCurrency(totalVendidoValor(c))} · {totalVendidoPacotes(c)}/{totalPacotesInicial(c)} pct</span>
+                  {v.fechados.map(c => {
+                    const cv = vendas.filter(vv => {
+                      if ((vv as any).deletedAt) return false;
+                      if ((vv as any).cicloId === c.id) return true;
+                      const ids = new Set([c.vendedorId, ...(c.participantes || []).map(p => p.id)]);
+                      if (!ids.has(vv.vendedorId)) return false;
+                      const d = new Date(vv.data).toISOString().slice(0, 10);
+                      if (c.dataInicio && d < c.dataInicio) return false;
+                      if (c.dataFim && d > c.dataFim) return false;
+                      return true;
+                    });
+                    const cvTotal = cv.reduce((s, vv) => s + vv.valorTotal, 0);
+                    const cvPecas = cv.reduce((s, vv) => s + vv.produtos.reduce((ss, p) => ss + ((p as any).tipo === 'unidade' ? p.quantidade : p.quantidade * PECAS_POR_PACOTE), 0), 0);
+                    return (
+                      <button key={c.id} onClick={() => { setModalCiclo(c); setFecharClicks(0); setDeleteClicks(0); }}
+                        className="w-full rounded-lg bg-elevated p-2 text-left hover:bg-border-medium transition-colors">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <Lock size={10} className="text-content-muted" />
+                            <span className="text-content-muted">Fechado</span>
+                            <span>{c.dataInicio ? new Date(c.dataInicio + 'T00:00:00').toLocaleDateString('pt-BR') : new Date(c.createdAt).toLocaleDateString('pt-BR')} — {c.dataFim ? new Date(c.dataFim + 'T00:00:00').toLocaleDateString('pt-BR') : c.closedAt ? new Date(c.closedAt).toLocaleDateString('pt-BR') : ''}</span>
                           </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                          <span className="text-green-400 font-medium">{formatCurrency(cvTotal)} · {Math.floor(cvPecas / PECAS_POR_PACOTE)}/{totalPacotesInicial(c)} pct</span>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -527,43 +515,60 @@ export default function CiclosPage() {
 
       {/* Modal ciclo fechado */}
       {modalCiclo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setModalCiclo(null)}>
+        <div className="fixed inset-0 lg:left-64 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setModalCiclo(null)}>
           <div className="w-full max-w-2xl rounded-xl border border-border-subtle bg-surface p-5 space-y-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">Ciclo — {modalCiclo.vendedorNome}</h3>
+              <div>
+                <h3 className="text-sm font-semibold">Ciclo — {modalCiclo.vendedorNome}</h3>
+                {modalCiclo.participantes && modalCiclo.participantes.length > 0 && (
+                  <p className="text-[10px] text-content-muted">+ {modalCiclo.participantes.map(p => p.nome).join(', ')}</p>
+                )}
+              </div>
               <button onClick={() => setModalCiclo(null)} className="text-content-muted hover:text-content"><X size={18} /></button>
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><span className="text-xs text-content-muted block">Período</span>{new Date(modalCiclo.createdAt).toLocaleDateString('pt-BR')} — {modalCiclo.closedAt ? new Date(modalCiclo.closedAt).toLocaleDateString('pt-BR') : ''}</div>
-              <div><span className="text-xs text-content-muted block">Valor vendido</span><span className="text-green-400 font-semibold">{formatCurrency(totalVendidoValor(modalCiclo))}</span></div>
-              <div><span className="text-xs text-content-muted block">Vendido</span>{totalVendidoPacotes(modalCiclo)}/{totalPacotesInicial(modalCiclo)} pct ({totalVendidoPecas(modalCiclo)} pçs)</div>
-              <div><span className="text-xs text-content-muted block">Devolvido</span>{totalPecas(modalCiclo)} pçs</div>
+              <div><span className="text-xs text-content-muted block">Período</span>{modalCiclo.dataInicio ? new Date(modalCiclo.dataInicio + 'T00:00:00').toLocaleDateString('pt-BR') : new Date(modalCiclo.createdAt).toLocaleDateString('pt-BR')} — {modalCiclo.dataFim ? new Date(modalCiclo.dataFim + 'T00:00:00').toLocaleDateString('pt-BR') : modalCiclo.closedAt ? new Date(modalCiclo.closedAt).toLocaleDateString('pt-BR') : 'em aberto'}</div>
+              <div><span className="text-xs text-content-muted block">Status</span><span className={modalCiclo.status === 'ativo' ? 'text-green-400' : 'text-content-muted'}>{modalCiclo.status === 'ativo' ? 'Ativo' : 'Fechado'}</span></div>
             </div>
-            <div className="overflow-x-auto rounded-lg border border-border-subtle">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-border-subtle bg-elevated text-left text-content-muted">
-                    <th className="px-3 py-2">Modelo</th>
-                    <th className="px-3 py-2 text-center">Vendido</th>
-                    <th className="px-3 py-2 text-right">Valor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {modalCiclo.produtos.map((p, i) => {
-                    const vendidoPecas = p.pecasInicial - p.pecasAtual;
-                    const vendidoPct = Math.floor(vendidoPecas / PECAS_POR_PACOTE);
-                    const avulsos = vendidoPecas % PECAS_POR_PACOTE;
-                    return (
-                      <tr key={i} className="border-b border-border-subtle last:border-0">
-                        <td className="px-3 py-2 font-medium">{p.modelo}</td>
-                        <td className="px-3 py-2 text-center text-green-400">{vendidoPct}/{p.pacotesInicial} pct{avulsos > 0 ? <span className="text-content-muted"> +{avulsos}</span> : ''}</td>
-                        <td className="px-3 py-2 text-right text-green-400">{formatCurrency(vendidoPecas * p.valorUnitario)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+
+            {/* Dashboard do ciclo */}
+            <CicloDashboard ciclo={modalCiclo} vendas={vendas} despesas={despesas} depositos={depositos} valeCards={valeCards} />
+
+            {/* Editar ciclo */}
+            {userIsAdmin(user) && (
+              <button onClick={() => {
+                setEditMetaOpen(true);
+                setMetaDataInicio(modalCiclo.dataInicio || modalCiclo.createdAt?.slice(0, 10) || '');
+                setMetaDataFim(modalCiclo.dataFim || '');
+                setMetaParticipantes((modalCiclo.participantes || []).map(p => p.id));
+              }}
+                className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 px-3 py-2 text-xs font-medium transition-colors">
+                <Pencil size={13} /> Editar ciclo
+              </button>
+            )}
+
+            {/* Fechar ciclo ativo */}
+            {userIsAdmin(user) && modalCiclo.status === 'ativo' && (
+              <button
+                onClick={() => handleFechar(modalCiclo.id)}
+                disabled={fecharLoading}
+                className={`w-full rounded-lg py-2.5 text-xs font-medium transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5 ${
+                  fecharClicks === 0 ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
+                  : fecharClicks === 1 ? 'bg-red-500/20 text-red-400'
+                  : 'bg-red-600/30 text-red-300'
+                }`}>
+                <Lock size={13} /> {fecharLabel}
+              </button>
+            )}
+
+            {/* Reabrir ciclo fechado */}
+            {userIsAdmin(user) && modalCiclo.status === 'fechado' && (
+              <button onClick={async () => { await reabrirCiclo(modalCiclo.id); setModalCiclo(null); }}
+                className="w-full rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 py-2.5 text-xs font-medium transition-colors flex items-center justify-center gap-1.5">
+                <Unlock size={13} /> Reabrir ciclo
+              </button>
+            )}
+
             {userIsAdmin(user) && (
               <button
                 onClick={() => handleDelete(modalCiclo.id)}
@@ -577,6 +582,70 @@ export default function CiclosPage() {
                 <Trash2 size={13} /> {deleteLabel}
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal editar ciclo meta */}
+      {editMetaOpen && modalCiclo && (
+        <div className="fixed inset-0 lg:left-64 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => setEditMetaOpen(false)}>
+          <div className="w-full max-w-md rounded-xl border border-border-subtle bg-surface p-5 space-y-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold">Editar Ciclo — {modalCiclo.vendedorNome}</span>
+              <button onClick={() => setEditMetaOpen(false)} className="text-content-muted hover:text-content"><X size={18} /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-content-muted mb-1 block">Data início</label>
+                <input type="date" value={metaDataInicio} onChange={e => setMetaDataInicio(e.target.value)} className={input} />
+                <p className="text-[9px] text-content-muted mt-0.5">Vazio = data de criação</p>
+              </div>
+              <div>
+                <label className="text-xs text-content-muted mb-1 block">Data fim</label>
+                <input type="date" value={metaDataFim} onChange={e => setMetaDataFim(e.target.value)} className={input} />
+                <p className="text-[9px] text-content-muted mt-0.5">Vazio = até agora. Se passado, fecha o ciclo.</p>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-content-muted mb-1 block">Participantes</label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className="text-xs bg-blue-500/10 text-blue-400 px-2 py-1 rounded-lg">{modalCiclo.vendedorNome} (principal)</span>
+                {metaParticipantes.map(pid => {
+                  const u = allUsers.find(x => (x.uid || x.id) === pid);
+                  return (
+                    <span key={pid} className="inline-flex items-center gap-1 bg-elevated text-content-secondary text-xs px-2 py-1 rounded-lg">
+                      {u?.nome || pid}
+                      <button type="button" onClick={() => setMetaParticipantes(prev => prev.filter(x => x !== pid))} className="hover:text-red-400"><X size={12} /></button>
+                    </span>
+                  );
+                })}
+              </div>
+              <select value="" onChange={e => { if (e.target.value && !metaParticipantes.includes(e.target.value)) setMetaParticipantes([...metaParticipantes, e.target.value]); }} className={input}>
+                <option value="">Adicionar pessoa...</option>
+                {allUsers.filter(u => !u.deletedAt && (u.uid || u.id) !== modalCiclo.vendedorId && !metaParticipantes.includes(u.uid || u.id)).map(u => (
+                  <option key={u.uid || u.id} value={u.uid || u.id}>{u.nome}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => setEditMetaOpen(false)}
+                className="rounded-lg border border-border-subtle bg-elevated py-2.5 text-xs font-medium text-content-secondary hover:bg-border-medium transition">Cancelar</button>
+              <button disabled={metaSaving} onClick={async () => {
+                setMetaSaving(true);
+                try {
+                  await updateCicloMeta(modalCiclo.id, {
+                    dataInicio: metaDataInicio || undefined,
+                    dataFim: metaDataFim || undefined,
+                    participantes: metaParticipantes.map(pid => { const u = allUsers.find(x => (x.uid || x.id) === pid); return { id: pid, nome: u?.nome || '' }; }),
+                  });
+                  setEditMetaOpen(false);
+                  setModalCiclo(null);
+                } finally { setMetaSaving(false); }
+              }}
+                className="rounded-lg bg-blue-600 py-2.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-30 transition">
+                {metaSaving ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
           </div>
         </div>
       )}
