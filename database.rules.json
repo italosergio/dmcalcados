@@ -70,6 +70,16 @@
       "anonimo": {
         ".write": true
       }
+    },
+    "vales": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["funcionarioId", "data"]
+    },
+    "depositos": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["vendedorId", "data", "deletedAt"]
     }
   }
 }
