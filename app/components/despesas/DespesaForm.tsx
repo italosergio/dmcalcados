@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { Plus, X, Pencil, Trash2, Check, ImagePlus, Fuel, UtensilsCrossed, BedDouble, Wrench, HelpCircle, Zap, Droplets, Wifi, Truck, Home, ShoppingCart, Heart, Briefcase, Star, Tag, ImageOff, type LucideIcon } from 'lucide-react';
 import { createDespesa, getTiposDespesa, addTipoDespesa, updateTipoDespesa, deleteTipoDespesa } from '~/services/despesas.service';
@@ -8,6 +8,7 @@ import { useAuth } from '~/contexts/AuthContext';
 import { useCachedState, clearFormCache } from '~/hooks/useFormCache';
 import type { User } from '~/models';
 import { userIsVendedor, userIsAdmin } from '~/models';
+import { findCicloParaUsuario } from '~/services/ciclos.service';
 
 const input = "w-full rounded-lg border border-border-subtle bg-elevated px-3 py-2.5 text-sm text-content focus:outline-none focus:border-border-medium focus:ring-1 focus:ring-blue-500/30 transition-colors";
 
@@ -45,7 +46,7 @@ function getImagensObrigatorias(tipo: string): number {
 
 type TipoItem = { key: string | null; nome: string; icone?: string };
 
-export function DespesaForm() {
+export function DespesaForm({ onClose }: { onClose?: () => void } = {}) {
   const FK = 'despesa';
   const [tipos, setTipos] = useState<TipoItem[]>([]);
   const [tipoSelecionado, setTipoSelecionado] = useCachedState(FK, 'tipo', '');
@@ -70,6 +71,10 @@ export function DespesaForm() {
   const [descricao, setDescricao] = useState('');
   const [rateioAtivo, setRateioAtivo] = useState(false);
   const [rateioIds, setRateioIds] = useState<string[]>([]);
+  const [fontePagamento, setFontePagamento] = useCachedState<'caixa_interno' | 'caixa_externo' | 'misto'>(FK, 'fontePagamento', 'caixa_interno');
+  const [valorInterno, setValorInterno] = useCachedState(FK, 'valorInterno', '');
+  const [valorExterno, setValorExterno] = useCachedState(FK, 'valorExterno', '');
+  const [ciclosAbertos, setCiclosAbertos] = useState<any[]>([]);
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'desenvolvedor';
@@ -80,8 +85,16 @@ export function DespesaForm() {
   const imagensObrigatorias = getImagensObrigatorias(tipoFinal);
   const imagensOk = semImagem || imagens.length >= imagensObrigatorias;
 
+  // Auto-detectar ciclo para o usuário atual
+  const cicloDetectado = useMemo(() => {
+    if (ciclosAbertos.length === 0 || !user) return null;
+    const uid = vendedorId || user.uid || user.id;
+    return findCicloParaUsuario(ciclosAbertos, uid, data);
+  }, [ciclosAbertos, user, vendedorId, data]);
+
   useEffect(() => {
     getUsers().then(u => setVendedores(u.filter(x => userIsVendedor(x) && (x.uid || x.id) !== (user?.uid || user?.id))));
+    import('~/services/ciclos.service').then(m => m.getCiclosAbertos()).then(setCiclosAbertos);
   }, [user]);
 
   useEffect(() => {
@@ -163,20 +176,35 @@ export function DespesaForm() {
             return { usuarioId: uid, usuarioNome: u?.nome || uid, valor: parseFloat((valorTotal / (rateioIds.length + 1)).toFixed(2)) };
           })
         : undefined;
+      const usuarioId = alvo ? (alvo.uid || alvo.id) : (user.uid || user.id);
+      // Auto-detectar ciclo
+      const { findCicloParaUsuario } = await import('~/services/ciclos.service');
+      const cicloMatch = findCicloParaUsuario(ciclosAbertos, usuarioId, data);
+      // Também checar participantes do rateio
+      let cicloId = cicloMatch?.id;
+      if (!cicloId && rateio) {
+        for (const r of rateio) {
+          const cm = findCicloParaUsuario(ciclosAbertos, r.usuarioId, data);
+          if (cm) { cicloId = cm.id; break; }
+        }
+      }
       await createDespesa({
         tipo: tipoFinal,
         valor: valorTotal,
         data: new Date(data + 'T12:00:00'),
-        usuarioId: alvo ? (alvo.uid || alvo.id) : (user.uid || user.id),
+        usuarioId,
         usuarioNome: alvo ? alvo.nome : user.nome,
         descricao: descricao.trim() || undefined,
         imagemUrl: imagensUrls[0],
         imagensUrls: imagensUrls.length > 0 ? imagensUrls : undefined,
         semImagemJustificativa: semImagem ? semImagemJustificativa.trim() : undefined,
         rateio,
+        fontePagamento,
+        ...(fontePagamento === 'misto' ? { valorInterno: parseFloat(valorInterno) || 0, valorExterno: parseFloat(valorExterno) || 0 } : {}),
+        ...(cicloId ? { cicloId } : {}),
       });
       clearFormCache(FK);
-      navigate('/despesas');
+      if (onClose) onClose(); else navigate('/despesas');
     } catch (error) {
       setErro(error instanceof Error ? error.message : 'Erro ao cadastrar despesa');
     } finally { setLoading(false); }
@@ -298,6 +326,33 @@ export function DespesaForm() {
         <input value={descricao} onChange={(e) => setDescricao(e.target.value)} className={input} placeholder="Ex: almoço na estrada, abastecimento km 320..." />
       </div>
 
+      {/* Fonte de pagamento */}
+      <div>
+        <label className="text-xs text-content-muted mb-1.5 block">Pago com{cicloDetectado ? <span className="text-blue-400 ml-1">(ciclo: {cicloDetectado.vendedorNome})</span> : ''}</label>
+        <div className="flex gap-2">
+          {([['caixa_interno', 'Caixa interno'], ['caixa_externo', 'Caixa externo'], ['misto', 'Misto']] as const).map(([v, l]) => (
+            <button key={v} type="button" onClick={() => setFontePagamento(v)}
+              className={`flex-1 rounded-lg py-2 text-xs font-medium transition ${fontePagamento === v ? 'bg-blue-600 text-white' : 'bg-elevated text-content-secondary hover:bg-border-medium'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+        {fontePagamento === 'misto' && (
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            <div>
+              <label className="text-[9px] text-content-muted">Caixa interno</label>
+              <input type="number" step="0.01" min="0" value={valorInterno} className={input} placeholder="0,00"
+                onChange={e => { setValorInterno(e.target.value); setValorExterno(String(Math.max(0, (parseFloat(valor) || 0) - (parseFloat(e.target.value) || 0)).toFixed(2))); }} />
+            </div>
+            <div>
+              <label className="text-[9px] text-content-muted">Caixa externo</label>
+              <input type="number" step="0.01" min="0" value={valorExterno} className={input} placeholder="0,00"
+                onChange={e => { setValorExterno(e.target.value); setValorInterno(String(Math.max(0, (parseFloat(valor) || 0) - (parseFloat(e.target.value) || 0)).toFixed(2))); }} />
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Rateio */}
       {vendedores.length > 0 && (
         <div>
@@ -373,7 +428,7 @@ export function DespesaForm() {
       {erro && <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">{erro}</div>}
 
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={() => navigate('/despesas')}
+        <button type="button" onClick={() => onClose ? onClose() : navigate('/despesas')}
           className="rounded-lg border border-border-subtle bg-elevated py-2.5 text-sm font-medium text-content-secondary transition hover:bg-border-medium">
           Cancelar
         </button>
