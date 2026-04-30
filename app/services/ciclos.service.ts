@@ -45,10 +45,33 @@ export async function getCicloAtivo(vendedorId: string): Promise<Ciclo | null> {
   return all.find(c => c.status === 'ativo') || null;
 }
 
+export async function getCiclosAbertos(): Promise<Ciclo[]> {
+  const all = await getCiclos();
+  return all.filter(c => c.status === 'ativo');
+}
+
+export function findCicloParaUsuario(ciclos: Ciclo[], userId: string, data?: string): Ciclo | null {
+  const dataRef = data ? data.slice(0, 10) : new Date().toISOString().slice(0, 10);
+  return ciclos.find(c => {
+    if (c.status !== 'ativo') return false;
+    // Checar se o usuário é o vendedor principal ou participante
+    const isParticipante = c.vendedorId === userId ||
+      (c.participantes || []).some(p => p.id === userId);
+    if (!isParticipante) return false;
+    // Checar período
+    if (c.dataInicio && dataRef < c.dataInicio) return false;
+    if (c.dataFim && dataRef > c.dataFim) return false;
+    return true;
+  }) || null;
+}
+
 export async function createCiclo(
   vendedorId: string,
   vendedorNome: string,
-  produtos: { produtoId: string; modelo: string; referencia: string; pacotes: number; valorUnitario: number }[]
+  produtos: { produtoId: string; modelo: string; referencia: string; pacotes: number; valorUnitario: number }[],
+  dataInicio?: string,
+  dataFim?: string,
+  participantes?: { id: string; nome: string }[],
 ): Promise<string> {
   const user = auth.currentUser;
   if (!user) throw new Error('Usuário não autenticado');
@@ -88,6 +111,9 @@ export async function createCiclo(
     vendedorNome,
     produtos: cicloProds,
     status: 'ativo',
+    ...(dataInicio ? { dataInicio } : { dataInicio: new Date().toISOString().slice(0, 10) }),
+    ...(dataFim ? { dataFim } : {}),
+    ...(participantes && participantes.length > 0 ? { participantes } : {}),
     criadoPorId: user.uid,
     criadoPorNome,
     createdAt: new Date().toISOString(),
@@ -129,6 +155,55 @@ export async function fecharCiclo(cicloId: string): Promise<void> {
     fechadoPorNome,
     closedAt: new Date().toISOString(),
   });
+}
+
+export async function reabrirCiclo(cicloId: string): Promise<void> {
+  const snap = await get(ref(db, `ciclos/${cicloId}`));
+  if (!snap.exists()) throw new Error('Ciclo não encontrado');
+  const cicloData = snap.val();
+  if (cicloData.status !== 'fechado') throw new Error('Ciclo não está fechado');
+  const produtos = normalizeProdutos(cicloData.produtos);
+
+  // Descontar peças restantes do estoque geral novamente
+  for (const p of produtos) {
+    if (p.pecasAtual > 0) {
+      const estoqueSnap = await get(ref(db, `produtos/${p.produtoId}/estoque`));
+      const atual = estoqueSnap.val() || 0;
+      await update(ref(db, `produtos/${p.produtoId}`), {
+        estoque: atual - p.pecasAtual,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  await update(ref(db, `ciclos/${cicloId}`), {
+    status: 'ativo',
+    fechadoPorId: null,
+    fechadoPorNome: null,
+    closedAt: null,
+  });
+}
+
+export async function updateCicloDatas(cicloId: string, dataInicio?: string, dataFim?: string): Promise<void> {
+  const updates: any = {};
+  if (dataInicio !== undefined) updates.dataInicio = dataInicio || null;
+  if (dataFim !== undefined) updates.dataFim = dataFim || null;
+  await update(ref(db, `ciclos/${cicloId}`), updates);
+}
+
+export async function updateCicloMeta(cicloId: string, meta: { dataInicio?: string; dataFim?: string; participantes?: { id: string; nome: string }[] }): Promise<void> {
+  const updates: any = {};
+  if (meta.dataInicio !== undefined) updates.dataInicio = meta.dataInicio || null;
+  if (meta.dataFim !== undefined) updates.dataFim = meta.dataFim || null;
+  if (meta.participantes !== undefined) updates.participantes = meta.participantes.length > 0 ? meta.participantes : null;
+  // Auto-fechar se dataFim definida e no passado
+  if (meta.dataFim && meta.dataFim < new Date().toISOString().slice(0, 10)) {
+    const snap = await get(ref(db, `ciclos/${cicloId}/status`));
+    if (snap.val() === 'ativo') {
+      await fecharCiclo(cicloId);
+    }
+  }
+  await update(ref(db, `ciclos/${cicloId}`), updates);
 }
 
 /** Edita ciclo ativo: adiciona/remove produtos e ajusta pacotes */

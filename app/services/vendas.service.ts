@@ -75,6 +75,16 @@ export async function deleteVenda(vendaId: string): Promise<void> {
   });
 }
 
+export async function updateVendaData(vendaId: string, novaData: Date): Promise<void> {
+  await update(ref(db, `vendas/${vendaId}`), { data: novaData.toISOString() });
+}
+
+export async function updateVenda(vendaId: string, data: Partial<Omit<Venda, 'id' | 'createdAt'>>): Promise<void> {
+  const payload: any = { ...data };
+  if (payload.data instanceof Date) payload.data = payload.data.toISOString();
+  await update(ref(db, `vendas/${vendaId}`), payload);
+}
+
 export async function restoreVenda(vendaId: string): Promise<void> {
   const snap = await get(ref(db, `vendas/${vendaId}`));
   const venda = snap.val();

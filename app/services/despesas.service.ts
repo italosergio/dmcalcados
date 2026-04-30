@@ -53,6 +53,12 @@ export async function restoreDespesa(despesaId: string): Promise<void> {
   });
 }
 
+export async function updateDespesa(despesaId: string, data: any): Promise<void> {
+  const payload = { ...data };
+  if (payload.data instanceof Date) payload.data = payload.data.toISOString();
+  await update(ref(db, `despesas/${despesaId}`), payload);
+}
+
 export async function getTiposDespesa(): Promise<{ key: string; nome: string; icone?: string }[]> {
   const snapshot = await get(ref(db, 'despesas-tipos'));
   if (!snapshot.exists()) return [];
@@ -99,6 +105,10 @@ export async function createDespesa(data: Omit<Despesa, 'id' | 'createdAt'>): Pr
     if (data.semImagemJustificativa) despesaData.semImagemJustificativa = data.semImagemJustificativa;
     if (data.descricao) despesaData.descricao = data.descricao;
     if (data.rateio && data.rateio.length > 0) despesaData.rateio = data.rateio;
+    if ((data as any).fontePagamento) despesaData.fontePagamento = (data as any).fontePagamento;
+    if ((data as any).cicloId) despesaData.cicloId = (data as any).cicloId;
+    if ((data as any).valorInterno != null) despesaData.valorInterno = (data as any).valorInterno;
+    if ((data as any).valorExterno != null) despesaData.valorExterno = (data as any).valorExterno;
 
     const newRef = push(ref(db, 'despesas'));
     await set(newRef, despesaData);
