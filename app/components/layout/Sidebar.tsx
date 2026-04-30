@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router';
-import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, History, LogOut, X, UserCircle, Home, Package, RefreshCw, Plus, ArrowRightLeft, Loader2, Activity, CreditCard, Navigation, PanelLeftClose, PanelLeftOpen, Banknote, Landmark } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, History, LogOut, X, UserCircle, Home, Package, RefreshCw, Plus, ArrowRightLeft, Loader2, Activity, CreditCard, Navigation, PanelLeftClose, PanelLeftOpen, Banknote, Landmark, Tag } from 'lucide-react';
+import { APP_VERSION, ChangelogModal } from './ChangelogModal';
 import { logout } from '~/services/auth.service';
 import { useNavigate } from 'react-router';
 import { useAuth } from '~/contexts/AuthContext';
@@ -34,6 +35,7 @@ export function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }: Sideba
   const location = useLocation();
   const { user, switching, switchAccount } = useAuth();
   const [showAccounts, setShowAccounts] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
   const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
 
   useEffect(() => { onClose(); setShowAccounts(false); }, [location.pathname]);
@@ -256,8 +258,22 @@ export function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }: Sideba
               <Plus size={sz.icon} /> <span>Adicionar conta</span>
             </button>
           )}
+          {!collapsed && (
+            <button onClick={() => setShowChangelog(true)}
+              className={`w-full flex items-center gap-3 rounded-lg px-3 ${sz.py} text-[10px] text-content-muted hover:text-blue-400 transition-colors`}>
+              <Tag size={12} /> <span className="font-mono">{APP_VERSION}</span>
+            </button>
+          )}
+          {collapsed && (
+            <button onClick={() => setShowChangelog(true)}
+              className="w-full flex justify-center py-1 text-[9px] font-mono text-content-muted hover:text-blue-400 transition-colors lg:block hidden"
+              title={APP_VERSION}>
+              <Tag size={10} />
+            </button>
+          )}
         </div>
       </aside>
+      {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
     </>
   );
 }
