@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ref, onValue } from 'firebase/database';
 import { db, auth } from '~/services/firebase';
-import type { Venda, Despesa, Produto, Cliente, User } from '~/models';
+import type { Venda, Despesa, Produto, Cliente, User, ValeCard, Deposito } from '~/models';
 
 function useRealtimeRef<T>(path: string, transform: (data: Record<string, any>, uid: string) => T[], deps: any[] = []): { data: T[]; loading: boolean } {
   const [data, setData] = useState<T[]>([]);
@@ -165,4 +165,25 @@ export function useUsers() {
   });
 
   return { users: data, loading };
+}
+
+export function useVales() {
+  const { data, loading } = useRealtimeRef<ValeCard>('vales', (raw) => {
+    return Object.keys(raw).map(key => {
+      const v = raw[key];
+      const registros = v.registros || {};
+      const total = Object.values(registros).reduce((s: number, r: any) => s + (r.valor || 0), 0);
+      return { id: key, ...v, registros, total };
+    });
+  });
+  return { valeCards: data, loading };
+}
+
+export function useDepositos() {
+  const { data, loading } = useRealtimeRef<Deposito>('depositos', (raw) => {
+    return Object.keys(raw)
+      .map(key => ({ id: key, ...raw[key] }))
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  });
+  return { depositos: data, loading };
 }
