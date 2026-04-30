@@ -39,6 +39,10 @@ export function userCanAccessAdmin(user: User): boolean {
   return getUserRoles(user).some(r => r === 'admin' || r === 'superadmin' || r === 'financeiro' || r === 'desenvolvedor');
 }
 
+export function userCanEditVenda(user: User): boolean {
+  return getUserRoles(user).some(r => r === 'admin' || r === 'superadmin' || r === 'financeiro' || r === 'desenvolvedor');
+}
+
 export interface Produto {
   id: string;
   modelo: string;
@@ -80,6 +84,8 @@ export interface VendaProduto {
   valorTotal: number;
 }
 
+export type EntradaForma = 'pix' | 'dinheiro' | 'misto';
+
 export interface Venda {
   id: string;
   pedidoNumero: number;
@@ -95,13 +101,20 @@ export interface Venda {
   valorPrazo: number;
   parcelas: number;
   datasParcelas?: string[];
+  entradaForma?: EntradaForma;
+  valorPix?: number;
+  valorDinheiro?: number;
+  desconto?: number;
   descricao?: string;
   imagemUrl?: string;
   data: Date;
   createdAt: Date;
   deletedAt?: Date;
   deletedBy?: string;
+  cicloId?: string;
 }
+
+export type FontePagamento = 'caixa_interno' | 'caixa_externo' | 'misto';
 
 export interface Despesa {
   id: string;
@@ -115,6 +128,10 @@ export interface Despesa {
   imagensUrls?: string[];
   semImagemJustificativa?: string;
   rateio?: { usuarioId: string; usuarioNome: string; valor: number }[];
+  fontePagamento?: FontePagamento;
+  valorInterno?: number;
+  valorExterno?: number;
+  cicloId?: string;
   createdAt: Date;
   deletedAt?: Date;
   deletedBy?: string;
@@ -128,6 +145,24 @@ export interface EntradaProduto {
   quantidade: number;
   valorUnitario: number;
   createdAt: string;
+}
+
+export interface Deposito {
+  id: string;
+  valor: number;
+  data: string;
+  depositanteId: string;
+  depositanteNome: string;
+  imagemUrl?: string;
+  semFoto?: boolean;
+  justificativa?: string;
+  cicloId?: string;
+  registradoPorId: string;
+  registradoPorNome: string;
+  createdAt: string;
+  deletedAt?: string;
+  deletedBy?: string;
+  deletedByNome?: string;
 }
 
 export interface CicloProduto {
@@ -145,8 +180,11 @@ export interface Ciclo {
   id: string;
   vendedorId: string;
   vendedorNome: string;
+  participantes?: { id: string; nome: string }[];
   produtos: CicloProduto[];
   status: 'ativo' | 'fechado';
+  dataInicio?: string;
+  dataFim?: string;
   criadoPorId: string;
   criadoPorNome: string;
   fechadoPorId?: string;
@@ -157,3 +195,38 @@ export interface Ciclo {
   deletedBy?: string;
 }
 
+
+export interface ValeRegistro {
+  valor: number;
+  descricao?: string;
+  data: string;
+  fontePagamento?: 'caixa_interno' | 'caixa_externo';
+  createdAt: string;
+  registradoPor: string;
+  registradoPorNome: string;
+}
+
+export interface ValeCard {
+  id: string;
+  funcionarioId: string;
+  funcionarioNome: string;
+  registros: Record<string, ValeRegistro>;
+  total: number;
+  quitado: boolean;
+  quitadoEm?: string;
+  quitadoPor?: string;
+  quitadoPorNome?: string;
+  createdAt: string;
+}
+
+export interface Cobranca {
+  id?: string;
+  nome: string;
+  valor: number;
+  data: string;
+  descricao?: string;
+  forma: 'dinheiro' | 'pix';
+  registradoPor: string;
+  registradoPorNome: string;
+  createdAt: string;
+}
