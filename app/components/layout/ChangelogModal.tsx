@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, ChevronDown, ChevronRight, Tag } from 'lucide-react';
 
-export const APP_VERSION = 'v0.10.6';
+export const APP_VERSION = 'v0.10.7';
 
 interface VersionEntry {
   version: string;
@@ -9,6 +9,14 @@ interface VersionEntry {
 }
 
 const changelog: VersionEntry[] = [
+  {
+    version: 'v0.10.7',
+    items: [
+      'Versão exibida no footer da landing page com link para changelog',
+      'Logo da landing page reduzida para ocupar menos espaço',
+      'Regra de versionamento automático nos commits',
+    ],
+  },
   {
     version: 'v0.10.6',
     items: [

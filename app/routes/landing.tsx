@@ -3,6 +3,7 @@ import { useAuth } from '~/contexts/AuthContext';
 import { useNavigate } from 'react-router';
 import { useState, useRef, useEffect } from 'react';
 import { trackEvent } from '~/services/analytics.service';
+import { APP_VERSION, ChangelogModal } from '~/components/layout/ChangelogModal';
 
 function shortName(nome?: string) {
   if (!nome) return '';
@@ -23,6 +24,7 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const logoClicks = useRef(0);
+  const [showChangelog, setShowChangelog] = useState(false);
   const logoTimer = useRef<ReturnType<typeof setTimeout>>();
   const [logoShake, setLogoShake] = useState(false);
 
@@ -128,7 +130,7 @@ export default function LandingPage() {
           <img
             src="/logo-dmcalcados.png"
             alt="DM Calçados"
-            className={`h-28 sm:h-40 w-auto object-contain cursor-pointer select-none transition-transform logo-glow ${logoShake ? 'animate-[shake_0.3s_ease-in-out]' : ''}`}
+            className={`h-20 sm:h-28 w-auto object-contain cursor-pointer select-none transition-transform logo-glow ${logoShake ? 'animate-[shake_0.3s_ease-in-out]' : ''}`}
             onClick={handleLogoClick}
           />
           <span style={{ fontFamily: '"Playfair Display", serif' }} className="text-[10px] sm:text-xs uppercase tracking-[0.25em] text-gold mt-1 text-center">Distribuidora Maranhense de Calçados</span>
@@ -186,7 +188,11 @@ export default function LandingPage() {
         <p style={{ fontFamily: '"Playfair Display", serif' }} className="text-[10px] text-content-muted">
           CNPJ: 14.271.980/0001-71 · © {new Date().getFullYear()} DM Calçados - Distribuidora Maranhense de Calçados. Todos os direitos reservados.
         </p>
+        <button onClick={() => setShowChangelog(true)} className="text-[9px] font-mono text-content-muted/40 hover:text-blue-400 transition-colors mt-1">
+          {APP_VERSION}
+        </button>
       </footer>
+      {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
     </div>
   );
 }
