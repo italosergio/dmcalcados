@@ -24,7 +24,7 @@ export default function DashboardPage() {
   const { clientes, loading: clientesLoading } = useClientes();
   const loading = vendasLoading || despesasLoading || usersLoading || clientesLoading;
 
-  const [periodoGlobal, setPeriodoGlobal] = useState<PeriodoGrafico>('365dias');
+  const [periodoGlobal, setPeriodoGlobal] = useState<PeriodoGrafico>('mes');
   const [customInicio, setCustomInicio] = useState('');
   const [customFim, setCustomFim] = useState('');
 

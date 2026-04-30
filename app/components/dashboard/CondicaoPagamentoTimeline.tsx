@@ -42,7 +42,7 @@ export function CondicaoPagamentoTimeline({ vendas, globalPeriodo, globalCustomI
           yAxis: baseYAxis, credits: { enabled: false },
           legend: { enabled: true, itemStyle: { color: chartTheme.textColor, fontSize: '10px' } },
           tooltip: { shared: true },
-          plotOptions: { area: { stacking: 'normal' } },
+          plotOptions: { area: { stacking: undefined } },
           series: [
             { type: 'area', name: 'À Vista', data: data.avista, color: '#3b82f6', fillColor: { linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 }, stops: [[0, 'rgba(59,130,246,0.3)'], [1, 'rgba(59,130,246,0)']] } },
             { type: 'area', name: 'Prazo', data: data.prazo, color: '#f59e0b', fillColor: { linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 }, stops: [[0, 'rgba(245,158,11,0.3)'], [1, 'rgba(245,158,11,0)']] } },

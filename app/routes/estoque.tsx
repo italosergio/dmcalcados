@@ -131,7 +131,7 @@ export default function ProdutosPage() {
     vendasFiltradas.forEach(v => {
       v.produtos?.forEach(p => {
         if (!p.modelo) return;
-        const unidades = p.tipo === 'pacote' ? p.quantidade * 15 : p.quantidade;
+        const unidades = p.tipo === 'unidade' ? p.quantidade : p.quantidade * 15;
         if (!map[p.modelo]) map[p.modelo] = { modelo: p.modelo, quantidade: 0, valor: 0 };
         map[p.modelo].quantidade += unidades;
         map[p.modelo].valor += p.valorTotal;
@@ -168,9 +168,10 @@ export default function ProdutosPage() {
           : `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
         v.produtos?.forEach(p => {
           if (!modelos.includes(p.modelo)) return;
+          const un = p.tipo === 'unidade' ? p.quantidade : p.quantidade * 15;
           if (!buckets[key]) buckets[key] = {};
-          buckets[key][p.modelo] = (buckets[key][p.modelo] || 0) + p.quantidade;
-          totalBuckets[key] = (totalBuckets[key] || 0) + p.quantidade;
+          buckets[key][p.modelo] = (buckets[key][p.modelo] || 0) + un;
+          totalBuckets[key] = (totalBuckets[key] || 0) + un;
         });
       });
     } else {
