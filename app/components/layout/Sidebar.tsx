@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router';
-import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, History, LogOut, X, UserCircle, Home, Package, RefreshCw, Plus, ArrowRightLeft, Loader2, Activity, CreditCard, Navigation, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, History, LogOut, X, UserCircle, Home, Package, RefreshCw, Plus, ArrowRightLeft, Loader2, Activity, CreditCard, Navigation, PanelLeftClose, PanelLeftOpen, Banknote, Landmark } from 'lucide-react';
 import { logout } from '~/services/auth.service';
 import { useNavigate } from 'react-router';
 import { useAuth } from '~/contexts/AuthContext';
@@ -99,6 +99,8 @@ export function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }: Sideba
 
   if (user && userCanAccessAdmin(user)) {
     links.push({ to: '/pagamentos', icon: CreditCard, label: 'Pagamentos' });
+    links.push({ to: '/depositos', icon: Landmark, label: 'Depósitos' });
+    links.push({ to: '/vales', icon: Banknote, label: 'Vales' });
     links.push({ to: '/rotas', icon: Navigation, label: 'Rotas' });
   }
 

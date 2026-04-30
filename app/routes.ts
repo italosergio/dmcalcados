@@ -23,6 +23,8 @@ export default [
     route("ciclos", "routes/ciclos.tsx"),
     route("meu-estoque", "routes/meu-estoque.tsx"),
     route("pagamentos", "routes/pagamentos.tsx"),
+    route("depositos", "routes/depositos.tsx"),
+    route("vales", "routes/vales.tsx"),
     route("conta", "routes/conta.tsx"),
     route("rotas", "routes/rotas.tsx"),
     route("analytics", "routes/analytics.tsx"),
