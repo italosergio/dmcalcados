@@ -1,8 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
-import { RefreshCw, Plus, X, Pencil, Banknote } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { RefreshCw, Plus, X, Pencil, Banknote, Landmark, ImageIcon, ChevronDown } from 'lucide-react';
 import { formatCurrency } from '~/utils/format';
 import { findCicloParaUsuario } from '~/services/ciclos.service';
 import { addCobranca, removeCobranca } from '~/services/cobrancas.service';
+import { createDeposito, deleteDeposito, updateDeposito } from '~/services/depositos.service';
+import { uploadImage } from '~/services/cloudinary.service';
 import { useAuth } from '~/contexts/AuthContext';
 import type { Ciclo, Venda, Despesa, Deposito, ValeCard, Cobranca } from '~/models';
 
@@ -18,6 +21,7 @@ interface Props {
 
 export function CicloDashboard({ ciclo, vendas, despesas, depositos, valeCards = [] }: Props) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [Highcharts, setHighcharts] = useState<any>(null);
   const [HighchartsReact, setHighchartsReact] = useState<any>(null);
   const [ts, setTs] = useState(Date.now());
@@ -32,6 +36,16 @@ export function CicloDashboard({ ciclo, vendas, despesas, depositos, valeCards =
   const [cobForma, setCobForma] = useState<'dinheiro' | 'pix'>('dinheiro');
   const [cobSaving, setCobSaving] = useState(false);
   const [caixaModal, setCaixaModal] = useState(false);
+  const [despDiaOpen, setDespDiaOpen] = useState(false);
+  const [depositosModal, setDepositosModal] = useState(false);
+  const [depForm, setDepForm] = useState(false);
+  const [depValor, setDepValor] = useState('');
+  const [depData, setDepData] = useState(new Date().toISOString().slice(0, 10));
+  const [depImagem, setDepImagem] = useState<File | null>(null);
+  const [depImagemPreview, setDepImagemPreview] = useState<string | null>(null);
+  const [depSemFoto, setDepSemFoto] = useState(false);
+  const [depJustificativa, setDepJustificativa] = useState('');
+  const [depSaving, setDepSaving] = useState(false);
 
   useEffect(() => {
     import('highcharts').then(m => setHighcharts(m.default));
@@ -142,6 +156,39 @@ export function CicloDashboard({ ciclo, vendas, despesas, depositos, valeCards =
 
   const saldoCaixaInterno = caixaInterno + cobrancasDinheiro - despesasInterno - totalDepositos - valesInterno;
 
+  // Caixa interno do dia de hoje
+  const despesasPorDiaComCaixa = useMemo(() => {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const inicio = ciclo.dataInicio || ciclo.createdAt.slice(0, 10);
+    const fim = ciclo.dataFim || hoje;
+    const d = new Date(inicio + 'T00:00:00');
+    const end = new Date((fim < hoje ? fim : hoje) + 'T00:00:00');
+    const result: { dia: string; despesas: Despesa[]; caixaInterno: number }[] = [];
+    let saldo = 0;
+    while (d <= end) {
+      const day = d.toISOString().slice(0, 10);
+      saldo += vendasCiclo.filter(v => new Date(v.data).toISOString().slice(0, 10) === day).reduce((s, v) => {
+        const ef = (v as any).entradaForma;
+        if (v.condicaoPagamento === 'avista') { if (ef === 'dinheiro') return s + v.valorTotal; if (ef === 'misto') return s + ((v as any).valorDinheiro || 0); }
+        if (v.condicaoPagamento?.includes('_entrada')) { if (ef === 'dinheiro') return s + (v.valorAvista || 0); if (ef === 'misto') return s + ((v as any).valorDinheiro || 0); }
+        return s;
+      }, 0);
+      saldo += cobrancas.filter(c => c.data === day && c.forma === 'dinheiro').reduce((s, c) => s + c.valor, 0);
+      saldo -= depositosCiclo.filter(dep => new Date(dep.data).toISOString().slice(0, 10) === day).reduce((s, dep) => s + dep.valor, 0);
+      saldo -= despesasCiclo.filter(dd => new Date(dd.data).toISOString().slice(0, 10) === day).reduce((s, dd) => {
+        const fp = (dd as any).fontePagamento;
+        if (fp === 'misto') return s + ((dd as any).valorInterno || 0);
+        if (fp === 'caixa_externo') return s;
+        return s + dd.valor;
+      }, 0);
+      saldo -= valesCiclo.reduce((s, vc) => s + Object.values(vc.registros || {}).filter((r: any) => r.data?.slice(0, 10) === day && r.fontePagamento !== 'caixa_externo').reduce((ss: number, r: any) => ss + (r.valor || 0), 0), 0);
+      const despDia = despesasCiclo.filter(dd => new Date(dd.data).toISOString().slice(0, 10) === day);
+      if (despDia.length > 0) result.push({ dia: day, despesas: despDia, caixaInterno: saldo });
+      d.setDate(d.getDate() + 1);
+    }
+    return result.reverse();
+  }, [vendasCiclo, despesasCiclo, depositosCiclo, valesCiclo, cobrancas, ciclo]);
+
   // Vendas por modelo
   const porModelo = useMemo(() => {
     const map: Record<string, { modelo: string; pecas: number; valor: number }> = {};
@@ -188,20 +235,25 @@ export function CicloDashboard({ ciclo, vendas, despesas, depositos, valeCards =
 
     return {
       chart: { type: 'column', height: 200, backgroundColor: '#232328' },
-      title: { text: 'Vendas × Despesas por dia', style: { fontSize: '11px', color: '#f0f0f2' } },
+      title: { text: undefined },
       xAxis: { categories: cats, labels: { style: { fontSize: '8px', color: '#f0f0f2' }, rotation: -45, step: Math.max(1, Math.floor(cats.length / 10)) } },
       yAxis: { title: { text: '' }, gridLineColor: '#2e2e36', labels: { style: { color: '#f0f0f2' } } },
       credits: { enabled: false },
       legend: { itemStyle: { color: '#f0f0f2', fontSize: '9px' } },
       series: [
-        { name: 'Vendas', data: vendasPorDia, color: '#10b981' },
-        { name: 'Despesas', data: despPorDia, color: '#ef4444' },
+        { name: 'Vendas', data: vendasPorDia, color: '#10b981', borderWidth: 0 },
+        { name: 'Despesas', data: despPorDia, color: '#ef4444', borderWidth: 0 },
       ],
     } as any;
   }, [Highcharts, vendasCiclo, despesasCiclo, ciclo]);
 
   return (
     <div className="space-y-3">
+      {/* Gráfico vendas vs despesas por dia — TOPO */}
+      {Highcharts && HighchartsReact && chartOptions && (
+        <HighchartsReact highcharts={Highcharts} options={chartOptions} />
+      )}
+
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-blue-400">Demonstrativo</span>
         <button onClick={() => { setRefreshing(true); setTs(Date.now()); setTimeout(() => setRefreshing(false), 800); }} className="text-content-muted hover:text-content transition-colors">
@@ -213,12 +265,12 @@ export function CicloDashboard({ ciclo, vendas, despesas, depositos, valeCards =
       <div className="rounded-lg bg-elevated p-2.5">
         <div className="flex justify-between items-center mb-1.5">
           <p className="text-[9px] text-content-muted font-medium">Estoque do ciclo</p>
-          <p className="text-[10px] text-content-secondary">{totalPctVendidos}/{totalPctInicial} pct · Restam {totalPecasRestantes} pçs</p>
+          <p className="text-[10px] text-content-secondary">{totalPctVendidos}/{totalPctInicial} pct · Restam {totalPecasRestantes} pçs (~{Math.floor(totalPecasRestantes / PECAS_POR_PACOTE)}{totalPecasRestantes % PECAS_POR_PACOTE > 0 ? `+${totalPecasRestantes % PECAS_POR_PACOTE}` : ''} pct)</p>
         </div>
         <div className="space-y-1 max-h-40 overflow-y-auto">
           {estoqueCiclo.map((p, i) => {
             const restPct = p.pacotesInicial - p.pctVendidos;
-            const cor = restPct <= 0 ? 'text-content-muted' : restPct < 5 ? 'text-red-400' : restPct <= 10 ? 'text-yellow-400' : 'text-green-400';
+            const cor = restPct <= 0 ? 'text-content-muted' : restPct < 3 ? 'text-red-400' : restPct < 7 ? 'text-orange-400' : restPct < 10 ? 'text-yellow-400' : 'text-green-400';
             return (
             <div key={i} className={`grid grid-cols-[1fr_auto_auto_auto] gap-x-4 items-center text-xs ${cor}`}>
               <span className="truncate">{p.modelo}</span>
@@ -233,28 +285,28 @@ export function CicloDashboard({ ciclo, vendas, despesas, depositos, valeCards =
 
       {/* Cards resumo */}
       <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-lg bg-elevated p-2.5">
+        <div onClick={() => navigate(`/vendas?${ciclo.dataInicio ? `dataInicio=${ciclo.dataInicio}` : ''}${ciclo.dataFim ? `&dataFim=${ciclo.dataFim}` : ''}`)} className="rounded-lg bg-elevated p-2.5 cursor-pointer hover:bg-border-medium transition-colors">
           <p className="text-[9px] text-content-muted">Vendas</p>
           <p className="text-sm font-bold text-green-400">{formatCurrency(totalVendas)}</p>
           <p className="text-[9px] text-content-muted">{vendasCiclo.length} venda(s)</p>
         </div>
-        <div className="rounded-lg bg-elevated p-2.5">
+        <div onClick={() => navigate(`/despesas?${ciclo.dataInicio ? `dataInicio=${ciclo.dataInicio}` : ''}${ciclo.dataFim ? `&dataFim=${ciclo.dataFim}` : ''}`)} className="rounded-lg bg-elevated p-2.5 cursor-pointer hover:bg-border-medium transition-colors">
           <p className="text-[9px] text-content-muted">Despesas</p>
           <p className="text-sm font-bold text-red-400">{formatCurrency(totalDespesas)}</p>
           <p className="text-[9px] text-content-muted">Interno {formatCurrency(despesasInterno)} · Externo {formatCurrency(despesasExterno)}</p>
         </div>
         <div onClick={() => setCaixaModal(true)} className="rounded-lg bg-elevated p-2.5 cursor-pointer hover:bg-border-medium transition-colors">
-          <p className="text-[9px] text-content-muted">Caixa interno <span className="text-blue-400">ver</span></p>
+          <p className="text-[9px] text-content-muted">Caixa interno</p>
           <p className={`text-sm font-bold ${saldoCaixaInterno >= 0 ? 'text-blue-400' : 'text-red-400'}`}>{formatCurrency(saldoCaixaInterno)}</p>
           <p className="text-[9px] text-content-muted">Entrada {formatCurrency(caixaInterno)} · Cob {formatCurrency(cobrancasDinheiro)} · Desp {formatCurrency(despesasInterno)} · Vale {formatCurrency(valesInterno)} · Dep {formatCurrency(totalDepositos)}</p>
         </div>
-        <div className="rounded-lg bg-elevated p-2.5">
-          <p className="text-[9px] text-content-muted">Caixa externo</p>
+        <div onClick={() => navigate(`/despesas?${ciclo.dataInicio ? `dataInicio=${ciclo.dataInicio}` : ''}${ciclo.dataFim ? `&dataFim=${ciclo.dataFim}` : ''}&caixa=caixa_externo`)} className="rounded-lg bg-elevated p-2.5 cursor-pointer hover:bg-border-medium transition-colors">
+          <p className="text-[9px] text-content-muted">Gastos caixa externo</p>
           <p className="text-sm font-bold text-yellow-400">{formatCurrency(despesasExterno + valesExterno)}</p>
           <p className="text-[9px] text-content-muted">Desp {formatCurrency(despesasExterno)} · Vale {formatCurrency(valesExterno)}</p>
         </div>
-        <div className="rounded-lg bg-elevated p-2.5">
-          <p className="text-[9px] text-content-muted">Depósitos</p>
+        <div onClick={() => setDepositosModal(true)} className="rounded-lg bg-elevated p-2.5 cursor-pointer hover:bg-border-medium transition-colors">
+          <p className="text-[9px] text-content-muted">Depósitos <span className="text-blue-400">+</span></p>
           <p className="text-sm font-bold text-blue-400">{formatCurrency(totalDepositos)}</p>
           <p className="text-[9px] text-content-muted">{depositosCiclo.length} depósito(s)</p>
         </div>
@@ -275,34 +327,92 @@ export function CicloDashboard({ ciclo, vendas, despesas, depositos, valeCards =
         </div>
       </div>
 
-      {/* Pagamento breakdown */}
-      <div className="rounded-lg bg-elevated p-2.5 space-y-1">
-        <p className="text-[9px] text-content-muted font-medium">Pagamentos</p>
-        <div className="flex justify-between text-xs"><span className="text-content-secondary">À vista (dinheiro)</span><span className="text-green-400 font-medium">{formatCurrency(caixaInterno)}</span></div>
-        <div className="flex justify-between text-xs"><span className="text-content-secondary">À vista (pix)</span><span className="text-green-400 font-medium">{formatCurrency(totalAvista - caixaInterno + totalEntradas)}</span></div>
-        <div className="flex justify-between text-xs"><span className="text-content-secondary">Entradas</span><span className="text-blue-400 font-medium">{formatCurrency(totalEntradas)}</span></div>
-        <div className="flex justify-between text-xs"><span className="text-content-secondary">À prazo</span><span className="text-yellow-400 font-medium">{formatCurrency(totalPrazo)}</span></div>
-        <div className="flex justify-between text-xs"><span className="text-content-secondary">Desp. caixa externo</span><span className="text-red-400 font-medium">{formatCurrency(despesasExterno)}</span></div>
-      </div>
-
-      {/* Top modelos */}
-      {porModelo.length > 0 && (
+      {/* Pagamento breakdown + Top modelos */}
+      <div className="grid grid-cols-2 gap-2">
         <div className="rounded-lg bg-elevated p-2.5">
-          <p className="text-[9px] text-content-muted font-medium mb-1.5">Vendas por modelo</p>
-          <div className="space-y-1 max-h-32 overflow-y-auto">
-            {porModelo.slice(0, 8).map(m => (
-              <div key={m.modelo} className="flex justify-between text-xs">
-                <span className="truncate">{m.modelo} <span className="text-content-muted">({Math.floor(m.pecas / PECAS_POR_PACOTE)} pct{m.pecas % PECAS_POR_PACOTE > 0 ? ` +${m.pecas % PECAS_POR_PACOTE}` : ''})</span></span>
-                <span className="text-green-400 font-medium shrink-0 ml-2">{formatCurrency(m.valor)}</span>
-              </div>
-            ))}
+          <p className="text-[9px] text-content-muted font-medium mb-2">Pagamentos</p>
+          <div className="space-y-1.5">
+            {[
+              { label: 'Dinheiro', valor: caixaInterno, cor: 'text-green-400', bg: 'bg-green-500' },
+              { label: 'Pix', valor: Math.max(0, totalAvista - caixaInterno + totalEntradas), cor: 'text-emerald-400', bg: 'bg-emerald-500' },
+              { label: 'Entradas', valor: totalEntradas, cor: 'text-blue-400', bg: 'bg-blue-500' },
+              { label: 'À prazo', valor: totalPrazo, cor: 'text-yellow-400', bg: 'bg-yellow-500' },
+              { label: 'Cx externo', valor: despesasExterno, cor: 'text-red-400', bg: 'bg-red-500' },
+            ].filter(r => r.valor > 0).map(r => {
+              const max = Math.max(caixaInterno, totalPrazo, totalEntradas, despesasExterno, 1);
+              return (
+                <div key={r.label}>
+                  <div className="flex justify-between text-[10px] mb-0.5">
+                    <span className="text-content-secondary">{r.label}</span>
+                    <span className={`${r.cor} font-semibold`}>{formatCurrency(r.valor)}</span>
+                  </div>
+                  <div className="h-1 rounded-full bg-surface overflow-hidden">
+                    <div className={`h-full rounded-full ${r.bg} opacity-50`} style={{ width: `${(r.valor / max) * 100}%` }} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
-      )}
 
-      {/* Gráfico */}
-      {Highcharts && HighchartsReact && chartOptions && (
-        <HighchartsReact highcharts={Highcharts} options={chartOptions} />
+        {porModelo.length > 0 && (
+          <div className="rounded-lg bg-elevated p-2.5">
+            <p className="text-[9px] text-content-muted font-medium mb-2">Vendas por modelo</p>
+            <div className="space-y-1.5 max-h-40 overflow-y-auto">
+              {(() => { const maxM = porModelo[0]?.valor || 1; return porModelo.slice(0, 8).map(m => {
+                const pct = Math.floor(m.pecas / PECAS_POR_PACOTE);
+                const avulsos = m.pecas % PECAS_POR_PACOTE;
+                return (
+                  <div key={m.modelo}>
+                    <div className="flex justify-between text-[10px] mb-0.5">
+                      <span className="truncate">{m.modelo} <span className="text-content-muted">{pct} pct{avulsos > 0 ? ` +${avulsos}` : ''}</span></span>
+                      <span className="text-green-400 font-semibold shrink-0 ml-2">{formatCurrency(m.valor)}</span>
+                    </div>
+                    <div className="h-1 rounded-full bg-surface overflow-hidden">
+                      <div className="h-full rounded-full bg-green-500 opacity-50" style={{ width: `${(m.valor / maxM) * 100}%` }} />
+                    </div>
+                  </div>
+                );
+              }); })()}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Despesas por dia — colapsável */}
+      {despesasPorDiaComCaixa.length > 0 && (
+        <div className="rounded-lg bg-elevated">
+          <button onClick={() => setDespDiaOpen(!despDiaOpen)} className="w-full flex items-center justify-between p-2.5 text-left">
+            <p className="text-[9px] text-content-muted font-medium">Despesas por dia ({despesasPorDiaComCaixa.length} dias)</p>
+            <ChevronDown size={14} className={`text-content-muted transition-transform ${despDiaOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {despDiaOpen && (
+            <div className="px-2.5 pb-2.5 space-y-2 max-h-60 overflow-y-auto">
+              {despesasPorDiaComCaixa.map(({ dia, despesas: desps, caixaInterno: cx }) => {
+                const totalDia = desps.reduce((s, d) => s + d.valor, 0);
+                const label = new Date(dia + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                return (
+                  <div key={dia} className="rounded-md bg-surface p-2 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-medium">{label}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-semibold text-red-400">{formatCurrency(totalDia)}</span>
+                        <span className={`text-[9px] font-semibold ${cx >= 0 ? 'text-blue-400' : 'text-red-400'}`}>Cx {formatCurrency(cx)}</span>
+                        <button onClick={() => navigate(`/despesas?novaData=${dia}`)} className="text-content-muted hover:text-content"><Plus size={12} /></button>
+                      </div>
+                    </div>
+                    {desps.map((d, i) => (
+                      <div key={i} className="flex justify-between text-[9px] text-content-secondary">
+                        <span className="truncate">{d.tipo}{(d as any).fontePagamento === 'caixa_externo' ? ' 🏦' : ''}</span>
+                        <span className="shrink-0 ml-2">{formatCurrency(d.valor)}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Modal caixa interno */}
@@ -430,6 +540,109 @@ export function CicloDashboard({ ciclo, vendas, despesas, depositos, valeCards =
                     }}
                       className="flex-1 rounded-lg bg-blue-600 py-1.5 text-[10px] font-medium text-white hover:bg-blue-500 disabled:opacity-30 transition">
                       {cobSaving ? 'Salvando...' : 'Salvar'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal depósitos */}
+      {depositosModal && (
+        <div className="fixed inset-0 lg:left-64 z-[120] flex items-center justify-center p-4" onClick={() => setDepositosModal(false)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative w-full max-w-md max-h-[80vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">
+              <div>
+                <p className="text-sm font-semibold">Depósitos</p>
+                <p className="text-xs text-blue-400 font-bold">{formatCurrency(totalDepositos)} <span className="text-content-muted font-normal">· {depositosCiclo.length} depósito(s)</span></p>
+              </div>
+              <button onClick={() => setDepositosModal(false)} className="text-content-muted hover:text-content"><X size={20} /></button>
+            </div>
+            <div className="p-4 space-y-2">
+              {depositosCiclo.length === 0 && !depForm && <p className="text-xs text-content-muted text-center py-4">Nenhum depósito registrado</p>}
+              {depositosCiclo.sort((a, b) => b.data.localeCompare(a.data)).map(dep => (
+                <div key={dep.id} className="rounded-lg bg-elevated p-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-blue-400">{formatCurrency(dep.valor)}</p>
+                    <p className="text-[10px] text-content-muted">{new Date(dep.data).toLocaleDateString('pt-BR')} · {dep.depositanteNome}</p>
+                    {dep.imagemUrl && <img src={dep.imagemUrl} alt="Comprovante" className="mt-1 rounded-lg max-h-20 object-contain" />}
+                    {dep.semFoto && dep.justificativa && <p className="text-[10px] text-content-secondary mt-0.5">Sem foto: {dep.justificativa}</p>}
+                  </div>
+                  <button onClick={() => { deleteDeposito(dep.id); setTs(Date.now()); }}
+                    className="text-content-muted/40 hover:text-red-500 transition-colors shrink-0"><X size={14} /></button>
+                </div>
+              ))}
+
+              {!depForm ? (
+                <button onClick={() => setDepForm(true)}
+                  className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border-subtle py-2.5 text-xs text-content-muted hover:bg-elevated transition">
+                  <Plus size={14} /> Adicionar depósito
+                </button>
+              ) : (
+                <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[9px] text-content-muted">Valor</label>
+                      <input type="number" step="0.01" min="0.01" value={depValor} onChange={e => setDepValor(e.target.value)}
+                        className="w-full rounded-lg border border-border-subtle bg-elevated px-2 py-1.5 text-xs text-content focus:outline-none focus:border-blue-500" placeholder="0,00" />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-content-muted">Data</label>
+                      <input type="date" value={depData} onChange={e => setDepData(e.target.value)}
+                        className="w-full rounded-lg border border-border-subtle bg-elevated px-2 py-1.5 text-xs text-content focus:outline-none focus:border-blue-500" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-content-muted">Comprovante</label>
+                    {depImagemPreview && (
+                      <div className="relative mb-1">
+                        <img src={depImagemPreview} alt="Preview" className="rounded-lg border border-border-subtle max-h-24 object-contain w-full" />
+                      </div>
+                    )}
+                    <label className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border-subtle bg-elevated py-1.5 text-[10px] text-content-muted cursor-pointer hover:bg-border-medium transition-colors">
+                      <ImageIcon size={12} /> {depImagemPreview ? 'Trocar' : 'Adicionar foto'}
+                      <input type="file" accept="image/*" className="hidden" onChange={e => {
+                        const f = e.target.files?.[0];
+                        if (f) { setDepImagem(f); setDepImagemPreview(URL.createObjectURL(f)); setDepSemFoto(false); }
+                      }} />
+                    </label>
+                    {!depImagem && (
+                      <label className="flex items-center gap-2 mt-1 text-[10px] text-content-secondary cursor-pointer">
+                        <input type="checkbox" checked={depSemFoto} onChange={e => setDepSemFoto(e.target.checked)} className="rounded" />
+                        Sem comprovante
+                      </label>
+                    )}
+                    {depSemFoto && !depImagem && (
+                      <input value={depJustificativa} onChange={e => setDepJustificativa(e.target.value)}
+                        className="w-full rounded-lg border border-border-subtle bg-elevated px-2 py-1.5 text-xs text-content focus:outline-none focus:border-blue-500 mt-1" placeholder="Justificativa" />
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => { setDepForm(false); setDepImagem(null); setDepImagemPreview(null); setDepSemFoto(false); setDepJustificativa(''); }}
+                      className="flex-1 rounded-lg border border-border-subtle py-1.5 text-[10px] text-content-secondary hover:bg-border-medium transition">Cancelar</button>
+                    <button disabled={depSaving || !depValor || (!depImagem && !depSemFoto)} onClick={async () => {
+                      setDepSaving(true);
+                      try {
+                        let imagemUrl: string | undefined;
+                        if (depImagem) imagemUrl = await uploadImage(depImagem, 'depositos');
+                        await createDeposito({
+                          valor: parseFloat(depValor),
+                          data: depData + 'T12:00:00.000Z',
+                          depositanteId: user?.uid || ciclo.vendedorId,
+                          depositanteNome: user?.nome || ciclo.vendedorNome,
+                          ...(imagemUrl ? { imagemUrl } : {}),
+                          ...(depSemFoto ? { semFoto: true, justificativa: depJustificativa.trim() } : {}),
+                          cicloId: ciclo.id,
+                        } as any);
+                        setDepForm(false); setDepValor(''); setDepImagem(null); setDepImagemPreview(null); setDepSemFoto(false); setDepJustificativa('');
+                        setTs(Date.now());
+                      } finally { setDepSaving(false); }
+                    }}
+                      className="flex-1 rounded-lg bg-blue-600 py-1.5 text-[10px] font-medium text-white hover:bg-blue-500 disabled:opacity-30 transition">
+                      {depSaving ? 'Salvando...' : 'Salvar'}
                     </button>
                   </div>
                 </div>
