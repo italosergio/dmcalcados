@@ -56,7 +56,7 @@ export function Header({ onMenuClick }: HeaderProps) {
     setShowMenu(false);
     if (hasStoredCredential(acc.username)) {
       const ok = await switchAccount(acc.username);
-      if (ok) { navigate('/vendas'); return; }
+      if (ok) { navigate('/painel'); return; }
     }
     // Fallback: credencial expirada
     await logout();

@@ -35,7 +35,7 @@ export function LoginForm() {
       if (userData) {
         saveAccount({ username: user, nome: userData.nome, foto: userData.foto, role: getUserRoles(userData)[0], roles: getUserRoles(userData), password: pass });
       }
-      navigate('/vendas');
+      navigate('/painel');
     } catch {
       if (silent) {
         // Credencial expirou, pede senha

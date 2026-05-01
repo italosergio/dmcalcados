@@ -61,7 +61,7 @@ export function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }: Sideba
     setShowAccounts(false);
     if (hasStoredCredential(acc.username)) {
       const ok = await switchAccount(acc.username);
-      if (ok) { onClose(); navigate('/vendas'); return; }
+      if (ok) { onClose(); navigate('/painel'); return; }
     }
     onClose();
     await logout();
