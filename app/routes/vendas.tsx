@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router';
-import { UserCircle, Trash2, Undo2, Plus, ShoppingBag, X, Calendar, CreditCard, MapPin, Phone, Package, User, LayoutGrid, List, ImageIcon, FileText, Pencil, Search, ArrowUp, ArrowDown } from 'lucide-react';
+import { UserCircle, Trash2, Undo2, Plus, ShoppingBag, X, Calendar, CreditCard, MapPin, Phone, Package, User, LayoutGrid, List, ImageIcon, FileText, Pencil, Search, ArrowUp, ArrowDown, MoreVertical } from 'lucide-react';
 import { ImageLightbox } from '~/components/common/ImageLightbox';
 import { Button } from '~/components/common/Button';
 import { Card } from '~/components/common/Card';
@@ -9,7 +9,7 @@ import { useVendas, useClientes, useUsers, useProdutos } from '~/hooks/useRealti
 import { auth } from '~/services/firebase';
 import { formatCurrency } from '~/utils/format';
 import { useAuth } from '~/contexts/AuthContext';
-import { userIsAdmin, userCanEditVenda } from '~/models';
+import { userIsAdmin, userCanEditVenda, userIsDev } from '~/models';
 import { VendaEditModal } from '~/components/vendas/VendaEditModal';
 import { VendaForm } from '~/components/vendas/VendaForm';
 import type { Venda, Cliente, CondicaoPagamento } from '~/models';
@@ -54,10 +54,12 @@ export default function VendasPage() {
   const { user } = useAuth();
   const isAdmin = user ? userIsAdmin(user) : false;
   const canEdit = user ? userCanEditVenda(user) : false;
+  const isDev = user ? userIsDev(user) : false;
   const { produtos } = useProdutos();
   const [vendaSelecionada, setVendaSelecionada] = useState<Venda | null>(null);
   const [editandoData, setEditandoData] = useState(false);
   const [editandoVenda, setEditandoVenda] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [criandoVenda, setCriandoVenda] = useState(false);
   const novaVendaBtnRef = useRef<HTMLButtonElement>(null);
   const fecharCriandoVenda = useCallback(() => {
@@ -72,10 +74,11 @@ export default function VendasPage() {
   const resolveUser = (id: string, fallback: string) => userNomeMap.get(id) || fallback;
   const [searchVendedor, setSearchVendedor] = useState('');
   const [searchPedido, setSearchPedido] = useState('');
-  const [filtroCondicao, setFiltroCondicao] = useState<string[]>([]);
+  const [showClienteDropdown, setShowClienteDropdown] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);  const [filtroCondicao, setFiltroCondicao] = useState<string[]>([]);
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
-  const [periodoFiltro, setPeriodoFiltro] = useState<'hoje' | '7dias' | '30dias' | '60dias' | 'mes' | 'ano' | 'tudo'>('30dias');
+  const [periodoFiltro, setPeriodoFiltro] = useState<'hoje' | '7dias' | '30dias' | '60dias' | 'semana' | 'mes' | 'ano' | 'tudo'>('30dias');
   const [deleteClicks, setDeleteClicks] = useState<Record<string, number>>({});
   const deleteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [imagemAberta, setImagemAberta] = useState<string | null>(null);
@@ -99,6 +102,12 @@ export default function VendasPage() {
   const location = useLocation();
   const modalRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (searchRef.current && !searchRef.current.contains(e.target as Node)) setShowClienteDropdown(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   // Lock body scroll + focus trap when modal is open
   useEffect(() => {
     const modal = criandoVenda || vendaSelecionada || editandoVenda;
@@ -118,10 +127,22 @@ export default function VendasPage() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const p = params.get('periodo');
-    if (p && ['hoje', '7dias', '30dias', '60dias', 'mes', 'ano', 'tudo'].includes(p)) {
+    if (p && ['hoje', '7dias', '30dias', '60dias', 'semana', 'mes', 'ano', 'tudo'].includes(p)) {
       setPeriodoFiltro(p as typeof periodoFiltro);
     }
-  }, [location.search]);
+    const di = params.get('dataInicio');
+    const df = params.get('dataFim');
+    if (di || df) {
+      setPeriodoFiltro('tudo');
+      if (di) setFiltroDataInicio(di);
+      if (df) setFiltroDataFim(df);
+    }
+    const vid = params.get('vendaId');
+    if (vid && vendas.length > 0) {
+      const v = vendas.find(v => v.id === vid);
+      if (v) setVendaSelecionada(v);
+    }
+  }, [location.search, vendas]);
 
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
 
@@ -151,6 +172,16 @@ export default function VendasPage() {
     setActionLoading(prev => ({ ...prev, [vendaId]: true }));
     import('~/services/vendas.service').then(m => m.restoreVenda(vendaId));
   }, []);
+
+  const handleHardDelete = useCallback((vendaId: string) => {
+    if (!confirm('Apagar PERMANENTEMENTE esta venda? O número de pedido será reutilizado.')) return;
+    setActionLoading(prev => ({ ...prev, [vendaId]: true }));
+    import('~/services/vendas.service').then(m => m.hardDeleteVenda(vendaId));
+    setVendaSelecionada(null);
+  }, []);
+
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTriggered = useRef(false);
 
   const handleEditSave = useCallback((vendaId: string, updates: Partial<Venda>) => {
     import('~/services/vendas.service').then(m => m.updateVenda(vendaId, updates));
@@ -197,6 +228,7 @@ export default function VendasPage() {
       const agora = new Date();
       const inicio = new Date();
       if (periodoFiltro === 'hoje') inicio.setHours(0, 0, 0, 0);
+      else if (periodoFiltro === 'semana') { const d = inicio.getDay(); inicio.setDate(inicio.getDate() - (d === 0 ? 6 : d - 1)); inicio.setHours(0, 0, 0, 0); }
       else if (periodoFiltro === '7dias') inicio.setDate(agora.getDate() - 7);
       else if (periodoFiltro === '30dias') inicio.setDate(agora.getDate() - 30);
       else if (periodoFiltro === '60dias') inicio.setDate(agora.getDate() - 60);
@@ -212,7 +244,15 @@ export default function VendasPage() {
       result = result.filter(v => new Date(v.data) <= new Date(filtroDataFim + 'T23:59:59'));
     }
     if (searchPedido.trim()) {
-      result = result.filter(v => String(v.pedidoNumero).includes(searchPedido.trim()));
+      const q = searchPedido.trim().toLowerCase();
+      if (q.startsWith('#')) {
+        const num = q.slice(1);
+        result = result.filter(v => String(v.pedidoNumero) === num);
+      } else {
+        const numQ = parseFloat(q);
+        const isNum = !isNaN(numQ) && q.length > 0;
+        result = result.filter(v => v.clienteNome?.toLowerCase().includes(q) || (isNum && v.valorTotal === numQ));
+      }
     }
     if (searchVendedor.trim()) {
       result = result.filter(v => v.vendedorNome?.toLowerCase().includes(searchVendedor.toLowerCase()));
@@ -325,7 +365,7 @@ export default function VendasPage() {
             ? `a partir de ${new Date(filtroDataInicio + 'T00:00:00').toLocaleDateString('pt-BR')}`
             : filtroDataFim
               ? `até ${new Date(filtroDataFim + 'T00:00:00').toLocaleDateString('pt-BR')}`
-              : { hoje: 'hoje', '7dias': 'últimos 7 dias', '30dias': 'últimos 30 dias', '60dias': 'últimos 60 dias', mes: 'do mês', ano: 'do ano', tudo: '' }[periodoFiltro];
+              : { hoje: 'hoje', '7dias': 'últimos 7 dias', '30dias': 'últimos 30 dias', '60dias': 'últimos 60 dias', semana: 'da semana', mes: 'do mês', ano: 'do ano', tudo: '' }[periodoFiltro];
         return (
           <div className="mb-4 space-y-3 sm:space-y-0 sm:flex sm:flex-wrap sm:items-stretch sm:gap-3">
             {/* Mobile: botão + total na mesma linha */}
@@ -364,15 +404,33 @@ export default function VendasPage() {
 
       {/* Filtros: Período + Datas + Condição */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="relative">
+        <div className="relative" ref={searchRef}>
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none" />
           <input
             type="text"
-            placeholder="Nº pedido"
+            placeholder="Nº pedido ou cliente"
             value={searchPedido}
-            onChange={(e) => { setSearchPedido(e.target.value); if (e.target.value) setPeriodoFiltro('tudo'); }}
-            className={`rounded-lg border bg-elevated pl-8 pr-2 py-1.5 text-xs focus:outline-none focus:border-border-medium w-24 transition-colors ${searchPedido ? 'border-green-600/30 text-content' : 'border-border-subtle text-content-muted'}`}
+            onChange={(e) => { setSearchPedido(e.target.value); setShowClienteDropdown(true); if (e.target.value) setPeriodoFiltro('tudo'); }}
+            onFocus={() => { if (searchPedido.trim() && !/^\d+$/.test(searchPedido.trim())) setShowClienteDropdown(true); }}
+            className={`rounded-lg border bg-elevated pl-8 pr-2 py-1.5 text-xs focus:outline-none focus:border-border-medium w-48 transition-colors ${searchPedido ? 'border-green-600/30 text-content' : 'border-border-subtle text-content-muted'}`}
           />
+          {showClienteDropdown && searchPedido.trim().length >= 2 && !/^\d+$/.test(searchPedido.trim()) && (() => {
+            const q = searchPedido.trim().toLowerCase();
+            const nomes = [...new Set(vendas.filter(v => !(v as any).deletedAt).map(v => resolveCliente(v.clienteId, v.clienteNome)))];
+            const matches = nomes.filter(n => n.toLowerCase().includes(q)).sort((a, b) => a.localeCompare(b)).slice(0, 8);
+            if (!matches.length) return null;
+            return (
+              <div className="absolute top-full left-0 mt-1 w-64 bg-surface border border-border-subtle rounded-xl shadow-xl z-50 overflow-hidden">
+                {matches.map(nome => (
+                  <button key={nome} type="button"
+                    onMouseDown={(e) => { e.preventDefault(); setSearchPedido(nome); setShowClienteDropdown(false); setPeriodoFiltro('tudo'); }}
+                    className="w-full text-left px-3 py-2 text-xs text-content-secondary hover:bg-surface-hover hover:text-content transition-colors truncate">
+                    {nome}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
         </div>
         <span className="hidden lg:inline text-content-muted/30">│</span>
         {([
@@ -380,6 +438,7 @@ export default function VendasPage() {
           { value: '7dias', label: '7 dias' },
           { value: '30dias', label: '30 dias' },
           { value: '60dias', label: '60 dias' },
+          { value: 'semana', label: 'Semana' },
           { value: 'mes', label: 'Mês' },
           { value: 'ano', label: 'Ano' },
           { value: 'tudo', label: 'Tudo' },
@@ -461,7 +520,7 @@ export default function VendasPage() {
       {!loading && filteredVendas.length === 0 && vendas.length > 0 && filtroCondicao.length === 0 && !filtroDataInicio && !filtroDataFim && (
         <div className="rounded-xl border border-border-subtle bg-surface p-6 sm:p-8 text-center">
           <ShoppingBag size={40} className="mx-auto mb-3 text-content-muted opacity-40" />
-          <p className="mb-2 text-sm sm:text-base font-medium">Nenhuma venda registrada {periodoFiltro === 'hoje' ? 'hoje' : periodoFiltro === '7dias' ? 'nos últimos 7 dias' : periodoFiltro === '30dias' ? 'nos últimos 30 dias' : periodoFiltro === '60dias' ? 'nos últimos 60 dias' : periodoFiltro === 'mes' ? 'neste mês' : 'no ano'}</p>
+          <p className="mb-2 text-sm sm:text-base font-medium">Nenhuma venda registrada {periodoFiltro === 'hoje' ? 'hoje' : periodoFiltro === 'semana' ? 'nesta semana' : periodoFiltro === '7dias' ? 'nos últimos 7 dias' : periodoFiltro === '30dias' ? 'nos últimos 30 dias' : periodoFiltro === '60dias' ? 'nos últimos 60 dias' : periodoFiltro === 'mes' ? 'neste mês' : 'no ano'}</p>
           <button onClick={() => setPeriodoFiltro('tudo')}
             className="rounded-lg border border-border-subtle bg-elevated px-4 py-2 text-sm font-medium text-content-secondary transition hover:bg-border-medium">
             Ver todas as vendas
@@ -474,7 +533,7 @@ export default function VendasPage() {
           <p className="mb-2 text-sm sm:text-base">Nenhuma venda encontrada com os filtros:</p>
           <div className="mb-4 flex flex-wrap justify-center gap-1.5">
             {periodoFiltro !== 'tudo' && !filtroDataInicio && !filtroDataFim && (
-              <span className="text-xs bg-elevated px-2.5 py-1 rounded-lg">{{ hoje: 'Hoje', '7dias': '7 dias', '30dias': '30 dias', '60dias': '60 dias', mes: 'Mês', ano: 'Ano' }[periodoFiltro]}</span>
+              <span className="text-xs bg-elevated px-2.5 py-1 rounded-lg">{{ hoje: 'Hoje', '7dias': '7 dias', '30dias': '30 dias', '60dias': '60 dias', semana: 'Semana', mes: 'Mês', ano: 'Ano' }[periodoFiltro]}</span>
             )}
             {filtroDataInicio && <span className="text-xs bg-elevated px-2.5 py-1 rounded-lg">De: {new Date(filtroDataInicio + 'T00:00:00').toLocaleDateString('pt-BR')}</span>}
             {filtroDataFim && <span className="text-xs bg-elevated px-2.5 py-1 rounded-lg">Até: {new Date(filtroDataFim + 'T00:00:00').toLocaleDateString('pt-BR')}</span>}
@@ -618,7 +677,7 @@ export default function VendasPage() {
         const condicao = v.condicaoPagamento;
         const temEntrada = condicao?.includes('_entrada');
         return (
-          <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={() => { setVendaSelecionada(null); setEditandoData(false); }}>
+          <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={() => { setVendaSelecionada(null); setEditandoData(false); setMenuOpen(false); }}>
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
             <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">
@@ -626,7 +685,29 @@ export default function VendasPage() {
                   {v.pedidoNumero && <span className="text-xs bg-elevated px-2.5 py-1 rounded-md font-mono font-semibold">#{v.pedidoNumero}</span>}
                   <CondicaoTags condicao={condicao} />
                 </div>
-                <button onClick={() => setVendaSelecionada(null)} className="text-content-muted hover:text-content transition-colors"><X size={20} /></button>
+                <div className="flex items-center gap-1">
+                  {canEdit && !(v as any).deletedAt && (
+                    <div className="relative">
+                      <button onClick={() => setMenuOpen(!menuOpen)} className="text-content-muted hover:text-content p-1 rounded-lg hover:bg-elevated transition-colors"><MoreVertical size={18} /></button>
+                      {menuOpen && (
+                        <div className="absolute right-0 top-full mt-1 w-44 rounded-lg border border-border-subtle bg-elevated shadow-xl z-10 py-1">
+                          <button onClick={() => { setMenuOpen(false); setEditandoVenda(true); }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-content hover:bg-surface-hover transition-colors">
+                            <Pencil size={13} /> Editar venda
+                          </button>
+                          <button onClick={() => { setMenuOpen(false); if (!longPressTriggered.current) handleDelete(v.id); }}
+                            className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
+                              (deleteClicks[v.id] || 0) === 0 ? 'text-red-500 hover:bg-surface-hover'
+                              : (deleteClicks[v.id] || 0) === 1 ? 'text-red-400 bg-red-500/10' : 'text-red-300 bg-red-600/20'
+                            }`}>
+                            <Trash2 size={13} /> {actionLoading[v.id] ? 'Aguarde...' : (deleteLabel(v.id) || 'Apagar venda')}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <button onClick={() => { setVendaSelecionada(null); setMenuOpen(false); }} className="text-content-muted hover:text-content transition-colors"><X size={20} /></button>
+                </div>
               </div>
               <div className="p-5 space-y-3">
                 <p className="text-2xl font-bold text-green-400">{formatCurrency(v.valorTotal)}</p>
@@ -762,13 +843,6 @@ export default function VendasPage() {
                 )}
                 <p className="text-[10px] text-content-muted text-center">Registrado em {new Date(v.createdAt).toLocaleString('pt-BR')}</p>
 
-                {canEdit && !(v as any).deletedAt && (
-                  <button type="button" onClick={() => { setEditandoVenda(true); }}
-                    className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 px-3 py-2 text-xs font-medium transition-colors">
-                    <Pencil size={14} /> Editar venda
-                  </button>
-                )}
-
                 {(v as any).deletedAt && (
                   <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-center">
                     <p className="text-xs text-red-400 font-medium">Venda apagada</p>
@@ -785,26 +859,6 @@ export default function VendasPage() {
                       {actionLoading[v.id] ? 'Aguarde...' : 'Desfazer exclusão'}
                     </button>
                   </div>
-                )}
-
-                {!(v as any).deletedAt && (
-                <button
-                  type="button"
-                  onClick={() => handleDelete(v.id)}
-                  disabled={actionLoading[v.id]}
-                  className={`w-full flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors disabled:opacity-40 ${
-                    actionLoading[v.id]
-                      ? 'bg-elevated text-content-muted'
-                      : (deleteClicks[v.id] || 0) === 0
-                        ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
-                        : (deleteClicks[v.id] || 0) === 1
-                          ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                          : 'bg-red-600/30 text-red-300 hover:bg-red-600/40'
-                  }`}
-                >
-                  <Trash2 size={14} />
-                  {actionLoading[v.id] ? 'Aguarde...' : (deleteLabel(v.id) || 'Apagar')}
-                </button>
                 )}
               </div>
             </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import { Plus, Package, Warehouse, PackageOpen, Footprints, X, Pencil, Trash2, Calendar, Tag, TrendingUp, TrendingDown, CheckCircle2, AlertCircle, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Package, Warehouse, PackageOpen, Footprints, X, Pencil, Trash2, Calendar, Tag, TrendingUp, TrendingDown, CheckCircle2, AlertCircle, Search, ArrowUpDown, ArrowUp, ArrowDown, MoreVertical } from 'lucide-react';
 import { useProdutos, useVendas, useEntradas } from '~/hooks/useRealtime';
 import { createEntrada, migrarEntradasExistentes } from '~/services/entradas.service';
 import { createProduto, updateProduto as updateProdutoService, deleteProduto } from '~/services/produtos.service';
@@ -24,6 +24,7 @@ export default function ProdutosPage() {
   const { entradas, loading: entradasLoading } = useEntradas();
   const loading = produtosLoading || vendasLoading || entradasLoading;
   const [produtoSelecionado, setProdutoSelecionado] = useState<Produto | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [periodo, setPeriodo] = useState<Periodo>('30d');
   const [modelosFiltro, setModelosFiltro] = useState<string[]>([]);
   const [painelModo, setPainelModo] = useState<'saida' | 'entrada'>('saida');
@@ -615,12 +616,29 @@ export default function ProdutosPage() {
         const saida = saidaPorModelo.find(s => s.modelo === produtoSelecionado.modelo);
         const entrada = entradaPorModelo.find(s => s.modelo === produtoSelecionado.modelo);
         return (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setProdutoSelecionado(null)}>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => { setProdutoSelecionado(null); setMenuOpen(false); }}>
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
             <div className="relative w-full max-w-md max-h-[85vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">
                 <h3 className="font-semibold">{produtoSelecionado.modelo}</h3>
-                <button onClick={() => setProdutoSelecionado(null)} className="text-content-muted hover:text-content transition-colors"><X size={20} /></button>
+                <div className="flex items-center gap-1">
+                  <div className="relative">
+                    <button onClick={() => setMenuOpen(!menuOpen)} className="text-content-muted hover:text-content p-1 rounded-lg hover:bg-elevated transition-colors"><MoreVertical size={18} /></button>
+                    {menuOpen && (
+                      <div className="absolute right-0 top-full mt-1 w-44 rounded-lg border border-border-subtle bg-elevated shadow-xl z-10 py-1">
+                        <button onClick={() => { setMenuOpen(false); setProdutoSelecionado(null); navigate(`/produtos/${produtoSelecionado.id}/editar`); }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-content hover:bg-surface-hover transition-colors">
+                          <Pencil size={13} /> Editar
+                        </button>
+                        <button onClick={async () => { setMenuOpen(false); await deleteProduto(produtoSelecionado.id); setProdutoSelecionado(null); }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-surface-hover transition-colors">
+                          <Trash2 size={13} /> Excluir
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={() => { setProdutoSelecionado(null); setMenuOpen(false); }} className="text-content-muted hover:text-content transition-colors"><X size={20} /></button>
+                </div>
               </div>
               <div className="p-5 space-y-3">
                 {produtoSelecionado.foto ? (
@@ -670,17 +688,6 @@ export default function ProdutosPage() {
                     <div className="flex items-center gap-1.5 text-content-muted mb-0.5"><Calendar size={12} /><span className="text-[10px]">Atualizado em</span></div>
                     <p className="text-xs font-semibold">{new Date(produtoSelecionado.updatedAt).toLocaleDateString('pt-BR')}</p>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <button onClick={() => { setProdutoSelecionado(null); navigate(`/produtos/${produtoSelecionado.id}/editar`); }}
-                    className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-500/10 py-2 text-xs font-medium text-blue-400 hover:bg-blue-500/20 transition-colors">
-                    <Pencil size={14} /> Editar
-                  </button>
-                  <button onClick={async () => { await deleteProduto(produtoSelecionado.id); setProdutoSelecionado(null); }}
-                    className="flex items-center justify-center gap-1.5 rounded-lg bg-red-500/10 py-2 text-xs font-medium text-red-500 hover:bg-red-500/20 transition-colors">
-                    <Trash2 size={14} /> Excluir
-                  </button>
                 </div>
               </div>
             </div>

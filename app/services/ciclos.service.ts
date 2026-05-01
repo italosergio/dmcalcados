@@ -72,12 +72,51 @@ export async function createCiclo(
   dataInicio?: string,
   dataFim?: string,
   participantes?: { id: string; nome: string }[],
+  titulo?: string,
 ): Promise<string> {
   const user = auth.currentUser;
   if (!user) throw new Error('Usuário não autenticado');
 
   const existente = await getCicloAtivo(vendedorId);
   if (existente) throw new Error('Vendedor já possui um ciclo ativo');
+
+  // Validar conflito de datas para todos os envolvidos (vendedor + participantes)
+  const todosEnvolvidos = [{ id: vendedorId, nome: vendedorNome }, ...(participantes || [])];
+  const novoInicio = dataInicio || new Date().toISOString().slice(0, 10);
+  const allCiclos = await getCiclos();
+
+  for (const pessoa of todosEnvolvidos) {
+    for (const c of allCiclos) {
+      if (c.status !== 'ativo' && !c.dataFim) continue;
+      const pessoaIds = [c.vendedorId, ...(c.participantes || []).map(p => p.id)];
+      if (!pessoaIds.includes(pessoa.id)) continue;
+
+      const cInicio = c.dataInicio || c.createdAt.slice(0, 10);
+      const cFim = c.dataFim;
+
+      // Ciclo ativo sem data fim = conflito direto
+      if (c.status === 'ativo' && !cFim) {
+        throw new Error(`${pessoa.nome} já está em um ciclo ativo (desde ${cInicio.split('-').reverse().join('/')})`);
+      }
+
+      // Verificar sobreposição de datas
+      if (cFim && dataFim) {
+        if (novoInicio <= cFim && dataFim >= cInicio) {
+          const de = cInicio.split('-').reverse().join('/');
+          const ate = cFim.split('-').reverse().join('/');
+          throw new Error(`${pessoa.nome} já participou de um ciclo de ${de} a ${ate}`);
+        }
+      } else if (cFim) {
+        if (novoInicio <= cFim) {
+          const de = cInicio.split('-').reverse().join('/');
+          const ate = cFim.split('-').reverse().join('/');
+          throw new Error(`${pessoa.nome} já participou de um ciclo de ${de} a ${ate}`);
+        }
+      } else if (c.status === 'ativo') {
+        throw new Error(`${pessoa.nome} já está em um ciclo ativo (desde ${cInicio.split('-').reverse().join('/')})`);
+      }
+    }
+  }
 
   const userData = await get(ref(db, `users/${user.uid}`));
   const criadoPorNome = userData.val()?.nome || '';
@@ -107,6 +146,7 @@ export async function createCiclo(
   }
 
   const ciclo: Omit<Ciclo, 'id'> = {
+    ...(titulo ? { titulo } : {}),
     vendedorId,
     vendedorNome,
     produtos: cicloProds,
@@ -191,8 +231,9 @@ export async function updateCicloDatas(cicloId: string, dataInicio?: string, dat
   await update(ref(db, `ciclos/${cicloId}`), updates);
 }
 
-export async function updateCicloMeta(cicloId: string, meta: { dataInicio?: string; dataFim?: string; participantes?: { id: string; nome: string }[] }): Promise<void> {
+export async function updateCicloMeta(cicloId: string, meta: { titulo?: string; dataInicio?: string; dataFim?: string; participantes?: { id: string; nome: string }[] }): Promise<void> {
   const updates: any = {};
+  if (meta.titulo !== undefined) updates.titulo = meta.titulo || null;
   if (meta.dataInicio !== undefined) updates.dataInicio = meta.dataInicio || null;
   if (meta.dataFim !== undefined) updates.dataFim = meta.dataFim || null;
   if (meta.participantes !== undefined) updates.participantes = meta.participantes.length > 0 ? meta.participantes : null;

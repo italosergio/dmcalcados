@@ -25,6 +25,8 @@ export async function createDeposito(data: Omit<Deposito, 'id' | 'createdAt' | '
     depositanteId: data.depositanteId,
     depositanteNome: data.depositanteNome,
     ...(data.imagemUrl ? { imagemUrl: data.imagemUrl } : {}),
+    ...((data as any).semFoto ? { semFoto: true, justificativa: (data as any).justificativa || '' } : {}),
+    ...((data as any).cicloId ? { cicloId: (data as any).cicloId } : {}),
     registradoPorId: user.uid,
     registradoPorNome: uData?.nome || '',
     createdAt: new Date().toISOString(),
@@ -46,5 +48,7 @@ export async function restoreDeposito(id: string): Promise<void> {
 }
 
 export async function updateDeposito(id: string, data: Partial<Omit<Deposito, 'id' | 'createdAt'>>): Promise<void> {
-  await update(ref(db, `depositos/${id}`), data);
+  const payload: any = { ...data };
+  Object.keys(payload).forEach(k => { if (payload[k] === undefined) delete payload[k]; });
+  await update(ref(db, `depositos/${id}`), payload);
 }

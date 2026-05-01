@@ -1,10 +1,10 @@
 import type { Venda } from '~/models';
 import type { PagamentoParcela } from '~/services/pagamentos.service';
 
-import { CheckCircle, AlertTriangle, XOctagon, TrendingDown, Minus, Diamond, Crown } from 'lucide-react';
+import { CheckCircle, AlertTriangle, XOctagon, TrendingDown, Minus, Diamond, Crown, Clock } from 'lucide-react';
 
 // --- Status de pagamento do cliente ---
-export type ClientePayStatus = 'avista' | 'em_dia' | 'atrasado' | 'critico';
+export type ClientePayStatus = 'avista' | 'em_dia' | 'atrasado' | 'critico' | 'pendente';
 
 export function getClientePayStatus(
   clienteId: string,
@@ -21,11 +21,14 @@ export function getClientePayStatus(
 
   const hoje = new Date().setHours(0, 0, 0, 0);
   let pioresAtraso = 0;
+  let temParcelaAPrazo = false;
+  let temPagamentoFeito = false;
 
   for (const v of cv) {
     if (v.condicaoPagamento === 'avista' || !v.datasParcelas?.length) continue;
+    temParcelaAPrazo = true;
     for (let i = 0; i < v.datasParcelas.length; i++) {
-      if (pagamentos[v.id]?.[i]?.pago) continue;
+      if (pagamentos[v.id]?.[i]?.pago) { temPagamentoFeito = true; continue; }
       const diff = Math.floor((hoje - new Date(v.datasParcelas[i] + 'T00:00:00').getTime()) / 86400000);
       if (diff > pioresAtraso) pioresAtraso = diff;
     }
@@ -33,12 +36,14 @@ export function getClientePayStatus(
 
   if (pioresAtraso > 60) return 'critico';
   if (pioresAtraso > 0) return 'atrasado';
+  if (temParcelaAPrazo && !temPagamentoFeito) return 'pendente';
   return 'em_dia';
 }
 
 export const PAY_STATUS_CONFIG: Record<ClientePayStatus, { label: string; color: string; bg: string; icon: any }> = {
   avista:   { label: 'Paga à vista', color: 'text-amber-400',  bg: 'bg-amber-500/15',  icon: Crown },
   em_dia:   { label: 'Bom pagador',  color: 'text-green-400',  bg: 'bg-green-500/15',  icon: CheckCircle },
+  pendente: { label: 'Aguardando',   color: 'text-blue-400',   bg: 'bg-blue-500/15',   icon: Clock },
   atrasado: { label: 'Atrasado',     color: 'text-yellow-400', bg: 'bg-yellow-500/15', icon: AlertTriangle },
   critico:  { label: 'Crítico',      color: 'text-red-400',    bg: 'bg-red-500/15',    icon: XOctagon },
 };

@@ -43,6 +43,10 @@ export function userCanEditVenda(user: User): boolean {
   return getUserRoles(user).some(r => r === 'admin' || r === 'superadmin' || r === 'financeiro' || r === 'desenvolvedor');
 }
 
+export function userIsDev(user: User): boolean {
+  return getUserRoles(user).some(r => r === 'desenvolvedor');
+}
+
 export interface Produto {
   id: string;
   modelo: string;
@@ -178,6 +182,7 @@ export interface CicloProduto {
 
 export interface Ciclo {
   id: string;
+  titulo?: string;
   vendedorId: string;
   vendedorNome: string;
   participantes?: { id: string; nome: string }[];

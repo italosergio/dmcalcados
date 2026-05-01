@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Plus, Trash2, Undo2, Landmark, UserCircle, X, Calendar, ImageIcon, Pencil } from 'lucide-react';
+import { Plus, Trash2, Undo2, Landmark, UserCircle, X, Calendar, ImageIcon, Pencil, MoreVertical } from 'lucide-react';
 import { ImageLightbox } from '~/components/common/ImageLightbox';
 import { Card } from '~/components/common/Card';
 import { useDepositos, useUsers, useVendas } from '~/hooks/useRealtime';
@@ -25,6 +25,7 @@ export default function DepositosPage() {
   const [periodo, setPeriodo] = useState<Periodo>('30dias');
   const [criando, setCriando] = useState(false);
   const [selecionado, setSelecionado] = useState<Deposito | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [imagemAberta, setImagemAberta] = useState<string | null>(null);
   const [deleteClicks, setDeleteClicks] = useState<Record<string, number>>({});
   const deleteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -239,12 +240,44 @@ export default function DepositosPage() {
       {selecionado && (() => {
         const d = selecionado;
         return (
-          <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={() => setSelecionado(null)}>
+          <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={() => { setSelecionado(null); setMenuOpen(false); }}>
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
             <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={e => e.stopPropagation()}>
               <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">
                 <span className="text-sm font-semibold">Depósito</span>
-                <button onClick={() => setSelecionado(null)} className="text-content-muted hover:text-content transition-colors"><X size={20} /></button>
+                <div className="flex items-center gap-1">
+                  {!d.deletedAt && (
+                    <div className="relative">
+                      <button onClick={() => setMenuOpen(!menuOpen)} className="text-content-muted hover:text-content p-1 rounded-lg hover:bg-elevated transition-colors"><MoreVertical size={18} /></button>
+                      {menuOpen && (
+                        <div className="absolute right-0 top-full mt-1 w-44 rounded-lg border border-border-subtle bg-elevated shadow-xl z-10 py-1">
+                          <button onClick={() => {
+                            setMenuOpen(false); setEditando(true);
+                            setFormValor(String(d.valor));
+                            setFormData(d.data.slice(0, 10));
+                            setFormDepositante(d.depositanteId);
+                            setFormImagemPreview(d.imagemUrl || null);
+                            setFormImagem(null);
+                            setFormSemFoto(!!d.semFoto);
+                            setFormJustificativa(d.justificativa || '');
+                            setFormErro('');
+                          }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-content hover:bg-surface-hover transition-colors">
+                            <Pencil size={13} /> Editar depósito
+                          </button>
+                          <button onClick={() => { setMenuOpen(false); handleDelete(d.id); }}
+                            className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
+                              (deleteClicks[d.id] || 0) === 0 ? 'text-red-500 hover:bg-surface-hover'
+                              : (deleteClicks[d.id] || 0) === 1 ? 'text-red-400 bg-red-500/10' : 'text-red-300 bg-red-600/20'
+                            }`}>
+                            <Trash2 size={13} /> {actionLoading[d.id] ? 'Aguarde...' : deleteLabel(d.id)}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <button onClick={() => { setSelecionado(null); setMenuOpen(false); }} className="text-content-muted hover:text-content transition-colors"><X size={20} /></button>
+                </div>
               </div>
               <div className="p-5 space-y-3">
                 <p className="text-2xl font-bold text-blue-400">{formatCurrency(d.valor)}</p>
@@ -271,22 +304,6 @@ export default function DepositosPage() {
                   Registrado por {resolveUser(d.registradoPorId, d.registradoPorNome)} em {new Date(d.createdAt).toLocaleString('pt-BR')}
                 </p>
 
-                {!d.deletedAt && (
-                  <button type="button" onClick={() => {
-                    setEditando(true);
-                    setFormValor(String(d.valor));
-                    setFormData(d.data.slice(0, 10));
-                    setFormDepositante(d.depositanteId);
-                    setFormImagemPreview(d.imagemUrl || null);
-                    setFormImagem(null);
-                    setFormSemFoto(!!d.semFoto);
-                    setFormJustificativa(d.justificativa || '');
-                  }}
-                    className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 px-3 py-2 text-xs font-medium transition-colors">
-                    <Pencil size={14} /> Editar depósito
-                  </button>
-                )}
-
                 {d.deletedAt && (
                   <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-center">
                     <p className="text-xs text-red-400 font-medium">Depósito apagado</p>
@@ -296,17 +313,6 @@ export default function DepositosPage() {
                       <Undo2 size={13} /> {actionLoading[d.id] ? 'Aguarde...' : 'Desfazer exclusão'}
                     </button>
                   </div>
-                )}
-
-                {!d.deletedAt && (
-                  <button type="button" onClick={() => handleDelete(d.id)} disabled={actionLoading[d.id]}
-                    className={`w-full flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors disabled:opacity-40 ${
-                      (deleteClicks[d.id] || 0) === 0 ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
-                      : (deleteClicks[d.id] || 0) === 1 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                      : 'bg-red-600/30 text-red-300 hover:bg-red-600/40'
-                    }`}>
-                    <Trash2 size={14} /> {actionLoading[d.id] ? 'Aguarde...' : deleteLabel(d.id)}
-                  </button>
                 )}
               </div>
             </div>
@@ -430,6 +436,7 @@ export default function DepositosPage() {
                   <input value={formJustificativa} onChange={e => setFormJustificativa(e.target.value)} className={`${input} mt-2`} placeholder="Justificativa" />
                 )}
               </div>
+              {formErro && <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">{formErro}</div>}
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => setEditando(false)}
                   className="rounded-lg border border-border-subtle bg-elevated py-2.5 text-sm font-medium text-content-secondary hover:bg-border-medium transition">Cancelar</button>
@@ -446,7 +453,7 @@ export default function DepositosPage() {
                       depositanteNome: dep?.nome || '',
                       ...(imagemUrl ? { imagemUrl } : {}),
                       ...(formSemFoto && !imagemUrl ? { semFoto: true, justificativa: formJustificativa.trim() } : { semFoto: null as any, justificativa: null as any }),
-                      cicloId: findCicloParaUsuario(ciclosAbertos, formDepositante, formData)?.id || undefined,
+                      cicloId: findCicloParaUsuario(ciclosAbertos, formDepositante, formData)?.id || null,
                     });
                     setEditando(false);
                     setSelecionado(null);

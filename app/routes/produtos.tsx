@@ -1,11 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router';
-import { Plus, Package, Footprints, Tag, Warehouse, Calendar, Pencil, Trash2, X, LayoutGrid, List, Search, ImageIcon } from 'lucide-react';
+import { Plus, Package, Footprints, Tag, Warehouse, Calendar, Pencil, Trash2, X, LayoutGrid, List, Search, ImageIcon, ShoppingCart, Check, MoreVertical } from 'lucide-react';
 import { Card } from '~/components/common/Card';
-import { useProdutos } from '~/hooks/useRealtime';
-import { deleteProduto } from '~/services/produtos.service';
+import { useProdutos, useVendas } from '~/hooks/useRealtime';
+import { deleteProduto, updateProduto, getPrecoHistorico, type PrecoHistorico } from '~/services/produtos.service';
 import { formatCurrency } from '~/utils/format';
-import type { Produto } from '~/models';
+import type { Produto, Venda } from '~/models';
 import { useAuth } from '~/contexts/AuthContext';
 import { userIsAdmin } from '~/models';
 
@@ -17,14 +17,47 @@ export default function ProdutosPage() {
   useEffect(() => { if (!authLoading && !allowed) navigate('/vendas'); }, [authLoading, allowed]);
 
   const { produtos, loading } = useProdutos();
+  const { vendas } = useVendas();
   const [search, setSearch] = useState('');
   const [produtoSelecionado, setProdutoSelecionado] = useState<Produto | null>(null);
+  const [vendaSelecionada, setVendaSelecionada] = useState<Venda | null>(null);
+  const [precoHistorico, setPrecoHistorico] = useState<PrecoHistorico[]>([]);
+  const [editandoPreco, setEditandoPreco] = useState(false);
+  const [novoPreco, setNovoPreco] = useState('');
   const [deleteClicks, setDeleteClicks] = useState<Record<string, number>>({});
   const deleteTimers = {} as Record<string, ReturnType<typeof setTimeout>>;
+  const [menuOpen, setMenuOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'cards' | 'tabela'>(() => {
     if (typeof window !== 'undefined') return (localStorage.getItem('produtos-list-view') as 'cards' | 'tabela') || 'cards';
     return 'cards';
   });
+
+  // Load price history when product selected
+  useEffect(() => {
+    if (produtoSelecionado) {
+      getPrecoHistorico(produtoSelecionado.id).then(setPrecoHistorico);
+    } else {
+      setPrecoHistorico([]);
+      setEditandoPreco(false);
+    }
+  }, [produtoSelecionado]);
+
+  // Vendas deste produto
+  const vendasDoProduto = useMemo(() => {
+    if (!produtoSelecionado) return [];
+    return vendas
+      .filter(v => !v.deletedAt && v.produtos.some(p => p.produtoId === produtoSelecionado.id || p.modelo === produtoSelecionado.modelo))
+      .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+  }, [produtoSelecionado, vendas]);
+
+  const handleSalvarPreco = async () => {
+    const valor = parseFloat(novoPreco.replace(',', '.'));
+    if (!produtoSelecionado || isNaN(valor) || valor <= 0) return;
+    await updateProduto(produtoSelecionado.id, { valor });
+    setProdutoSelecionado({ ...produtoSelecionado, valor });
+    setEditandoPreco(false);
+    getPrecoHistorico(produtoSelecionado.id).then(setPrecoHistorico);
+  };
 
   if (!allowed) return null;
 
@@ -125,27 +158,20 @@ export default function ProdutosPage() {
 
       {/* Cards */}
       {!loading && filtered.length > 0 && viewMode === 'cards' && (
-        <div className="space-y-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {filtered.map(produto => (
-            <div key={produto.id} className="rounded-xl border border-border-subtle bg-surface p-3 sm:p-4 cursor-pointer hover:border-border-medium transition-colors" onClick={() => setProdutoSelecionado(produto)}>
-              <div className="flex items-start gap-3">
-                {produto.foto ? (
-                  <img src={produto.foto} alt={produto.modelo} className="h-14 w-14 rounded-lg object-cover shrink-0" />
-                ) : (
-                  <div className="h-14 w-14 rounded-lg bg-elevated flex items-center justify-center shrink-0"><Footprints size={20} className="text-content-muted opacity-30" /></div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <p className="text-sm font-semibold truncate">{produto.modelo}</p>
-                    {produto.referencia && <span className="text-xs bg-elevated px-2 py-0.5 rounded-md text-content-muted">{produto.referencia}</span>}
-                  </div>
-                  <p className="text-lg font-bold text-green-400">{formatCurrency(produto.valor)}</p>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-content-muted">
-                    <span>{produto.estoque} un</span>
-                    <span>{Math.floor(produto.estoque / 15)} pct{produto.estoque % 15 > 0 ? ` + ${produto.estoque % 15}` : ''}</span>
-                    <span className="text-green-400/70">{formatCurrency(produto.valor * produto.estoque)}</span>
-                  </div>
-                </div>
+            <div key={produto.id} className="relative rounded-xl overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform aspect-[3/4]" onClick={() => setProdutoSelecionado(produto)}>
+              {produto.foto ? (
+                <img src={produto.foto} alt={produto.modelo} className="absolute inset-0 h-full w-full object-cover" />
+              ) : (
+                <div className="absolute inset-0 bg-elevated flex items-center justify-center"><Footprints size={40} className="text-content-muted opacity-20" /></div>
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+              <div className="absolute bottom-0 left-0 right-0 p-3">
+                <p className="text-sm font-bold text-white truncate">{produto.modelo}</p>
+                {produto.referencia && <p className="text-[10px] text-white/60">{produto.referencia}</p>}
+                <p className="text-base font-bold text-green-400 mt-1">{formatCurrency(produto.valor)}</p>
+                <p className="text-[10px] text-white/70">{produto.estoque} un · {Math.floor(produto.estoque / 15)} pct{produto.estoque % 15 > 0 ? ` + ${produto.estoque % 15}` : ''}</p>
               </div>
             </div>
           ))}
@@ -191,15 +217,46 @@ export default function ProdutosPage() {
       )}
 
       {/* Modal detalhe */}
-      {produtoSelecionado && (() => {
+      {produtoSelecionado && !vendaSelecionada && (() => {
         const p = produtoSelecionado;
+        // Sparkline preço
+        const hist = [...precoHistorico].sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
+        const sparkW = 200; const sparkH = 40; const pad = 4;
+        const vals = hist.map(h => h.valor);
+        const min = Math.min(...vals, 0); const max = Math.max(...vals, 1);
+        const range = max - min || 1;
+        const sparkLine = hist.length > 1
+          ? hist.map((h, i) => `${i === 0 ? 'M' : 'L'}${pad + i * ((sparkW - pad * 2) / (hist.length - 1))},${pad + (sparkH - pad * 2) - ((h.valor - min) / range) * (sparkH - pad * 2)}`).join(' ')
+          : '';
+        const sparkArea = sparkLine ? sparkLine + ` L${pad + (hist.length - 1) * ((sparkW - pad * 2) / (hist.length - 1))},${sparkH - pad} L${pad},${sparkH - pad} Z` : '';
+
         return (
-          <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={() => setProdutoSelecionado(null)}>
+          <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={() => { setProdutoSelecionado(null); setMenuOpen(false); }}>
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
             <div className="relative w-full max-w-md max-h-[85vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">
                 <h3 className="font-semibold">{p.modelo}</h3>
-                <button onClick={() => setProdutoSelecionado(null)} className="text-content-muted hover:text-content transition-colors"><X size={20} /></button>
+                <div className="flex items-center gap-1">
+                  <div className="relative">
+                    <button onClick={() => setMenuOpen(!menuOpen)} className="text-content-muted hover:text-content p-1 rounded-lg hover:bg-elevated transition-colors"><MoreVertical size={18} /></button>
+                    {menuOpen && (
+                      <div className="absolute right-0 top-full mt-1 w-44 rounded-lg border border-border-subtle bg-elevated shadow-xl z-10 py-1">
+                        <button onClick={() => { setMenuOpen(false); setProdutoSelecionado(null); navigate(`/produtos/${p.id}/editar`); }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-content hover:bg-surface-hover transition-colors">
+                          <Pencil size={13} /> Editar
+                        </button>
+                        <button onClick={() => { setMenuOpen(false); handleDelete(p.id); }}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
+                            (deleteClicks[p.id] || 0) === 0 ? 'text-red-500 hover:bg-surface-hover'
+                            : (deleteClicks[p.id] || 0) === 1 ? 'text-red-400 bg-red-500/10' : 'text-red-300 bg-red-600/20'
+                          }`}>
+                          <Trash2 size={13} /> {deleteLabel(p.id)}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={() => { setProdutoSelecionado(null); setMenuOpen(false); }} className="text-content-muted hover:text-content transition-colors"><X size={20} /></button>
+                </div>
               </div>
               <div className="p-5 space-y-3">
                 {p.foto ? (
@@ -208,7 +265,43 @@ export default function ProdutosPage() {
                   <div className="w-full h-56 rounded-xl bg-elevated flex items-center justify-center"><Footprints size={48} className="text-content-muted opacity-30" /></div>
                 )}
 
-                <p className="text-2xl font-bold text-green-400">{formatCurrency(p.valor)}</p>
+                {/* Preço editável + sparkline */}
+                <div className="rounded-lg bg-elevated p-3">
+                  <div className="flex items-center justify-between">
+                    {editandoPreco ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-content-muted text-sm">R$</span>
+                        <input type="text" value={novoPreco} onChange={e => setNovoPreco(e.target.value)}
+                          className="w-28 rounded border border-border-subtle bg-surface px-2 py-1 text-lg font-bold text-green-400 focus:outline-none focus:border-green-500"
+                          autoFocus onKeyDown={e => { if (e.key === 'Enter') handleSalvarPreco(); if (e.key === 'Escape') setEditandoPreco(false); }} />
+                        <button onClick={handleSalvarPreco} className="text-green-400 hover:text-green-300"><Check size={18} /></button>
+                        <button onClick={() => setEditandoPreco(false)} className="text-content-muted hover:text-content"><X size={18} /></button>
+                      </div>
+                    ) : (
+                      <p className="text-2xl font-bold text-green-400 cursor-pointer hover:text-green-300 transition-colors"
+                        onClick={() => { setNovoPreco(String(p.valor)); setEditandoPreco(true); }}>
+                        {formatCurrency(p.valor)}
+                      </p>
+                    )}
+                  </div>
+                  {hist.length > 1 && (
+                    <div className="mt-2">
+                      <svg viewBox={`0 0 ${sparkW} ${sparkH}`} className="w-full h-10" preserveAspectRatio="none">
+                        <path d={sparkArea} fill="rgba(16,185,129,0.1)" />
+                        <path d={sparkLine} fill="none" stroke="#10b981" strokeWidth="1.5" />
+                        {hist.map((h, i) => {
+                          const cx = pad + i * ((sparkW - pad * 2) / (hist.length - 1));
+                          const cy = pad + (sparkH - pad * 2) - ((h.valor - min) / range) * (sparkH - pad * 2);
+                          return <circle key={i} cx={cx} cy={cy} r="2" fill="#10b981"><title>{new Date(h.data).toLocaleDateString('pt-BR')} · {formatCurrency(h.valor)}</title></circle>;
+                        })}
+                      </svg>
+                      <div className="flex justify-between text-[9px] text-content-muted mt-0.5">
+                        <span>{new Date(hist[0].data).toLocaleDateString('pt-BR')}</span>
+                        <span>{new Date(hist[hist.length - 1].data).toLocaleDateString('pt-BR')}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-lg bg-elevated p-2.5">
@@ -226,30 +319,96 @@ export default function ProdutosPage() {
                   <p className="text-sm font-bold text-green-400">{formatCurrency(p.valor * p.estoque)}</p>
                 </div>
 
+                {/* Vendas deste modelo */}
+                <div>
+                  <div className="flex items-center gap-1.5 text-content-muted mb-1.5"><ShoppingCart size={12} /><span className="text-[10px] font-medium">Vendas ({vendasDoProduto.length})</span></div>
+                  {vendasDoProduto.length === 0 ? (
+                    <p className="text-xs text-content-muted text-center py-3">Nenhuma venda deste modelo</p>
+                  ) : (
+                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                      {vendasDoProduto.map(v => {
+                        const vp = v.produtos.find(pr => pr.produtoId === p.id || pr.modelo === p.modelo);
+                        return (
+                          <div key={v.id} onClick={() => setVendaSelecionada(v)}
+                            className="flex items-center justify-between gap-2 rounded-lg bg-elevated p-2.5 cursor-pointer hover:bg-border-subtle transition-colors">
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium truncate">{v.clienteNome}</p>
+                              <p className="text-[10px] text-content-muted">
+                                {new Date(v.data).toLocaleDateString('pt-BR')}
+                                {vp && <> · {vp.quantidade} un × {formatCurrency(vp.valorUnitario)}</>}
+                              </p>
+                            </div>
+                            <span className="text-xs font-bold text-green-400 shrink-0">{formatCurrency(v.valorTotal)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Modal detalhe venda */}
+      {vendaSelecionada && (() => {
+        const v = vendaSelecionada;
+        return (
+          <div className="fixed inset-0 lg:left-64 z-[110] flex items-center justify-center p-4" onClick={() => setVendaSelecionada(null)}>
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <div className="relative w-full max-w-md max-h-[85vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">
+                <div className="flex items-center gap-2">
+                  {v.pedidoNumero && <span className="text-xs bg-elevated px-2.5 py-1 rounded-md font-mono font-semibold">#{v.pedidoNumero}</span>}
+                  <span className="text-xs text-content-muted">{v.clienteNome}</span>
+                </div>
+                <button onClick={() => setVendaSelecionada(null)} className="text-content-muted hover:text-content transition-colors"><X size={20} /></button>
+              </div>
+              <div className="p-5 space-y-3">
+                <p className="text-2xl font-bold text-green-400">{formatCurrency(v.valorTotal)}</p>
+
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-lg bg-elevated p-2.5">
-                    <div className="flex items-center gap-1.5 text-content-muted mb-0.5"><Calendar size={12} /><span className="text-[10px]">Cadastrado em</span></div>
-                    <p className="text-xs font-semibold">{new Date(p.createdAt).toLocaleDateString('pt-BR')}</p>
+                    <div className="flex items-center gap-1.5 text-content-muted mb-0.5"><Calendar size={12} /><span className="text-[10px]">Data</span></div>
+                    <p className="text-xs font-semibold">{new Date(v.data).toLocaleDateString('pt-BR')}</p>
                   </div>
                   <div className="rounded-lg bg-elevated p-2.5">
-                    <div className="flex items-center gap-1.5 text-content-muted mb-0.5"><Calendar size={12} /><span className="text-[10px]">Atualizado em</span></div>
-                    <p className="text-xs font-semibold">{new Date(p.updatedAt).toLocaleDateString('pt-BR')}</p>
+                    <div className="flex items-center gap-1.5 text-content-muted mb-0.5"><Tag size={12} /><span className="text-[10px]">Vendedor</span></div>
+                    <p className="text-xs font-semibold">{v.vendedorNome}</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <button onClick={() => { setProdutoSelecionado(null); navigate(`/produtos/${p.id}/editar`); }}
-                    className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-500/10 py-2 text-xs font-medium text-blue-400 hover:bg-blue-500/20 transition-colors">
-                    <Pencil size={14} /> Editar
-                  </button>
-                  <button onClick={() => handleDelete(p.id)}
-                    className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
-                      (deleteClicks[p.id] || 0) === 0 ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
-                      : (deleteClicks[p.id] || 0) === 1 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-red-600/30 text-red-300 hover:bg-red-600/40'
-                    }`}>
-                    <Trash2 size={14} /> {deleteLabel(p.id)}
-                  </button>
+                <div className="rounded-lg bg-elevated p-2.5">
+                  <p className="text-[10px] text-content-muted mb-1">Cliente</p>
+                  <p className="text-xs font-semibold">{v.clienteNome}</p>
                 </div>
+
+                <div>
+                  <p className="text-[10px] text-content-muted mb-1.5">Produtos</p>
+                  <div className="space-y-1">
+                    {v.produtos.map((pr, i) => (
+                      <div key={i} className="flex items-center justify-between gap-2 rounded-lg bg-elevated p-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium truncate">{pr.modelo}</p>
+                          <p className="text-[10px] text-content-muted">{pr.quantidade} un × {formatCurrency(pr.valorUnitario)}</p>
+                        </div>
+                        <span className="text-xs font-bold text-green-400 shrink-0">{formatCurrency(pr.valorTotal)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg bg-elevated p-2.5">
+                  <p className="text-[10px] text-content-muted mb-0.5">Pagamento</p>
+                  <p className="text-xs font-semibold">{v.condicaoPagamento === 'avista' ? 'À vista' : `${v.parcelas}x`}{v.condicaoPagamento?.includes('_entrada') ? ' com entrada' : ''}</p>
+                </div>
+
+                <button onClick={() => { setVendaSelecionada(null); setProdutoSelecionado(null); navigate(`/vendas?vendaId=${v.id}`); }}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-500/10 py-2 text-xs font-medium text-blue-400 hover:bg-blue-500/20 transition-colors">
+                  <ShoppingCart size={14} /> Ver em Vendas
+                </button>
               </div>
             </div>
           </div>

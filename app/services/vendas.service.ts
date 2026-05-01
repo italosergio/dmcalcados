@@ -1,4 +1,4 @@
-import { ref, push, get, set, update } from 'firebase/database';
+import { ref, push, get, set, update, remove } from 'firebase/database';
 import { db, auth } from './firebase';
 import { descontarDoCiclo } from './ciclos.service';
 import type { Venda } from '~/models';
@@ -73,6 +73,19 @@ export async function deleteVenda(vendaId: string): Promise<void> {
     deletedAt: new Date().toISOString(),
     deletedBy: user.uid
   });
+}
+
+export async function hardDeleteVenda(vendaId: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Usuário não autenticado');
+
+  const snap = await get(ref(db, `vendas/${vendaId}`));
+  const venda = snap.val();
+  if (venda?.produtos && !venda.deletedAt) {
+    await ajustarEstoque(venda.produtos, 1);
+  }
+
+  await remove(ref(db, `vendas/${vendaId}`));
 }
 
 export async function updateVendaData(vendaId: string, novaData: Date): Promise<void> {

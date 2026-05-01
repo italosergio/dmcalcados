@@ -17,7 +17,7 @@ const chartTheme = {
 const inputCls = "w-full rounded-lg border border-border-subtle bg-elevated px-3 py-2.5 text-sm text-content focus:outline-none focus:border-border-medium focus:ring-1 focus:ring-blue-500/30 transition-colors";
 const ESTADOS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 
-type Periodo = '3m' | '6m' | '1a';
+type Periodo = '1a' | '3a' | '5a';
 
 interface Props {
   cliente: Cliente;
@@ -172,7 +172,7 @@ export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda, user, 
   const vendedoresRanked = Object.values(vendedorMap).sort((a, b) => b.total - a.total);
 
   // Gráfico de compras por mês
-  const mesesAtras = periodo === '3m' ? 3 : periodo === '6m' ? 6 : 12;
+  const mesesAtras = periodo === '1a' ? 12 : periodo === '3a' ? 36 : 60;
   const chartData = useMemo(() => {
     const cats: string[] = [];
     const vals: number[] = [];
@@ -331,7 +331,7 @@ export function ClienteModal({ cliente, vendas, onClose, onNavigateVenda, user, 
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-medium text-content-muted">Compras ao longo do tempo</span>
                 <div className="flex items-center bg-surface rounded-md p-0.5">
-                  {([['3m', '3M'], ['6m', '6M'], ['1a', '1A']] as [Periodo, string][]).map(([v, l]) => (
+                  {([['1a', '1A'], ['3a', '3A'], ['5a', '5A']] as [Periodo, string][]).map(([v, l]) => (
                     <button key={v} onClick={() => setPeriodo(v)}
                       className={`rounded px-2 py-0.5 text-[10px] font-medium transition ${periodo === v ? 'bg-elevated text-content shadow-sm' : 'text-content-muted hover:text-content'}`}>
                       {l}
