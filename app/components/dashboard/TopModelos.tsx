@@ -45,7 +45,7 @@ export function TopModelos({ vendas, resolveNome, vendedores, globalPeriodo, glo
         map[p.modelo].total += p.valorTotal;
         map[p.modelo].porVendedor[vn] = (map[p.modelo].porVendedor[vn] || 0) + p.valorTotal;
         if (p.tipo === 'pacote') { map[p.modelo].pacotes += p.quantidade; map[p.modelo].pares += p.quantidade * 15; }
-        else map[p.modelo].pares += p.quantidade;
+        else { map[p.modelo].pares += p.quantidade; map[p.modelo].pacotes += p.quantidade / 15; }
       });
     });
     return Object.entries(map).sort((a, b) => b[1].total - a[1].total).slice(0, 15);
@@ -97,7 +97,7 @@ export function TopModelos({ vendas, resolveNome, vendedores, globalPeriodo, glo
                 <tr key={modelo}>
                   <td className="px-2.5 py-1.5 text-xs text-content-muted">{i + 1}º</td>
                   <td className="px-2.5 py-1.5 text-xs font-medium truncate max-w-[120px]">{modelo}</td>
-                  <td className="px-2.5 py-1.5 text-xs text-center text-content-muted">{d.pacotes || '—'}</td>
+                  <td className="px-2.5 py-1.5 text-xs text-center text-content-muted">{d.pacotes ? (d.pacotes % 1 === 0 ? d.pacotes : d.pacotes.toFixed(1)) : '—'}</td>
                   <td className="px-2.5 py-1.5 text-xs text-center text-blue-400">{d.pares}</td>
                   <td className="px-2.5 py-1.5 text-xs font-semibold text-green-400 text-right whitespace-nowrap">{formatCurrency(d.total)}</td>
                 </tr>
