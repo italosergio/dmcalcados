@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, ChevronDown, ChevronRight, Tag } from 'lucide-react';
 
-export const APP_VERSION = 'v0.10.7';
+export const APP_VERSION = 'v0.11.0';
 
 interface VersionEntry {
   version: string;
@@ -9,6 +9,22 @@ interface VersionEntry {
 }
 
 const changelog: VersionEntry[] = [
+  {
+    version: 'v0.11.0',
+    items: [
+      'Nova página Painel com cards de navegação e carrossel de destaques',
+      'Carrossel com gráficos de vendas, ranking de modelos, ciclos, clientes e pagamentos',
+      'Background CSS neon moderno para cards de dashboard e clientes',
+      'Despesas agrupadas por dia com gráfico de barras por tipo e cores temáticas',
+      'Modal de dia com lista de despesas e botão de adicionar com data correta',
+      'Despesas por dia colapsável no modal do ciclo com caixa interno acumulado',
+      'Estoque restante exibido em pacotes no demonstrativo do ciclo',
+      'Corrige contagem de pacotes quando venda é registrada em unidades',
+      'Dashboard padrão alterado para 30 dias',
+      'Filtros de despesas com quebra de linha agrupada',
+      'Melhorias gerais em ciclos, vendas, estoque, depósitos e produtos',
+    ],
+  },
   {
     version: 'v0.10.7',
     items: [
