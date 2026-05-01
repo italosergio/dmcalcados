@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router';
-import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, History, LogOut, X, UserCircle, Home, Package, RefreshCw, Plus, ArrowRightLeft, Loader2, Activity, CreditCard, Navigation, PanelLeftClose, PanelLeftOpen, Banknote, Landmark, Tag } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, History, LogOut, X, UserCircle, Home, Package, RefreshCw, Plus, ArrowRightLeft, Loader2, Activity, CreditCard, Navigation, PanelLeftClose, PanelLeftOpen, Banknote, Tag } from 'lucide-react';
 import { APP_VERSION, ChangelogModal } from './ChangelogModal';
 import { logout } from '~/services/auth.service';
 import { useNavigate } from 'react-router';
@@ -80,6 +80,7 @@ export function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }: Sideba
   };
 
   const links = [
+    { to: '/painel', icon: Home, label: getPainelLabel(user) },
     { to: '/vendas', icon: ShoppingBag, label: 'Vendas' },
     { to: '/despesas', icon: DollarSign, label: 'Despesas' },
   ];
@@ -101,7 +102,6 @@ export function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }: Sideba
 
   if (user && userCanAccessAdmin(user)) {
     links.push({ to: '/pagamentos', icon: CreditCard, label: 'Pagamentos' });
-    links.push({ to: '/depositos', icon: Landmark, label: 'Depósitos' });
     links.push({ to: '/vales', icon: Banknote, label: 'Vales' });
     links.push({ to: '/rotas', icon: Navigation, label: 'Rotas' });
   }

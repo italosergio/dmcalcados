@@ -49,6 +49,7 @@ export default function Layout() {
     prevPath.current = location.pathname;
     const LABELS: Record<string, string> = {
       '/vendas': 'Vendas', '/vendas/nova': 'Nova Venda',
+      '/painel': 'Painel',
       '/despesas': 'Despesas', '/despesas/nova': 'Nova Despesa',
       '/produtos': 'Produtos', '/produtos/novo': 'Novo Produto',
       '/estoque': 'Estoque', '/clientes': 'Clientes', '/clientes/novo': 'Novo Cliente',

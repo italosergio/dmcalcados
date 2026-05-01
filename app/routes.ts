@@ -6,6 +6,7 @@ export default [
   route("register", "routes/register.tsx"),
   route("teste", "routes/teste.tsx"),
   layout("components/layout/Layout.tsx", [
+    route("painel", "routes/painel.tsx"),
     route("dashboard", "routes/dashboard.tsx"),
     route("vendas", "routes/vendas.tsx"),
     route("vendas/nova", "routes/vendas.nova.tsx"),
@@ -23,7 +24,6 @@ export default [
     route("ciclos", "routes/ciclos.tsx"),
     route("meu-estoque", "routes/meu-estoque.tsx"),
     route("pagamentos", "routes/pagamentos.tsx"),
-    route("depositos", "routes/depositos.tsx"),
     route("vales", "routes/vales.tsx"),
     route("conta", "routes/conta.tsx"),
     route("rotas", "routes/rotas.tsx"),
