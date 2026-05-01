@@ -46,7 +46,7 @@ function getImagensObrigatorias(tipo: string): number {
 
 type TipoItem = { key: string | null; nome: string; icone?: string };
 
-export function DespesaForm({ onClose }: { onClose?: () => void } = {}) {
+export function DespesaForm({ onClose, dataInicial }: { onClose?: () => void; dataInicial?: string } = {}) {
   const FK = 'despesa';
   const [tipos, setTipos] = useState<TipoItem[]>([]);
   const [tipoSelecionado, setTipoSelecionado] = useCachedState(FK, 'tipo', '');
@@ -60,7 +60,8 @@ export function DespesaForm({ onClose }: { onClose?: () => void } = {}) {
   const [menuTipo, setMenuTipo] = useState<string | null>(null);
 
   const [valor, setValor] = useCachedState(FK, 'valor', '');
-  const [data, setData] = useCachedState(FK, 'data', new Date().toISOString().split('T')[0]);
+  const [data, setData] = useCachedState(FK, 'data', dataInicial || new Date().toISOString().split('T')[0]);
+  useEffect(() => { if (dataInicial) setData(dataInicial); }, [dataInicial]);
   const [imagens, setImagens] = useState<{ file: File; preview: string }[]>([]);
   const [semImagem, setSemImagem] = useState(false);
   const [semImagemJustificativa, setSemImagemJustificativa] = useState('');

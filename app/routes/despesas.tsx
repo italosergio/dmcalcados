@@ -1,6 +1,6 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router';
-import { Plus, Trash2, Undo2, Receipt, UserCircle, Fuel, UtensilsCrossed, BedDouble, ImageIcon, ImageOff, X, Wrench, HelpCircle, Calendar, LayoutGrid, List, FileText, Pencil, type LucideIcon } from 'lucide-react';
+import { Plus, Trash2, Undo2, Receipt, UserCircle, Fuel, UtensilsCrossed, BedDouble, ImageIcon, ImageOff, X, Wrench, HelpCircle, Calendar, LayoutGrid, List, FileText, Pencil, MoreVertical, type LucideIcon } from 'lucide-react';
 import { auth } from '~/services/firebase';
 import { ImageLightbox } from '~/components/common/ImageLightbox';
 import { Card } from '~/components/common/Card';
@@ -18,6 +18,12 @@ export default function DespesasPage() {
   const { users } = useUsers();
   const userNomeMap = new Map(users.map(u => [u.uid || u.id, u.nome]));
   const resolveUser = (id: string, fallback: string) => userNomeMap.get(id) || fallback;
+  const [HC, setHC] = useState<any>(null);
+  const [HCReact, setHCReact] = useState<any>(null);
+  useEffect(() => {
+    import('highcharts').then(m => setHC(m.default));
+    import('highcharts-react-official').then(m => setHCReact(() => m.default));
+  }, []);
   const [tiposMeta, setTiposMeta] = useState<{ nome: string; icone?: string }[]>([]);
   const [tiposLoading, setTiposLoading] = useState(true);
   const loading = despesasLoading || tiposLoading;
@@ -30,7 +36,10 @@ export default function DespesasPage() {
   const deleteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [imagemAberta, setImagemAberta] = useState<string | null>(null);
   const [despesaSelecionada, setDespesaSelecionada] = useState<Despesa | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
   const [criandoDespesa, setCriandoDespesa] = useState(false);
+  const [novaDespesaData, setNovaDespesaData] = useState<string | undefined>();
   const [editando, setEditando] = useState(false);
   const [editValor, setEditValor] = useState('');
   const [editData, setEditData] = useState('');
@@ -60,6 +69,7 @@ export default function DespesasPage() {
   }, [criandoDespesa]);
   const fecharCriandoDespesa = useCallback(() => {
     setCriandoDespesa(false);
+    setNovaDespesaData(undefined);
     setTimeout(() => novaDespesaBtnRef.current?.focus(), 50);
   }, []);
   const [viewMode, setViewMode] = useState<'cards' | 'tabela'>(() => {
@@ -76,6 +86,8 @@ export default function DespesasPage() {
     if (p && ['hoje', '7dias', '30dias', '60dias', 'mes', 'ano', 'tudo'].includes(p)) {
       setPeriodo(p as Periodo);
     }
+    const novaData = params.get('novaData');
+    if (novaData) { setNovaDespesaData(novaData); setCriandoDespesa(true); }
   }, [location.search]);
 
   const changeViewMode = (mode: 'cards' | 'tabela') => {
@@ -193,6 +205,31 @@ export default function DespesasPage() {
         ? `até ${new Date(filtroDataFim + 'T00:00:00').toLocaleDateString('pt-BR')}`
         : { hoje: 'hoje', '7dias': 'últimos 7 dias', '30dias': 'últimos 30 dias', '60dias': 'últimos 60 dias', mes: 'do mês', ano: 'do ano', tudo: '' }[periodo];
 
+  // Agrupar despesas por dia
+  const despesasPorDia = (() => {
+    const map: Record<string, Despesa[]> = {};
+    activeFiltered.forEach(d => {
+      const dia = new Date(d.data).toISOString().slice(0, 10);
+      if (!map[dia]) map[dia] = [];
+      map[dia].push(d);
+    });
+    return Object.entries(map).sort(([a], [b]) => b.localeCompare(a)).map(([dia, desps]) => {
+      const total = desps.reduce((s, d) => s + d.valor, 0);
+      const interno = desps.reduce((s, d) => {
+        const fp = (d as any).fontePagamento;
+        if (fp === 'misto') return s + ((d as any).valorInterno || 0);
+        if (fp === 'caixa_externo') return s;
+        return s + d.valor;
+      }, 0);
+      const externo = total - interno;
+      // Agrupar por tipo para mini barras
+      const porTipo: Record<string, number> = {};
+      desps.forEach(d => { porTipo[d.tipo] = (porTipo[d.tipo] || 0) + d.valor; });
+      const tipos = Object.entries(porTipo).sort(([, a], [, b]) => b - a);
+      return { dia, despesas: desps, total, interno, externo, tipos };
+    });
+  })();
+
   return (
     <div className={viewMode === 'tabela' ? 'flex flex-col h-[calc(100vh-4rem)] overflow-hidden' : ''}>
       {/* Header: Botão + Cards */}
@@ -259,36 +296,37 @@ export default function DespesasPage() {
       </div>
 
       {/* Filtros */}
-      <div className="mb-3 flex flex-wrap lg:flex-nowrap items-center gap-2">
-        {([
-          { value: 'hoje', label: 'Hoje' },
-          { value: '7dias', label: '7 dias' },
-          { value: '30dias', label: '30 dias' },
-          { value: '60dias', label: '60 dias' },
-          { value: 'mes', label: 'Mês' },
-          { value: 'ano', label: 'Ano' },
-          { value: 'tudo', label: 'Tudo' },
-        ] as { value: Periodo; label: string }[]).map(opt => (
-          <button key={opt.value} onClick={() => { setPeriodo(opt.value); setFiltroDataInicio(''); setFiltroDataFim(''); }}
-            className={`rounded-md px-2.5 py-1 text-[10px] font-medium transition whitespace-nowrap ${
-              periodo === opt.value && !filtroDataInicio && !filtroDataFim
-                ? 'bg-green-600 text-white shadow-sm'
-                : 'bg-elevated text-content-secondary hover:bg-border-medium'
-            }`}>
-            {opt.label}
-          </button>
-        ))}
-        <span className="hidden lg:inline text-content-muted/30">│</span>
-        <input type="date" value={filtroDataInicio} onChange={(e) => { setFiltroDataInicio(e.target.value); if (e.target.value) setPeriodo('tudo'); }}
-          className={`rounded-md border bg-elevated px-1.5 py-1 text-[10px] focus:outline-none focus:border-border-medium w-[6.5rem] transition-colors ${filtroDataInicio ? 'border-green-600/30 text-content' : 'border-border-subtle text-content-muted'}`} />
-        <span className="text-[10px] text-content-muted">até</span>
-        <input type="date" value={filtroDataFim} onChange={(e) => { setFiltroDataFim(e.target.value); if (e.target.value) setPeriodo('tudo'); }}
-          className={`rounded-md border bg-elevated px-1.5 py-1 text-[10px] focus:outline-none focus:border-border-medium w-[6.5rem] transition-colors ${filtroDataFim ? 'border-green-600/30 text-content' : 'border-border-subtle text-content-muted'}`} />
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1 flex-wrap">
+          {([
+            { value: 'hoje', label: 'Hoje' },
+            { value: '7dias', label: '7 dias' },
+            { value: '30dias', label: '30 dias' },
+            { value: '60dias', label: '60 dias' },
+            { value: 'mes', label: 'Mês' },
+            { value: 'ano', label: 'Ano' },
+            { value: 'tudo', label: 'Tudo' },
+          ] as { value: Periodo; label: string }[]).map(opt => (
+            <button key={opt.value} onClick={() => { setPeriodo(opt.value); setFiltroDataInicio(''); setFiltroDataFim(''); }}
+              className={`rounded-md px-2.5 py-1 text-[10px] font-medium transition whitespace-nowrap ${
+                periodo === opt.value && !filtroDataInicio && !filtroDataFim
+                  ? 'bg-green-600 text-white shadow-sm'
+                  : 'bg-elevated text-content-secondary hover:bg-border-medium'
+              }`}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1">
+          <input type="date" value={filtroDataInicio} onChange={(e) => { setFiltroDataInicio(e.target.value); if (e.target.value) setPeriodo('tudo'); }}
+            className={`rounded-md border bg-elevated px-1.5 py-1 text-[10px] focus:outline-none focus:border-border-medium w-[6.5rem] transition-colors ${filtroDataInicio ? 'border-green-600/30 text-content' : 'border-border-subtle text-content-muted'}`} />
+          <span className="text-[10px] text-content-muted">até</span>
+          <input type="date" value={filtroDataFim} onChange={(e) => { setFiltroDataFim(e.target.value); if (e.target.value) setPeriodo('tudo'); }}
+            className={`rounded-md border bg-elevated px-1.5 py-1 text-[10px] focus:outline-none focus:border-border-medium w-[6.5rem] transition-colors ${filtroDataFim ? 'border-green-600/30 text-content' : 'border-border-subtle text-content-muted'}`} />
+        </div>
 
         {tiposUnicos.length > 0 && (
-          <>
-            <span className="hidden lg:inline text-content-muted/30">│</span>
-            <div className="flex items-center gap-1 lg:gap-1 flex-wrap lg:flex-nowrap">
+            <div className="flex items-center gap-1 flex-wrap">
               {tiposUnicos.map(t => (
                 <button key={t} onClick={() => toggleTipo(t)}
                   className={`rounded-md px-2.5 py-1 text-[10px] font-medium border transition flex items-center gap-1 whitespace-nowrap ${
@@ -304,9 +342,7 @@ export default function DespesasPage() {
                 </button>
               )}
             </div>
-          </>
         )}
-        <span className="hidden lg:inline text-content-muted/30">│</span>
         <div className="flex items-center gap-1">
           <button onClick={() => setFiltroCaixa(filtroCaixa === 'caixa_interno' ? '' : 'caixa_interno')}
             className={`rounded-md px-2 py-1 text-[10px] font-medium border transition whitespace-nowrap ${filtroCaixa === 'caixa_interno' ? 'bg-green-500/10 text-green-400 border-green-500/30' : 'bg-elevated text-content-muted border-transparent hover:bg-border-medium'}`}>
@@ -367,61 +403,43 @@ export default function DespesasPage() {
       )}
 
       {!loading && filtered.length > 0 && viewMode === 'cards' && (
-        <div className="space-y-3">
-          {filtered.map(despesa => (
-            <div key={despesa.id} className={`rounded-xl border p-3 sm:p-4 cursor-pointer transition-colors ${ (despesa as any).deletedAt ? 'border-red-900/50 bg-red-950/20 opacity-70 hover:opacity-90' : 'border-border-subtle bg-surface hover:border-border-medium' }`} onClick={() => setDespesaSelecionada(despesa)}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs bg-red-500/10 text-red-400 px-2 py-0.5 rounded font-medium flex items-center gap-1">
-                      {getTipoIcone(despesa.tipo)}
-                      {despesa.tipo}
-                    </span>
-                    {(() => {
-                      const fp = (despesa as any).fontePagamento;
-                      if (!fp) return null;
-                      if (fp === 'misto') return (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-purple-500/10 text-purple-400">💵🏦 Misto</span>
-                      );
-                      const isExterno = fp === 'caixa_externo';
-                      return (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium inline-flex items-center gap-1 ${isExterno ? 'bg-blue-500/10 text-blue-400' : 'bg-green-500/10 text-green-400'}`}>
-                          {isExterno ? '🏦 Caixa externo' : '💵 Caixa interno'}
-                        </span>
-                      );
-                    })()}
-                    {((despesa as any).imagemUrl || (despesa as any).imagensUrls?.length) && (
-                      <ImageIcon size={13} className="text-blue-400 shrink-0" />
-                    )}
-                    {!(despesa as any).imagemUrl && !(despesa as any).imagensUrls?.length && (despesa as any).semImagemJustificativa && (
-                      <ImageOff size={13} className="text-red-400 shrink-0" />
-                    )}
-                    {despesa.descricao && (
-                      <FileText size={13} className="text-content-muted/60 shrink-0" />
-                    )}
-                  </div>
-                  {(despesa as any).deletedAt && (
-                    <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded font-medium">Apagada</span>
-                  )}
-                  <p className={`text-lg sm:text-xl font-bold ${ (despesa as any).deletedAt ? 'text-red-400 line-through' : 'text-red-400' }`}>{formatCurrency(despesa.valor)}</p>
-                  <div className="mt-1 flex items-center gap-1 text-xs text-content-muted">
-                    <UserCircle size={14} />
-                    <span className="truncate">{resolveUser(despesa.usuarioId, despesa.usuarioNome)}</span>
-                    {despesa.rateio && despesa.rateio.length > 0 && (
-                      <span className="text-content-muted/60">· inclui {despesa.rateio.map(r => resolveUser(r.usuarioId, r.usuarioNome)).join(', ')}</span>
-                    )}
-                  </div>
-                  {despesa.descricao && (
-                    <p className="text-xs text-content-muted mt-0.5 truncate">{despesa.descricao}</p>
-                  )}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+          {despesasPorDia.map(({ dia, despesas: desps, total, interno, externo, tipos }) => {
+            const label = new Date(dia + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+            const TIPO_CORES: Record<string, string> = {
+              'Combustível': '#f59e0b', 'Alimentação': '#fb923c', 'Café da Manhã': '#fdba74', 'Almoço': '#f97316', 'Janta': '#ea580c', 'Lanche': '#fed7aa',
+              'Hospedagem': '#8b5cf6', 'Hotel': '#a78bfa', 'Manutenção': '#3b82f6', 'Pedágio': '#6366f1', 'Estacionamento': '#818cf8',
+            };
+            const corTipo = (t: string) => TIPO_CORES[t] || '#ef4444';
+            const chartOpts = HC ? {
+              chart: { type: 'bar', height: tipos.length * 24 + 20, backgroundColor: 'transparent', margin: [0, 0, 0, 0], spacing: [2, 4, 2, 4] },
+              title: { text: undefined },
+              xAxis: { categories: tipos.map(([t]) => t), labels: { style: { fontSize: '8px', color: '#a0a0a8' } }, lineWidth: 0, tickLength: 0 },
+              yAxis: { visible: false },
+              legend: { enabled: false },
+              credits: { enabled: false },
+              tooltip: { style: { fontSize: '10px' }, formatter: function(this: any) { return `${this.point.category}: ${formatCurrency(this.y)}`; } },
+              plotOptions: { bar: { borderWidth: 0, borderRadius: 2, dataLabels: { enabled: true, align: 'left' as const, x: 4, style: { fontSize: '7px', color: '#f0f0f2', textOutline: 'none' }, overflow: 'allow' as const, crop: false, formatter: function(this: any) { return formatCurrency(this.y); } } } },
+              series: [{ data: tipos.map(([t, v]) => ({ y: v, color: corTipo(t) })), colorByPoint: true }],
+            } as any : null;
+            return (
+              <div key={dia} onClick={() => setDiaSelecionado(dia)}
+                className="rounded-xl border border-border-subtle bg-surface p-3 cursor-pointer transition-colors hover:border-border-medium aspect-square flex flex-col">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[10px] font-semibold">{label}</p>
+                  <p className="text-[9px] text-content-muted">{desps.length}</p>
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-xs text-content-muted whitespace-nowrap">{formatDate(new Date(despesa.data))}</p>
-                  <p className="text-[10px] text-content-muted/60 whitespace-nowrap">reg. {new Date(despesa.createdAt).toLocaleDateString('pt-BR')}</p>
+                <p className="text-base font-bold text-red-400">{formatCurrency(total)}</p>
+                <div className="flex items-center gap-2 mb-1">
+                  {interno > 0 && <span className="text-[8px] text-green-400">💵 {formatCurrency(interno)}</span>}
+                  {externo > 0 && <span className="text-[8px] text-blue-400">🏦 {formatCurrency(externo)}</span>}
+                </div>
+                <div className="flex-1 min-h-0">
+                  {HC && HCReact && chartOpts && <HCReact highcharts={HC} options={chartOpts} />}
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -463,10 +481,64 @@ export default function DespesasPage() {
 
       {imagemAberta && <ImageLightbox src={imagemAberta} onClose={() => setImagemAberta(null)} />}
 
+      {/* Modal dia */}
+      {diaSelecionado && (() => {
+        const desps = activeFiltered.filter(d => new Date(d.data).toISOString().slice(0, 10) === diaSelecionado);
+        const totalDia = desps.reduce((s, d) => s + d.valor, 0);
+        const internoDia = desps.reduce((s, d) => { const fp = (d as any).fontePagamento; if (fp === 'misto') return s + ((d as any).valorInterno || 0); if (fp === 'caixa_externo') return s; return s + d.valor; }, 0);
+        const externoDia = totalDia - internoDia;
+        const label = new Date(diaSelecionado + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+        return (
+          <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={() => setDiaSelecionado(null)}>
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <div className="relative w-full max-w-md max-h-[80vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">
+                <div>
+                  <p className="text-sm font-semibold capitalize">{label}</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-red-400">{formatCurrency(totalDia)}</span>
+                    {internoDia > 0 && <span className="text-[9px] text-green-400">💵 {formatCurrency(internoDia)}</span>}
+                    {externoDia > 0 && <span className="text-[9px] text-blue-400">🏦 {formatCurrency(externoDia)}</span>}
+                  </div>
+                </div>
+                <button onClick={() => setDiaSelecionado(null)} className="text-content-muted hover:text-content"><X size={20} /></button>
+              </div>
+              <div className="p-4 space-y-2">
+                {desps.map(d => (
+                  <div key={d.id} onClick={() => { setDiaSelecionado(null); setDespesaSelecionada(d); }}
+                    className="rounded-lg bg-elevated p-3 flex items-start justify-between gap-3 cursor-pointer hover:bg-border-medium transition-colors">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-xs bg-red-500/10 text-red-400 px-2 py-0.5 rounded font-medium flex items-center gap-1">
+                          {getTipoIcone(d.tipo)} {d.tipo}
+                        </span>
+                        {(() => {
+                          const fp = (d as any).fontePagamento;
+                          if (fp === 'caixa_externo') return <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/10 text-blue-400">🏦</span>;
+                          if (fp === 'misto') return <span className="text-[9px] px-1 py-0.5 rounded bg-purple-500/10 text-purple-400">💵🏦</span>;
+                          return null;
+                        })()}
+                      </div>
+                      <p className="text-[10px] text-content-muted">{resolveUser(d.usuarioId, d.usuarioNome)}</p>
+                      {d.descricao && <p className="text-[10px] text-content-secondary mt-0.5 truncate">{d.descricao}</p>}
+                    </div>
+                    <span className="text-sm font-bold text-red-400 shrink-0">{formatCurrency(d.valor)}</span>
+                  </div>
+                ))}
+                <button onClick={() => { setDiaSelecionado(null); setNovaDespesaData(diaSelecionado); setCriandoDespesa(true); }}
+                  className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border-subtle py-2.5 text-xs text-content-muted hover:bg-elevated transition">
+                  <Plus size={14} /> Adicionar despesa
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {despesaSelecionada && (() => {
         const d = despesaSelecionada;
         return (
-          <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={() => setDespesaSelecionada(null)}>
+          <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={() => { setDespesaSelecionada(null); setMenuOpen(false); }}>
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
             <div className="relative w-full max-w-sm rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between px-5 py-3 border-b border-border-subtle">
@@ -474,7 +546,41 @@ export default function DespesasPage() {
                   {getTipoIcone(d.tipo)}
                   {d.tipo}
                 </span>
-                <button onClick={() => setDespesaSelecionada(null)} className="text-content-muted hover:text-content transition-colors"><X size={20} /></button>
+                <div className="flex items-center gap-1">
+                  {!(d as any).deletedAt && (
+                    <div className="relative">
+                      <button onClick={() => setMenuOpen(!menuOpen)} className="text-content-muted hover:text-content p-1 rounded-lg hover:bg-elevated transition-colors"><MoreVertical size={18} /></button>
+                      {menuOpen && (
+                        <div className="absolute right-0 top-full mt-1 w-44 rounded-lg border border-border-subtle bg-elevated shadow-xl z-10 py-1">
+                          <button onClick={() => {
+                            setMenuOpen(false); setEditando(true);
+                            setEditValor(String(d.valor));
+                            setEditData(new Date(d.data).toISOString().slice(0, 10));
+                            setEditDescricao(d.descricao || '');
+                            setEditFonte((d as any).fontePagamento || 'caixa_interno');
+                            setEditValorInterno(String((d as any).valorInterno || ''));
+                            setEditValorExterno(String((d as any).valorExterno || ''));
+                            setEditTipo(d.tipo);
+                            setEditImagem(null);
+                            setEditImagemPreview((d as any).imagensUrls?.[0] || (d as any).imagemUrl || null);
+                            setEditRateioIds((d.rateio || []).map((r: any) => r.usuarioId));
+                          }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-content hover:bg-surface-hover transition-colors">
+                            <Pencil size={13} /> Editar despesa
+                          </button>
+                          <button onClick={() => { setMenuOpen(false); handleDelete(d.id); }}
+                            className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
+                              (deleteClicks[d.id] || 0) === 0 ? 'text-red-500 hover:bg-surface-hover'
+                              : (deleteClicks[d.id] || 0) === 1 ? 'text-red-400 bg-red-500/10' : 'text-red-300 bg-red-600/20'
+                            }`}>
+                            <Trash2 size={13} /> {actionLoading[d.id] ? 'Aguarde...' : deleteLabel(d.id)}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <button onClick={() => { setDespesaSelecionada(null); setMenuOpen(false); }} className="text-content-muted hover:text-content transition-colors"><X size={20} /></button>
+                </div>
               </div>
               <div className="p-5 space-y-3">
                 <p className="text-2xl font-bold text-red-400">{formatCurrency(d.valor)}</p>
@@ -518,25 +624,6 @@ export default function DespesasPage() {
                 )}
                 <p className="text-[10px] text-content-muted text-center">Registrado em {new Date(d.createdAt).toLocaleString('pt-BR')}</p>
 
-                {!(d as any).deletedAt && (
-                  <button type="button" onClick={() => {
-                    setEditando(true);
-                    setEditValor(String(d.valor));
-                    setEditData(new Date(d.data).toISOString().slice(0, 10));
-                    setEditDescricao(d.descricao || '');
-                    setEditFonte((d as any).fontePagamento || 'caixa_interno');
-                    setEditValorInterno(String((d as any).valorInterno || ''));
-                    setEditValorExterno(String((d as any).valorExterno || ''));
-                    setEditTipo(d.tipo);
-                    setEditImagem(null);
-                    setEditImagemPreview((d as any).imagensUrls?.[0] || (d as any).imagemUrl || null);
-                    setEditRateioIds((d.rateio || []).map((r: any) => r.usuarioId));
-                  }}
-                    className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 px-3 py-2 text-xs font-medium transition-colors">
-                    <Pencil size={14} /> Editar despesa
-                  </button>
-                )}
-
                 {(d as any).deletedAt && (
                   <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-center">
                     <p className="text-xs text-red-400 font-medium">Despesa apagada</p>
@@ -554,26 +641,6 @@ export default function DespesasPage() {
                     </button>
                   </div>
                 )}
-
-                {!(d as any).deletedAt && (
-                <button
-                  type="button"
-                  onClick={() => handleDelete(d.id)}
-                  disabled={actionLoading[d.id]}
-                  className={`w-full flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors disabled:opacity-40 ${
-                    actionLoading[d.id]
-                      ? 'bg-elevated text-content-muted'
-                      : (deleteClicks[d.id] || 0) === 0
-                        ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
-                        : (deleteClicks[d.id] || 0) === 1
-                          ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                          : 'bg-red-600/30 text-red-300 hover:bg-red-600/40'
-                  }`}
-                >
-                  <Trash2 size={14} />
-                  {actionLoading[d.id] ? 'Aguarde...' : deleteLabel(d.id)}
-                </button>
-                )}
               </div>
             </div>
           </div>
@@ -588,7 +655,7 @@ export default function DespesasPage() {
               <button onClick={fecharCriandoDespesa} className="text-content-muted hover:text-content transition-colors"><X size={20} /></button>
             </div>
             <div className="p-5">
-              <DespesaForm onClose={fecharCriandoDespesa} />
+              <DespesaForm onClose={fecharCriandoDespesa} dataInicial={novaDespesaData} />
             </div>
           </div>
         </div>
