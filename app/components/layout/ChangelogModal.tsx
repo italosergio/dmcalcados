@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, ChevronDown, ChevronRight, Tag } from 'lucide-react';
 
-export const APP_VERSION = 'v0.11.0';
+export const APP_VERSION = 'v0.11.1';
 
 interface VersionEntry {
   version: string;
@@ -10,14 +10,56 @@ interface VersionEntry {
 
 const changelog: VersionEntry[] = [
   {
+    version: 'v0.11.1',
+    items: [
+      'Botão da landing page redireciona para Painel Administrativo ao invés de Vendas',
+      'Clique na logo quando logado também vai para o Painel Administrativo',
+    ],
+  },
+  {
     version: 'v0.11.0',
     items: [
-      'Nova página Painel com cards de navegação e carrossel de destaques',
-      'Carrossel com gráficos de vendas, ranking de modelos, ciclos, clientes e pagamentos',
+      'Carrossel com slides de ciclos, clientes, condições de pagamento e sparklines',
+      'Busca e filtro nos cards de navegação',
+      'Modal de ciclo acessível direto do carrossel',
+    ],
+  },
+  {
+    version: 'v0.10.13',
+    items: [
+      'Carrossel de destaques com gráficos de vendas e ranking de modelos',
+      'Navegação por setas e progress bars com auto-play e pausa no hover',
+    ],
+  },
+  {
+    version: 'v0.10.12',
+    items: [
+      'Nova página Painel com grid de cards de navegação por role',
+      'Cards com imagens de fundo, ícones e descrições por seção',
+    ],
+  },
+  {
+    version: 'v0.10.11',
+    items: [
       'Background CSS neon moderno para cards de dashboard e clientes',
+    ],
+  },
+  {
+    version: 'v0.10.10',
+    items: [
       'Despesas agrupadas por dia com gráfico de barras por tipo e cores temáticas',
       'Modal de dia com lista de despesas e botão de adicionar com data correta',
+    ],
+  },
+  {
+    version: 'v0.10.9',
+    items: [
       'Despesas por dia colapsável no modal do ciclo com caixa interno acumulado',
+    ],
+  },
+  {
+    version: 'v0.10.8',
+    items: [
       'Estoque restante exibido em pacotes no demonstrativo do ciclo',
       'Corrige contagem de pacotes quando venda é registrada em unidades',
       'Dashboard padrão alterado para 30 dias',

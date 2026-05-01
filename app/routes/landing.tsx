@@ -102,7 +102,7 @@ export default function LandingPage() {
 
   const handleLogoClick = () => {
     if (user) {
-      navigate('/vendas');
+      navigate('/painel');
       return;
     }
     logoClicks.current++;
@@ -162,11 +162,11 @@ export default function LandingPage() {
             <ArrowRight size={16} className="relative z-10 transition-transform duration-300 group-hover:translate-x-1" />
           </a>
           {user ? (
-            <button onClick={() => navigate('/vendas')}
+            <button onClick={() => navigate('/painel')}
               className="cta-button-silver group relative inline-flex items-center gap-3 px-8 py-3 text-sm font-semibold uppercase tracking-wider text-white overflow-hidden">
               <span className="cta-bg-silver absolute inset-0" />
               <span className="cta-shine absolute inset-0" />
-              <span style={{ fontFamily: '"Playfair Display", serif' }} className="relative z-10">Acessar Painel</span>
+              <span style={{ fontFamily: '"Playfair Display", serif' }} className="relative z-10">Painel Administrativo</span>
               <ArrowRight size={16} className="relative z-10 transition-transform duration-300 group-hover:translate-x-1" />
             </button>
           ) : (
