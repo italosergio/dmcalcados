@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, ChevronDown, ChevronRight, Tag } from 'lucide-react';
 
-export const APP_VERSION = 'v0.12.0';
+export const APP_VERSION = 'v0.12.1';
 
 interface VersionEntry {
   version: string;
@@ -9,6 +9,13 @@ interface VersionEntry {
 }
 
 const changelog: VersionEntry[] = [
+  {
+    version: 'v0.12.1',
+    items: [
+      'Botão de colapso da sidebar movido para o header (desktop)',
+      'Link de Histórico removido da sidebar — acesso pelo sino no header',
+    ],
+  },
   {
     version: 'v0.12.0',
     items: [

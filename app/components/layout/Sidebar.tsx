@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router';
-import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, History, LogOut, X, UserCircle, Home, Package, RefreshCw, Plus, ArrowRightLeft, Loader2, Activity, CreditCard, Navigation, PanelLeftClose, PanelLeftOpen, Banknote, Tag } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, LogOut, X, UserCircle, Home, Package, RefreshCw, Plus, ArrowRightLeft, Loader2, Activity, CreditCard, Navigation, Banknote, Tag } from 'lucide-react';
 import { APP_VERSION, ChangelogModal } from './ChangelogModal';
 import { logout } from '~/services/auth.service';
 import { useNavigate } from 'react-router';
@@ -27,10 +27,9 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   collapsed?: boolean;
-  onToggleCollapse?: () => void;
 }
 
-export function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }: SidebarProps) {
+export function Sidebar({ isOpen, onClose, collapsed }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, switching, switchAccount } = useAuth();
@@ -106,10 +105,6 @@ export function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }: Sideba
     links.push({ to: '/rotas', icon: Navigation, label: 'Rotas' });
   }
 
-  if (user && userIsAdmin(user)) {
-    links.push({ to: '/historico', icon: History, label: 'Histórico' });
-  }
-
   if (user && getUserRoles(user).includes('desenvolvedor')) {
     links.push({ to: '/analytics', icon: Activity, label: 'Analytics' });
   }
@@ -135,16 +130,23 @@ export function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }: Sideba
         )}
 
         <div className={`flex items-center justify-between px-5 py-4 lg:py-3 ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}>
-          <Link to="/" className={`hidden lg:flex items-center gap-3 ${collapsed ? 'lg:justify-center' : ''}`}>
+          <Link to="/" className={`flex items-center gap-3 ${collapsed ? 'lg:justify-center' : ''}`}>
             <img src="/logo-dmcalcados.png" alt="DM Calçados" className="h-7 w-7 object-contain logo-glow shrink-0" />
-            {!collapsed && (
-              <div className="flex flex-col">
+            {(!collapsed) && (
+              <div className={`flex flex-col ${collapsed ? 'lg:hidden' : 'flex'}`}>
                 <h1 style={{ fontFamily: '"Playfair Display", serif' }} className="text-base font-semibold leading-tight uppercase tracking-wide">DM Calçados</h1>
-                {user && <div className="flex flex-wrap gap-0.5">{getUserRoles(user).map(r => <RoleBadge key={r} role={r} size="sm" />)}</div>}
+                {user && <div className="flex flex-wrap gap-0.5 lg:flex hidden">{getUserRoles(user).map(r => <RoleBadge key={r} role={r} size="sm" />)}</div>}
               </div>
             )}
           </Link>
-          <div className="flex lg:hidden items-center gap-2.5 flex-1 min-w-0">
+          <button onClick={onClose}
+            className="lg:hidden rounded-lg p-1 hover:bg-surface-hover text-content-secondary transition-colors" aria-label="Fechar menu">
+            <X size={22} />
+          </button>
+        </div>
+
+        <div className="lg:hidden px-5 pb-4">
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
             <Link to="/conta" className="shrink-0">
               {user?.foto ? (
                 <img src={user.foto} alt={user.nome} className="h-8 w-8 rounded-full object-cover" />
@@ -172,10 +174,6 @@ export function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }: Sideba
               </button>
             )}
           </div>
-          <button onClick={onClose}
-            className="lg:hidden rounded-lg p-1 hover:bg-surface-hover text-content-secondary transition-colors" aria-label="Fechar menu">
-            <X size={22} />
-          </button>
         </div>
 
         {showAccounts && (
@@ -223,12 +221,6 @@ export function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }: Sideba
         </nav>
 
         <div className={`m-3 lg:mt-1 space-y-0.5 ${collapsed ? 'lg:mx-2' : ''}`}>
-          {/* Collapse toggle - desktop only */}
-          <button onClick={onToggleCollapse}
-            className={`hidden lg:flex w-full items-center gap-3 rounded-lg px-3 ${sz.py} ${sz.text} text-content-secondary hover:bg-surface-hover hover:text-content transition-colors ${collapsed ? 'justify-center px-0' : ''}`}
-            title={collapsed ? 'Expandir menu' : 'Minimizar menu'}>
-            {collapsed ? <PanelLeftOpen size={sz.icon} /> : <><PanelLeftClose size={sz.icon} /> <span>Minimizar</span></>}
-          </button>
           <Link to="/conta"
             className={`flex items-center gap-3 rounded-lg px-3 ${sz.py} ${sz.text} transition-colors ${collapsed ? 'lg:justify-center lg:px-0' : ''} ${
               isActive('/conta') ? 'bg-blue-600/10 text-blue-400' : 'text-content-secondary hover:bg-surface-hover hover:text-content'
