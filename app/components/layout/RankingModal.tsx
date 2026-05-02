@@ -3,6 +3,7 @@ import { X, Trophy, Medal, Gift, Rocket } from 'lucide-react';
 import { ref, get } from 'firebase/database';
 import { db } from '~/services/firebase';
 import { formatCurrency } from '~/utils/format';
+import { isVendedor } from '~/models';
 import { salvarRanking, type RankingEntry } from '~/services/ranking.service';
 
 type Periodo = 'dia' | 'mes' | 'ano';
@@ -35,7 +36,7 @@ export function RankingModal({ initialTab = 'mes', onClose }: { initialTab?: 'di
       const usersData = usersSnap.exists() ? usersSnap.val() : {};
       const vendedorIds = new Set(Object.entries(usersData).filter(([_, u]: any) => {
         const roles: string[] = u.roles?.length ? u.roles : [u.role];
-        return roles.some((r: string) => r === 'vendedor' || r === 'vendedor1' || r === 'vendedor2' || r === 'vendedor3');
+        return roles.some((r: string) => isVendedor(r as any));
       }).map(([id]) => id));
 
       const vendas = Object.values(snap.val()) as any[];

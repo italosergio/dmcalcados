@@ -3,7 +3,6 @@ import type { UserRole } from '~/models';
 export const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrador',
   superadmin: 'Super Admin',
-  vendedor: 'Vendedor',
   vendedor1: 'Vendedor I',
   vendedor2: 'Vendedor II',
   vendedor3: 'Vendedor III',
@@ -12,7 +11,6 @@ export const ROLE_LABELS: Record<string, string> = {
 };
 
 export const ROLE_COLORS: Record<string, string> = {
-  vendedor: 'bg-green-900/60 text-green-300',
   vendedor1: 'bg-green-900/60 text-green-300',
   vendedor2: 'bg-green-800/60 text-green-400 drop-shadow-[0_0_4px_rgba(74,222,128,0.4)]',
   vendedor3: 'bg-green-800/60 text-green-400 drop-shadow-[0_0_8px_rgba(74,222,128,0.6)]',

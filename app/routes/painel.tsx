@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router';
-import { ShoppingBag, DollarSign, Warehouse, Users, LayoutDashboard, RefreshCw, CreditCard, Banknote, Navigation, Package, Bell, Activity, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ShoppingBag, DollarSign, Warehouse, Users, LayoutDashboard, RefreshCw, CreditCard, Banknote, Navigation, Package, Bell, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useAuth } from '~/contexts/AuthContext';
-import { userIsAdmin, userIsVendedor, userCanAccessAdmin, getUserRoles } from '~/models';
+import { userIsAdmin, userIsVendedor, userCanAccessAdmin, getUserRoles, isVendedor } from '~/models';
 import type { Ciclo } from '~/models';
 import { useVendas, useClientes, useCiclos, useDespesas, useDepositos, useVales } from '~/hooks/useRealtime';
 import { formatCurrency } from '~/utils/format';
@@ -14,20 +14,19 @@ const clientesImage = 'https://images.unsplash.com/photo-1556745757-8d76bdb6984b
 const clientesBannerImage = 'https://images.pexels.com/photos/8470843/pexels-photo-8470843.jpeg?auto=compress&cs=tinysrgb&w=1200';
 
 const cards = [
-  { to: '/vendas', icon: ShoppingBag, label: 'Vendas', desc: 'Registrar e acompanhar vendas', img: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&q=80', color: 'from-green-900/30 to-green-950/50', border: 'hover:border-green-500/40', roles: ['all'] },
-  { to: '/despesas', icon: DollarSign, label: 'Despesas', desc: 'Controle de gastos por dia', img: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=600&q=80', color: 'from-red-900/30 to-red-950/50', border: 'hover:border-red-500/40', roles: ['all'] },
-  { to: '/ciclos', icon: RefreshCw, label: 'Ciclos', desc: 'Gerenciar ciclos de venda', img: 'https://images.unsplash.com/photo-1519003722824-194d4455a60c?w=600&q=80', color: 'from-emerald-900/30 to-emerald-950/50', border: 'hover:border-emerald-500/40', roles: ['admin'] },
-  { to: '/meu-estoque', icon: Package, label: 'Meu Estoque', desc: 'Pacotes no carro', img: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600&q=80', color: 'from-sky-900/30 to-sky-950/50', border: 'hover:border-sky-500/40', roles: ['vendedor'] },
-  { to: '/meus-clientes', icon: Users, label: 'Meus Clientes', desc: 'Carteira de clientes', img: 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=600&q=80', color: 'from-violet-900/30 to-violet-950/50', border: 'hover:border-violet-500/40', roles: ['vendedor'] },
-  { to: '/estoque', icon: Warehouse, label: 'Estoque', desc: 'Produtos e entradas', img: 'https://images.unsplash.com/photo-1553413077-190dd305871c?w=600&q=80', color: 'from-blue-900/30 to-blue-950/50', border: 'hover:border-blue-500/40', roles: ['admin'] },
-  { to: '/produtos', icon: Package, label: 'Produtos', desc: 'Catálogo de modelos', img: 'https://images.unsplash.com/photo-1603487742131-4160ec999306?w=600&q=80', color: 'from-orange-900/30 to-orange-950/50', border: 'hover:border-orange-500/40', roles: ['admin'] },
-  { to: '/clientes', icon: Users, label: 'Clientes', desc: 'Todos os clientes', img: clientesImage, color: 'from-purple-900/30 to-purple-950/50', border: 'hover:border-purple-500/40', roles: ['admin'] },
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', desc: 'Gráficos e métricas', img: dashboardImage, color: 'from-cyan-900/40 to-cyan-950/60', border: 'hover:border-cyan-500/40', roles: ['all'] },
-  { to: '/pagamentos', icon: CreditCard, label: 'Pagamentos', desc: 'Parcelas e cobranças', img: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=600&q=80', color: 'from-indigo-900/30 to-indigo-950/50', border: 'hover:border-indigo-500/40', roles: ['adminAccess'] },
-  { to: '/vales', icon: Banknote, label: 'Vales', desc: 'Vales de funcionários', img: 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=600&q=80', color: 'from-amber-900/30 to-amber-950/50', border: 'hover:border-amber-500/40', roles: ['adminAccess'] },
-  { to: '/rotas', icon: Navigation, label: 'Rotas', desc: 'Rastreamento GPS', img: rotasImage, color: 'from-teal-900/30 to-teal-950/50', border: 'hover:border-teal-500/40', roles: ['adminAccess'] },
-  { to: '/historico', icon: Bell, label: 'Notificações', desc: 'Alertas e eventos recentes', img: 'https://images.unsplash.com/photo-1504868584819-f8e8b4b6d7e3?w=600&q=80', color: 'from-slate-800/30 to-slate-900/50', border: 'hover:border-slate-400/40', roles: ['admin'] },
-  { to: '/analytics', icon: Activity, label: 'Analytics', desc: 'Análises avançadas', img: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&q=80', color: 'from-fuchsia-900/30 to-fuchsia-950/50', border: 'hover:border-fuchsia-500/40', roles: ['dev'] },
+  { to: '/vendas', icon: ShoppingBag, label: 'Vendas', desc: 'Registrar e acompanhar vendas', img: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&q=80', color: 'from-green-900/77 to-green-950/77', border: 'hover:border-green-500/40', roles: ['all'] },
+  { to: '/despesas', icon: DollarSign, label: 'Despesas', desc: 'Controle de gastos por dia', img: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=600&q=80', color: 'from-red-900/77 to-red-950/77', border: 'hover:border-red-500/40', roles: ['all'] },
+  { to: '/ciclos', icon: RefreshCw, label: 'Ciclos', desc: 'Gerenciar ciclos de venda', img: 'https://images.unsplash.com/photo-1519003722824-194d4455a60c?w=600&q=80', color: 'from-emerald-900/77 to-emerald-950/77', border: 'hover:border-emerald-500/40', roles: ['admin'] },
+  { to: '/meu-estoque', icon: Package, label: 'Meu Estoque', desc: 'Pacotes no carro', img: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600&q=80', color: 'from-sky-900/77 to-sky-950/77', border: 'hover:border-sky-500/40', roles: ['vendedor1', 'vendedor2', 'vendedor3'] },
+  { to: '/meus-clientes', icon: Users, label: 'Meus Clientes', desc: 'Carteira de clientes', img: 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=600&q=80', color: 'from-violet-900/77 to-violet-950/77', border: 'hover:border-violet-500/40', roles: ['vendedor1', 'vendedor2', 'vendedor3'] },
+  { to: '/estoque', icon: Warehouse, label: 'Estoque', desc: 'Produtos e entradas', img: 'https://images.unsplash.com/photo-1553413077-190dd305871c?w=600&q=80', color: 'from-blue-900/77 to-blue-950/77', border: 'hover:border-blue-500/40', roles: ['admin'] },
+  { to: '/produtos', icon: Package, label: 'Produtos', desc: 'Catálogo de modelos', img: 'https://images.unsplash.com/photo-1603487742131-4160ec999306?w=600&q=80', color: 'from-orange-900/77 to-orange-950/77', border: 'hover:border-orange-500/40', roles: ['admin'] },
+  { to: '/clientes', icon: Users, label: 'Clientes', desc: 'Todos os clientes', img: clientesImage, color: 'from-purple-900/77 to-purple-950/77', border: 'hover:border-purple-500/40', roles: ['admin'] },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', desc: 'Gráficos e métricas', img: dashboardImage, color: 'from-cyan-900/77 to-cyan-950/77', border: 'hover:border-cyan-500/40', roles: ['all'] },
+  { to: '/pagamentos', icon: CreditCard, label: 'Pagamentos', desc: 'Parcelas e cobranças', img: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=600&q=80', color: 'from-indigo-900/77 to-indigo-950/77', border: 'hover:border-indigo-500/40', roles: ['adminAccess'] },
+  { to: '/vales', icon: Banknote, label: 'Vales', desc: 'Vales de funcionários', img: 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=600&q=80', color: 'from-amber-900/77 to-amber-950/77', border: 'hover:border-amber-500/40', roles: ['adminAccess'] },
+  { to: '/rotas', icon: Navigation, label: 'Rotas', desc: 'Rastreamento GPS', img: rotasImage, color: 'from-teal-900/77 to-teal-950/77', border: 'hover:border-teal-500/40', roles: ['adminAccess'] },
+  { to: '/historico', icon: Bell, label: 'Notificações', desc: 'Alertas e eventos recentes', img: 'https://images.unsplash.com/photo-1504868584819-f8e8b4b6d7e3?w=600&q=80', color: 'from-blue-900/77 to-blue-950/77', border: 'hover:border-blue-500/40', roles: ['admin'] },
 ];
 
 export default function PainelPage() {
@@ -36,7 +35,7 @@ export default function PainelPage() {
   const visibleCards = cards.filter(c => {
     if (c.roles.includes('all')) return true;
     if (c.roles.includes('admin') && user && userIsAdmin(user)) return true;
-    if (c.roles.includes('vendedor') && user && userIsVendedor(user)) return true;
+    if (c.roles.some(r => isVendedor(r as any)) && user && userIsVendedor(user)) return true;
     if (c.roles.includes('adminAccess') && user && userCanAccessAdmin(user)) return true;
     if (c.roles.includes('dev') && user && getUserRoles(user).includes('desenvolvedor')) return true;
     return false;

@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'vendedor' | 'vendedor1' | 'vendedor2' | 'vendedor3' | 'financeiro' | 'desenvolvedor' | 'superadmin';
+export type UserRole = 'vendedor1' | 'vendedor2' | 'vendedor3' | 'admin' | 'financeiro' | 'desenvolvedor' | 'superadmin';
 
 export type UserStatus = 'ativo' | 'inativo' | 'suspenso';
 
@@ -24,7 +24,7 @@ export function getUserRoles(user: User): UserRole[] {
 }
 
 export function isVendedor(role: UserRole | undefined): boolean {
-  return role === 'vendedor' || role === 'vendedor1' || role === 'vendedor2' || role === 'vendedor3';
+  return role === 'vendedor1' || role === 'vendedor2' || role === 'vendedor3';
 }
 
 export function userIsVendedor(user: User): boolean {

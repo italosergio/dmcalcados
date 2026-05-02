@@ -84,7 +84,7 @@ export async function updateUserRoles(userId: string, roles: UserRole[]): Promis
     }
   }
 
-  const priority: UserRole[] = ['superadmin', 'desenvolvedor', 'admin', 'financeiro', 'vendedor1', 'vendedor2', 'vendedor3', 'vendedor'];
+  const priority: UserRole[] = ['superadmin', 'desenvolvedor', 'admin', 'financeiro', 'vendedor1', 'vendedor2', 'vendedor3'];
   const primaryRole = priority.find(r => roles.includes(r)) ?? roles[0];
 
   await update(ref(db, `users/${userId}`), {
