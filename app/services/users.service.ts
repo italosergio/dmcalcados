@@ -58,6 +58,7 @@ export async function deleteUser(userId: string): Promise<void> {
   await update(ref(db, `users/${userId}`), {
     deletedAt: new Date().toISOString(),
     deletedBy: current.uid,
+    deletedByNome: current.data.nome,
   });
 }
 
@@ -92,6 +93,7 @@ export async function updateUserRoles(userId: string, roles: UserRole[]): Promis
     roles,
     roleUpdatedAt: new Date().toISOString(),
     roleUpdatedBy: current.uid,
+    roleUpdatedByNome: current.data.nome,
   });
 }
 
@@ -142,6 +144,20 @@ export async function resetUserPassword(userId: string, newPassword: string): Pr
     _pendingPassword: btoa(encodeURIComponent(newPassword)),
     passwordResetAt: new Date().toISOString(),
     passwordResetBy: current.uid,
+  });
+}
+
+export async function restoreUser(userId: string): Promise<void> {
+  const current = await getCurrentUser();
+  if (getHierarchyLevel({ id: userId }) >= getHierarchyLevel(current.data)) {
+    throw new Error('Sem permissão para restaurar este usuário');
+  }
+
+  await update(ref(db, `users/${userId}`), {
+    deletedAt: null,
+    deletedBy: null,
+    restoredAt: new Date().toISOString(),
+    restoredBy: current.uid,
   });
 }
 

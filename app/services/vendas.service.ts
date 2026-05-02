@@ -69,9 +69,13 @@ export async function deleteVenda(vendaId: string): Promise<void> {
     await ajustarEstoque(venda.produtos, 1);
   }
 
+  const userData = await get(ref(db, `users/${user.uid}`));
+  const nome = userData.val()?.nome || '';
+
   await update(ref(db, `vendas/${vendaId}`), {
     deletedAt: new Date().toISOString(),
-    deletedBy: user.uid
+    deletedBy: user.uid,
+    deletedByNome: nome,
   });
 }
 
@@ -89,16 +93,33 @@ export async function hardDeleteVenda(vendaId: string): Promise<void> {
 }
 
 export async function updateVendaData(vendaId: string, novaData: Date): Promise<void> {
-  await update(ref(db, `vendas/${vendaId}`), { data: novaData.toISOString() });
+  const user = auth.currentUser;
+  const userData = await get(ref(db, `users/${user!.uid}`));
+  const nome = userData.val()?.nome || '';
+  await update(ref(db, `vendas/${vendaId}`), {
+    data: novaData.toISOString(),
+    updatedAt: new Date().toISOString(),
+    updatedBy: user!.uid,
+    updatedByNome: nome,
+  });
 }
 
 export async function updateVenda(vendaId: string, data: Partial<Omit<Venda, 'id' | 'createdAt'>>): Promise<void> {
+  const user = auth.currentUser;
+  const userData = await get(ref(db, `users/${user!.uid}`));
+  const nome = userData.val()?.nome || '';
   const payload: any = { ...data };
   if (payload.data instanceof Date) payload.data = payload.data.toISOString();
+  payload.updatedAt = new Date().toISOString();
+  payload.updatedBy = user!.uid;
+  payload.updatedByNome = nome;
   await update(ref(db, `vendas/${vendaId}`), payload);
 }
 
 export async function restoreVenda(vendaId: string): Promise<void> {
+  const user = auth.currentUser;
+  const userData = await get(ref(db, `users/${user!.uid}`));
+  const nome = userData.val()?.nome || '';
   const snap = await get(ref(db, `vendas/${vendaId}`));
   const venda = snap.val();
   if (venda?.produtos && venda.deletedAt) {
@@ -107,7 +128,10 @@ export async function restoreVenda(vendaId: string): Promise<void> {
 
   await update(ref(db, `vendas/${vendaId}`), {
     deletedAt: null,
-    deletedBy: null
+    deletedBy: null,
+    restoredAt: new Date().toISOString(),
+    restoredBy: user!.uid,
+    restoredByNome: nome,
   });
 }
 

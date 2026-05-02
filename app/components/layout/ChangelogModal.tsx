@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, ChevronDown, ChevronRight, Tag } from 'lucide-react';
 
-export const APP_VERSION = 'v0.12.10';
+export const APP_VERSION = 'v0.13.0';
 
 interface VersionEntry {
   version: string;
@@ -9,6 +9,22 @@ interface VersionEntry {
 }
 
 const changelog: VersionEntry[] = [
+  {
+    version: 'v0.13.0',
+    items: [
+      'Rastreamento completo de notificações com quem fez cada ação e links para redirecionar',
+      'Vendas: trackeado criação, edição, exclusão e restauração',
+      'Despesas: trackeado criação, edição, exclusão e restauração',
+      'Ciclos: trackeado criação, edição, fechamento, reabertura e exclusão',
+      'Depósitos: trackeado criação, edição, exclusão e restauração',
+      'Vales: trackeado criação, registros, quitação e edição',
+      'Clientes: trackeado criação, edição e exclusão',
+      'Produtos: trackeado criação, edição e exclusão (agora soft delete)',
+      'Usuários: trackeado criação, alteração de role, status, reset de senha e restauração',
+      'Header com listeners em tempo real para todos os novos tipos de evento',
+      'Cards de notificação com botão de link externo para a página correspondente',
+    ],
+  },
   {
     version: 'v0.12.10',
     items: [

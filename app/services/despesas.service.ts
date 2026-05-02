@@ -40,22 +40,38 @@ export async function deleteDespesa(despesaId: string): Promise<void> {
   const user = auth.currentUser;
   if (!user) throw new Error('Usuário não autenticado');
 
+  const userData = await get(ref(db, `users/${user.uid}`));
+  const nome = userData.val()?.nome || '';
+
   await update(ref(db, `despesas/${despesaId}`), {
     deletedAt: new Date().toISOString(),
-    deletedBy: user.uid
+    deletedBy: user.uid,
+    deletedByNome: nome,
   });
 }
 
 export async function restoreDespesa(despesaId: string): Promise<void> {
+  const user = auth.currentUser;
+  const userData = await get(ref(db, `users/${user!.uid}`));
+  const nome = userData.val()?.nome || '';
   await update(ref(db, `despesas/${despesaId}`), {
     deletedAt: null,
-    deletedBy: null
+    deletedBy: null,
+    restoredAt: new Date().toISOString(),
+    restoredBy: user!.uid,
+    restoredByNome: nome,
   });
 }
 
 export async function updateDespesa(despesaId: string, data: any): Promise<void> {
+  const user = auth.currentUser;
+  const userData = await get(ref(db, `users/${user!.uid}`));
+  const nome = userData.val()?.nome || '';
   const payload = { ...data };
   if (payload.data instanceof Date) payload.data = payload.data.toISOString();
+  payload.updatedAt = new Date().toISOString();
+  payload.updatedBy = user!.uid;
+  payload.updatedByNome = nome;
   await update(ref(db, `despesas/${despesaId}`), payload);
 }
 

@@ -37,18 +37,36 @@ export async function createDeposito(data: Omit<Deposito, 'id' | 'createdAt' | '
 export async function deleteDeposito(id: string): Promise<void> {
   const user = auth.currentUser;
   if (!user) throw new Error('Usuário não autenticado');
+  const userData = await get(ref(db, `users/${user.uid}`));
+  const nome = userData.val()?.nome || '';
   await update(ref(db, `depositos/${id}`), {
     deletedAt: new Date().toISOString(),
     deletedBy: user.uid,
+    deletedByNome: nome,
   });
 }
 
 export async function restoreDeposito(id: string): Promise<void> {
-  await update(ref(db, `depositos/${id}`), { deletedAt: null, deletedBy: null });
+  const user = auth.currentUser;
+  const userData = await get(ref(db, `users/${user!.uid}`));
+  const nome = userData.val()?.nome || '';
+  await update(ref(db, `depositos/${id}`), {
+    deletedAt: null,
+    deletedBy: null,
+    restoredAt: new Date().toISOString(),
+    restoredBy: user!.uid,
+    restoredByNome: nome,
+  });
 }
 
 export async function updateDeposito(id: string, data: Partial<Omit<Deposito, 'id' | 'createdAt'>>): Promise<void> {
+  const user = auth.currentUser;
+  const userData = await get(ref(db, `users/${user!.uid}`));
+  const nome = userData.val()?.nome || '';
   const payload: any = { ...data };
   Object.keys(payload).forEach(k => { if (payload[k] === undefined) delete payload[k]; });
+  payload.updatedAt = new Date().toISOString();
+  payload.updatedBy = user!.uid;
+  payload.updatedByNome = nome;
   await update(ref(db, `depositos/${id}`), payload);
 }

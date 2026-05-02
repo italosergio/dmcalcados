@@ -198,6 +198,9 @@ export async function fecharCiclo(cicloId: string): Promise<void> {
 }
 
 export async function reabrirCiclo(cicloId: string): Promise<void> {
+  const user = auth.currentUser;
+  const userData = await get(ref(db, `users/${user!.uid}`));
+  const nome = userData.val()?.nome || '';
   const snap = await get(ref(db, `ciclos/${cicloId}`));
   if (!snap.exists()) throw new Error('Ciclo não encontrado');
   const cicloData = snap.val();
@@ -221,22 +224,37 @@ export async function reabrirCiclo(cicloId: string): Promise<void> {
     fechadoPorId: null,
     fechadoPorNome: null,
     closedAt: null,
+    reabertoAt: new Date().toISOString(),
+    reabertoBy: user!.uid,
+    reabertoByNome: nome,
   });
 }
 
 export async function updateCicloDatas(cicloId: string, dataInicio?: string, dataFim?: string): Promise<void> {
+  const user = auth.currentUser;
+  const userData = await get(ref(db, `users/${user!.uid}`));
+  const nome = userData.val()?.nome || '';
   const updates: any = {};
   if (dataInicio !== undefined) updates.dataInicio = dataInicio || null;
   if (dataFim !== undefined) updates.dataFim = dataFim || null;
+  updates.updatedAt = new Date().toISOString();
+  updates.updatedBy = user!.uid;
+  updates.updatedByNome = nome;
   await update(ref(db, `ciclos/${cicloId}`), updates);
 }
 
 export async function updateCicloMeta(cicloId: string, meta: { titulo?: string; dataInicio?: string; dataFim?: string; participantes?: { id: string; nome: string }[] }): Promise<void> {
+  const user = auth.currentUser;
+  const userData = await get(ref(db, `users/${user!.uid}`));
+  const nome = userData.val()?.nome || '';
   const updates: any = {};
   if (meta.titulo !== undefined) updates.titulo = meta.titulo || null;
   if (meta.dataInicio !== undefined) updates.dataInicio = meta.dataInicio || null;
   if (meta.dataFim !== undefined) updates.dataFim = meta.dataFim || null;
   if (meta.participantes !== undefined) updates.participantes = meta.participantes.length > 0 ? meta.participantes : null;
+  updates.updatedAt = new Date().toISOString();
+  updates.updatedBy = user!.uid;
+  updates.updatedByNome = nome;
   // Auto-fechar se dataFim definida e no passado
   if (meta.dataFim && meta.dataFim < new Date().toISOString().slice(0, 10)) {
     const snap = await get(ref(db, `ciclos/${cicloId}/status`));
@@ -330,7 +348,15 @@ export async function editarCiclo(
     }
   }
 
-  await update(ref(db, `ciclos/${cicloId}`), { produtos: novosProds });
+  const userData = await get(ref(db, `users/${user.uid}`));
+  const editorNome = userData.val()?.nome || '';
+
+  await update(ref(db, `ciclos/${cicloId}`), {
+    produtos: novosProds,
+    updatedAt: new Date().toISOString(),
+    updatedBy: user.uid,
+    updatedByNome: editorNome,
+  });
 }
 
 export async function deleteCiclo(cicloId: string): Promise<void> {
@@ -356,9 +382,13 @@ export async function deleteCiclo(cicloId: string): Promise<void> {
     }
   }
 
+  const userData = await get(ref(db, `users/${user.uid}`));
+  const nome = userData.val()?.nome || '';
+
   await update(ref(db, `ciclos/${cicloId}`), {
     deletedAt: new Date().toISOString(),
     deletedBy: user.uid,
+    deletedByNome: nome,
   });
 }
 

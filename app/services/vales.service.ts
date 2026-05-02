@@ -27,13 +27,16 @@ export async function createValeCard(funcionarioId: string, funcionarioNome: str
 }
 
 export async function addValeRegistro(cardId: string, registro: Omit<ValeRegistro, 'createdAt'>): Promise<void> {
+  const user = auth.currentUser;
+  const userData = await get(ref(db, `users/${user!.uid}`));
+  const nome = userData.val()?.nome || '';
   const regRef = push(ref(db, `vales/${cardId}/registros`));
-  await set(regRef, { ...registro, createdAt: new Date().toISOString() });
+  await set(regRef, { ...registro, createdAt: new Date().toISOString(), registradoPor: user!.uid, registradoPorNome: nome });
   // Recalcular total
   const snap = await get(ref(db, `vales/${cardId}/registros`));
   const regs = snap.val() || {};
   const total = Object.values(regs).reduce((s: number, r: any) => s + (r.valor || 0), 0);
-  await update(ref(db, `vales/${cardId}`), { total });
+  await update(ref(db, `vales/${cardId}`), { total, updatedAt: new Date().toISOString() });
 }
 
 export async function quitarValeCard(cardId: string): Promise<void> {
@@ -50,15 +53,21 @@ export async function quitarValeCard(cardId: string): Promise<void> {
 }
 
 export async function removeValeRegistro(cardId: string, registroId: string): Promise<void> {
+  const user = auth.currentUser;
+  const userData = await get(ref(db, `users/${user!.uid}`));
+  const nome = userData.val()?.nome || '';
   await import('firebase/database').then(m => m.remove(ref(db, `vales/${cardId}/registros/${registroId}`)));
   const snap = await get(ref(db, `vales/${cardId}/registros`));
   const regs = snap.val() || {};
   const total = Object.values(regs).reduce((s: number, r: any) => s + (r.valor || 0), 0);
-  await update(ref(db, `vales/${cardId}`), { total });
+  await update(ref(db, `vales/${cardId}`), { total, updatedAt: new Date().toISOString(), updatedBy: user!.uid, updatedByNome: nome });
 }
 
 export async function updateValeRegistro(cardId: string, registroId: string, data: Partial<ValeRegistro>): Promise<void> {
-  await update(ref(db, `vales/${cardId}/registros/${registroId}`), data);
+  const user = auth.currentUser;
+  const userData = await get(ref(db, `users/${user!.uid}`));
+  const nome = userData.val()?.nome || '';
+  await update(ref(db, `vales/${cardId}/registros/${registroId}`), { ...data, updatedAt: new Date().toISOString(), updatedBy: user!.uid, updatedByNome: nome });
   const snap = await get(ref(db, `vales/${cardId}/registros`));
   const regs = snap.val() || {};
   const total = Object.values(regs).reduce((s: number, r: any) => s + (r.valor || 0), 0);

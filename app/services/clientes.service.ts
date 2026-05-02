@@ -32,9 +32,13 @@ export async function deleteCliente(clienteId: string): Promise<void> {
   const user = auth.currentUser;
   if (!user) throw new Error('Usuário não autenticado');
 
+  const userData = await get(ref(db, `users/${user.uid}`));
+  const nome = userData.val()?.nome || '';
+
   await update(ref(db, `clientes/${clienteId}`), {
     deletedAt: new Date().toISOString(),
-    deletedBy: user.uid
+    deletedBy: user.uid,
+    deletedByNome: nome,
   });
 }
 
@@ -63,6 +67,7 @@ export async function createCliente(data: Omit<Cliente, 'id' | 'createdAt'>): Pr
 }
 
 export async function updateCliente(clienteId: string, data: Partial<Omit<Cliente, 'id' | 'createdAt'>>): Promise<void> {
+  const user = auth.currentUser;
   const snapshot = await get(ref(db, 'clientes'));
   if (snapshot.exists()) {
     const all = snapshot.val();
@@ -78,13 +83,40 @@ export async function updateCliente(clienteId: string, data: Partial<Omit<Client
       }
     }
   }
-  await update(ref(db, `clientes/${clienteId}`), data);
+  const userData = await get(ref(db, `users/${user!.uid}`));
+  const nome = userData.val()?.nome || '';
+  await update(ref(db, `clientes/${clienteId}`), {
+    ...data,
+    updatedAt: new Date().toISOString(),
+    updatedBy: user!.uid,
+    updatedByNome: nome,
+  });
 }
 
 export async function compartilharCliente(clienteId: string, userIds: string[]): Promise<void> {
-  await update(ref(db, `clientes/${clienteId}`), { compartilhadoCom: userIds });
+  const user = auth.currentUser;
+  const userData = await get(ref(db, `users/${user!.uid}`));
+  const nome = userData.val()?.nome || '';
+  await update(ref(db, `clientes/${clienteId}`), {
+    compartilhadoCom: userIds,
+    updatedAt: new Date().toISOString(),
+    updatedBy: user!.uid,
+    updatedByNome: nome,
+    compartilhadoPor: user!.uid,
+    compartilhadoPorNome: nome,
+  });
 }
 
 export async function suspenderCliente(clienteId: string, suspenso: boolean): Promise<void> {
-  await update(ref(db, `clientes/${clienteId}`), { suspenso });
+  const user = auth.currentUser;
+  const userData = await get(ref(db, `users/${user!.uid}`));
+  const nome = userData.val()?.nome || '';
+  await update(ref(db, `clientes/${clienteId}`), {
+    suspenso,
+    updatedAt: new Date().toISOString(),
+    updatedBy: user!.uid,
+    updatedByNome: nome,
+    suspensoPor: user!.uid,
+    suspensoPorNome: nome,
+  });
 }

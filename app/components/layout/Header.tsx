@@ -61,7 +61,7 @@ export function Header({ onMenuClick, sidebarCollapsed, onToggleSidebar }: Heade
       return;
     }
 
-    const paths = ['vendas', 'despesas', 'produtos', 'users', 'clientes'];
+    const paths = ['vendas', 'despesas', 'produtos', 'users', 'clientes', 'ciclos', 'depositos', 'vales'];
     const latestByPath: Record<string, number> = {};
     const getTime = (value?: string) => {
       if (!value) return 0;
@@ -74,8 +74,21 @@ export function Header({ onMenuClick, sidebarCollapsed, onToggleSidebar }: Heade
         const itemMax = Math.max(
           getTime(item?.createdAt),
           getTime(item?.deletedAt),
-          getTime(item?.roleUpdatedAt)
+          getTime(item?.roleUpdatedAt),
+          getTime(item?.updatedAt),
+          getTime(item?.restoredAt),
+          getTime(item?.closedAt),
+          getTime(item?.reabertoAt),
+          getTime(item?.quitadoEm),
+          getTime(item?.statusUpdatedAt),
+          getTime(item?.passwordResetAt)
         );
+        // Also check nested registros for vales
+        if (item?.registros) {
+          const regMax = Object.values(item.registros).reduce((rMax: number, r: any) =>
+            Math.max(rMax, getTime(r?.createdAt), getTime(r?.updatedAt)), 0);
+          return Math.max(max, itemMax, regMax);
+        }
         return Math.max(max, itemMax);
       }, 0);
     };
