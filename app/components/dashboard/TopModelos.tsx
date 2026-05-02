@@ -66,7 +66,7 @@ export function TopModelos({ vendas, resolveNome, vendedores, globalPeriodo, glo
   });
 
   const options: Highcharts.Options = {
-    chart: { type: 'bar', height: Math.max(220, cats.length * 30 + 60), backgroundColor: chartTheme.backgroundColor },
+    chart: { type: 'bar', height: Math.max(150, cats.length * 35 + 40), backgroundColor: chartTheme.backgroundColor },
     title: { text: 'Top Modelos', style: { fontSize: '12px', color: chartTheme.textColor } },
     xAxis: baseAxis(cats) as Highcharts.XAxisOptions,
     yAxis: baseYAxis, tooltip: baseTooltip, credits: { enabled: false },
@@ -78,7 +78,9 @@ export function TopModelos({ vendas, resolveNome, vendedores, globalPeriodo, glo
   return (
     <Card>
       <ChartFilters periodo={periodo} setPeriodo={setPeriodo} customInicio={customInicio} setCustomInicio={setCustomInicio} customFim={customFim} setCustomFim={setCustomFim} condicoes={condicoes} setCondicoes={setCondicoes} showCondicao />
-      <HighchartsReact highcharts={Highcharts} options={options} />
+      <div className="max-h-[220px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-border-medium">
+        <HighchartsReact highcharts={Highcharts} options={options} />
+      </div>
       {/* Tabela ranking */}
       {modeloData.length > 0 && (
         <div className="mt-3 rounded-xl border border-border-subtle overflow-hidden">

@@ -35,7 +35,7 @@ export function TicketMedioPorVendedor({ vendas, resolveNome, globalPeriodo, glo
         }, [filtered]);
 
         const options: Highcharts.Options = {
-          chart: { type: 'bar', height: Math.max(200, data.length * 40 + 60), backgroundColor: chartTheme.backgroundColor },
+          chart: { type: 'bar', height: Math.max(150, data.length * 40 + 50), backgroundColor: chartTheme.backgroundColor },
           title: { text: 'Ticket Médio por Vendedor', style: { fontSize: '12px', color: chartTheme.textColor } },
           xAxis: baseAxis(data.map(d => d.nome)) as Highcharts.XAxisOptions,
           yAxis: baseYAxis,
@@ -50,7 +50,11 @@ export function TicketMedioPorVendedor({ vendas, resolveNome, globalPeriodo, glo
           series: [{ type: 'bar', name: 'Ticket Médio', data: data.map(d => d.ticket), color: '#8b5cf6' }],
         };
 
-        return <HighchartsReact highcharts={Highcharts} options={options} />;
+        return (
+          <div className="max-h-[220px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-border-medium">
+            <HighchartsReact highcharts={Highcharts} options={options} />
+          </div>
+        );
       }}
     </ChartCard>
   );

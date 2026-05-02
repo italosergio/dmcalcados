@@ -29,7 +29,7 @@ export function SaldoTimeline({ vendas, despesas, globalPeriodo, globalCustomIni
         }, [vFilt, dFilt, cats, isMonthly]);
 
         const options: Highcharts.Options = {
-          chart: { type: 'line', height: 260, backgroundColor: chartTheme.backgroundColor },
+          chart: { type: 'line', height: 180, backgroundColor: chartTheme.backgroundColor },
           title: { text: 'Evolução do Saldo', style: { fontSize: '12px', color: chartTheme.textColor } },
           xAxis: { ...baseAxis(cats), labels: { step: Math.max(1, Math.floor(cats.length / 10)), rotation: cats.length > 10 ? -45 : 0, style: { fontSize: '9px', color: chartTheme.textColor } } },
           yAxis: baseYAxis, tooltip: baseTooltip, credits: { enabled: false },

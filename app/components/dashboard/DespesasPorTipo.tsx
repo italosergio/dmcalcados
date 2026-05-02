@@ -59,7 +59,7 @@ export function DespesasPorTipo({ despesas, resolveNome, vendedores, globalPerio
   });
 
   const options: Highcharts.Options = {
-    chart: { type: 'bar', height: Math.max(220, cats.length * 30 + 60), backgroundColor: chartTheme.backgroundColor },
+    chart: { type: 'bar', height: Math.max(150, cats.length * 35 + 40), backgroundColor: chartTheme.backgroundColor },
     title: { text: 'Despesas por Tipo', style: { fontSize: '12px', color: chartTheme.textColor } },
     xAxis: baseAxis(cats) as Highcharts.XAxisOptions,
     yAxis: baseYAxis, tooltip: baseTooltip, credits: { enabled: false },
@@ -71,7 +71,9 @@ export function DespesasPorTipo({ despesas, resolveNome, vendedores, globalPerio
   return (
     <Card>
       <ChartFilters periodo={periodo} setPeriodo={setPeriodo} customInicio={customInicio} setCustomInicio={setCustomInicio} customFim={customFim} setCustomFim={setCustomFim} />
-      <HighchartsReact highcharts={Highcharts} options={options} />
+      <div className="max-h-[220px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-border-medium">
+        <HighchartsReact highcharts={Highcharts} options={options} />
+      </div>
       <LegendaSeletor items={vendedores} selected={selectedVendedores} setSelected={setSelectedVendedores} label="Vendedores" defaultAllVisible={false} />
     </Card>
   );

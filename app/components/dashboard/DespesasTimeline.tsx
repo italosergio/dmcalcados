@@ -59,7 +59,7 @@ export function DespesasTimeline({ despesas, globalPeriodo, globalCustomInicio, 
         }, [filtered, cats, isMonthly, selectedTipos, tipos]);
 
         const options: Highcharts.Options = {
-          chart: { type: 'area', height: 260, backgroundColor: chartTheme.backgroundColor },
+          chart: { type: 'area', height: 180, backgroundColor: chartTheme.backgroundColor },
           title: { text: 'Despesas', style: { fontSize: '12px', color: chartTheme.textColor } },
           xAxis: { ...baseAxis(cats), labels: { step: Math.max(1, Math.floor(cats.length / 10)), rotation: cats.length > 10 ? -45 : 0, style: { fontSize: '9px', color: chartTheme.textColor } } },
           yAxis: baseYAxis, tooltip: baseTooltip, credits: { enabled: false },
@@ -72,7 +72,9 @@ export function DespesasTimeline({ despesas, globalPeriodo, globalCustomInicio, 
 
         return (
           <>
-            <HighchartsReact highcharts={Highcharts} options={options} />
+            <div className="max-h-[220px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-border-medium">
+              <HighchartsReact highcharts={Highcharts} options={options} />
+            </div>
             <LegendaSeletor items={tipos} selected={selectedTipos} setSelected={setSelectedTipos} label="Tipos" />
           </>
         );

@@ -41,7 +41,7 @@ export function ComparativoMensal({ vendas, despesas }: Props) {
   }, [vendas, despesas]);
 
   const options: Highcharts.Options = {
-    chart: { type: 'column', height: 240, backgroundColor: chartTheme.backgroundColor },
+    chart: { type: 'column', height: 180, backgroundColor: chartTheme.backgroundColor },
     title: { text: 'Comparativo Mensal', style: { fontSize: '12px', color: chartTheme.textColor } },
     xAxis: {
       categories: [data.mesAnteriorLabel, data.mesAtualLabel],

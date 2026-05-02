@@ -28,7 +28,7 @@ export function SazonalidadeSemanal({ vendas, globalPeriodo, globalCustomInicio,
         }, [filtered]);
 
         const options: Highcharts.Options = {
-          chart: { type: 'column', height: 240, backgroundColor: chartTheme.backgroundColor },
+          chart: { type: 'column', height: 180, backgroundColor: chartTheme.backgroundColor },
           title: { text: 'Vendas por Dia da Semana', style: { fontSize: '12px', color: chartTheme.textColor } },
           xAxis: baseAxis(DIAS) as Highcharts.XAxisOptions,
           yAxis: baseYAxis,

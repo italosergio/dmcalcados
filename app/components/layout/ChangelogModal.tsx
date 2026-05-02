@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, ChevronDown, ChevronRight, Tag } from 'lucide-react';
 
-export const APP_VERSION = 'v0.12.3';
+export const APP_VERSION = 'v0.12.4';
 
 interface VersionEntry {
   version: string;
@@ -9,6 +9,13 @@ interface VersionEntry {
 }
 
 const changelog: VersionEntry[] = [
+  {
+    version: 'v0.12.4',
+    items: [
+      'Gráficos do dashboard com altura reduzida para caber no grid compacto',
+      'Gráficos de barra com muitos itens ganham scroll vertical limitado a 220px',
+    ],
+  },
   {
     version: 'v0.12.3',
     items: [
