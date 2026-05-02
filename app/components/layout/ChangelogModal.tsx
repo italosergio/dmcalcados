@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, ChevronDown, ChevronRight, Tag } from 'lucide-react';
 
-export const APP_VERSION = 'v0.12.7';
+export const APP_VERSION = 'v0.12.9';
 
 interface VersionEntry {
   version: string;
@@ -10,7 +10,13 @@ interface VersionEntry {
 
 const changelog: VersionEntry[] = [
   {
-    version: 'v0.12.7',
+    version: 'v0.12.9',
+    items: [
+      'Remoção definitiva de app/routes/analytics.tsx e app/services/analytics.service.ts',
+    ],
+  },
+  {
+    version: 'v0.12.8',
     items: [
       'Role "vendedor" removida do tipo UserRole — mantidos apenas vendedor1, vendedor2 e vendedor3',
       'Permissões de vendedor preservadas para todas as variações (vendedor1/2/3)',
