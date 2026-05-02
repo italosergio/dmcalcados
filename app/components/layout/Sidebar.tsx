@@ -105,10 +105,6 @@ export function Sidebar({ isOpen, onClose, collapsed }: SidebarProps) {
     links.push({ to: '/rotas', icon: Navigation, label: 'Rotas' });
   }
 
-  if (user && getUserRoles(user).includes('desenvolvedor')) {
-    links.push({ to: '/analytics', icon: Activity, label: 'Analytics' });
-  }
-
   const isActive = (path: string) => location.pathname.startsWith(path);
   const otherAccounts = savedAccounts.filter(a => a.username !== user?.username);
   const isDev = user ? getUserRoles(user).includes('desenvolvedor') : false;

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, ChevronDown, ChevronRight, Tag } from 'lucide-react';
 
-export const APP_VERSION = 'v0.12.9';
+export const APP_VERSION = 'v0.12.10';
 
 interface VersionEntry {
   version: string;
@@ -9,6 +9,12 @@ interface VersionEntry {
 }
 
 const changelog: VersionEntry[] = [
+  {
+    version: 'v0.12.10',
+    items: [
+      'Remove link de Analytics do sidebar (página deletada causava erro "Activity is not defined")',
+    ],
+  },
   {
     version: 'v0.12.9',
     items: [
