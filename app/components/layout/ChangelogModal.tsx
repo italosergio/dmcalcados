@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, ChevronDown, ChevronRight, Tag } from 'lucide-react';
 
-export const APP_VERSION = 'v0.12.6';
+export const APP_VERSION = 'v0.12.7';
 
 interface VersionEntry {
   version: string;
@@ -10,6 +10,14 @@ interface VersionEntry {
 
 const changelog: VersionEntry[] = [
   {
+    version: 'v0.12.7',
+    items: [
+      'Role "vendedor" removida do tipo UserRole — mantidos apenas vendedor1, vendedor2 e vendedor3',
+      'Permissões de vendedor preservadas para todas as variações (vendedor1/2/3)',
+      'Correção nas entradas corrompidas do changelog (v0.12.5 e v0.12.4 sem items)',
+    ],
+  },
+  {
     version: 'v0.12.6',
     items: [
       'Cards do painel com opacidade aumentada para 77% (cores mais intensas)',
@@ -17,8 +25,16 @@ const changelog: VersionEntry[] = [
   },
   {
     version: 'v0.12.5',
+    items: [
+      'Remoção da página de analytics substituída pelo sistema de notificações',
+    ],
+  },
   {
     version: 'v0.12.4',
+    items: [
+      'Corrige estrutura do changelog (entradas v0.12.5 e v0.12.4 sem items)',
+    ],
+  },
   {
     version: 'v0.12.3',
     items: [
