@@ -57,7 +57,7 @@ Todas as páginas autenticadas usam o layout com Sidebar + Header + Conteúdo.
 | 5 | Meus Clientes | Users | Vendedor |
 | 6 | Clientes | Users | Admin / Super Admin (badge "ADMIN") |
 | 7 | Usuários | UserCog | Admin / Super Admin (badge "ADMIN") |
-| 8 | Histórico | History | Admin / Super Admin (badge "ADMIN") |
+| 8 | Notificações | Bell | Admin / Super Admin (badge "ADMIN") |
 
 ### Seção Inferior
 - **Toggle "Loop de estatísticas":** Switch para ativar/desativar o HeaderTicker

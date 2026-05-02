@@ -167,7 +167,7 @@ O Dockerfile usa multi-stage build com Node 20 Alpine para imagem otimizada.
 | `/despesas/nova` | Registrar despesa | Autenticado | [despesas.md](docs/despesas.md) |
 | `/dashboard` | Dashboard com gráficos | Autenticado | [dashboard.md](docs/dashboard.md) |
 | `/usuarios` | Gestão de usuários | Admin | [administracao.md](docs/administracao.md) |
-| `/historico` | Histórico de atividades | Admin | [administracao.md](docs/administracao.md) |
+| `/historico` | Notificações | Admin | [administracao.md](docs/administracao.md) |
 | `/conta` | Minha conta / Perfil | Autenticado | [autenticacao.md](docs/autenticacao.md) |
 
 ---
@@ -188,7 +188,7 @@ O Dockerfile usa multi-stage build com Node 20 Alpine para imagem otimizada.
 | Gerenciar produtos | — | ✅ | ✅ |
 | Gerenciar usuários | — | ✅ | ✅ |
 | Promover a Super Admin | — | — | ✅ |
-| Histórico de atividades | — | ✅ | ✅ |
+| Notificações | — | ✅ | ✅ |
 
 ---
 
