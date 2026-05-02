@@ -1,12 +1,17 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router';
-import { ShoppingBag, DollarSign, Warehouse, Users, LayoutDashboard, RefreshCw, CreditCard, Banknote, Navigation, Package, History, Activity, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ShoppingBag, DollarSign, Warehouse, Users, LayoutDashboard, RefreshCw, CreditCard, Banknote, Navigation, Package, Bell, Activity, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useAuth } from '~/contexts/AuthContext';
 import { userIsAdmin, userIsVendedor, userCanAccessAdmin, getUserRoles } from '~/models';
 import type { Ciclo } from '~/models';
 import { useVendas, useClientes, useCiclos, useDespesas, useDepositos, useVales } from '~/hooks/useRealtime';
 import { formatCurrency } from '~/utils/format';
 import { CicloDashboard } from '~/components/ciclos/CicloDashboard';
+
+const dashboardImage = 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=900&q=80';
+const rotasImage = 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80';
+const clientesImage = 'https://images.unsplash.com/photo-1556745757-8d76bdb6984b?auto=format&fit=crop&w=900&q=80';
+const clientesBannerImage = 'https://images.pexels.com/photos/8470843/pexels-photo-8470843.jpeg?auto=compress&cs=tinysrgb&w=1200';
 
 const cards = [
   { to: '/vendas', icon: ShoppingBag, label: 'Vendas', desc: 'Registrar e acompanhar vendas', img: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&q=80', color: 'from-green-900/10 to-green-950/10', border: 'hover:border-green-500/40', roles: ['all'] },
@@ -16,12 +21,12 @@ const cards = [
   { to: '/meus-clientes', icon: Users, label: 'Meus Clientes', desc: 'Carteira de clientes', img: 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=600&q=80', color: 'from-violet-900/10 to-violet-950/10', border: 'hover:border-violet-500/40', roles: ['vendedor'] },
   { to: '/estoque', icon: Warehouse, label: 'Estoque', desc: 'Produtos e entradas', img: 'https://images.unsplash.com/photo-1553413077-190dd305871c?w=600&q=80', color: 'from-blue-900/10 to-blue-950/10', border: 'hover:border-blue-500/40', roles: ['admin'] },
   { to: '/produtos', icon: Package, label: 'Produtos', desc: 'Catálogo de modelos', img: 'https://images.unsplash.com/photo-1603487742131-4160ec999306?w=600&q=80', color: 'from-orange-900/10 to-orange-950/10', border: 'hover:border-orange-500/40', roles: ['admin'] },
-  { to: '/clientes', icon: Users, label: 'Clientes', desc: 'Todos os clientes', img: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=600&q=80', color: 'from-purple-900/10 to-purple-950/10', border: 'hover:border-purple-500/40', roles: ['admin'] },
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', desc: 'Gráficos e métricas', img: '', cssBg: true, color: 'from-cyan-900/10 to-cyan-950/10', border: 'hover:border-cyan-500/40', roles: ['all'] },
+  { to: '/clientes', icon: Users, label: 'Clientes', desc: 'Todos os clientes', img: clientesImage, color: 'from-purple-900/10 to-purple-950/10', border: 'hover:border-purple-500/40', roles: ['admin'] },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', desc: 'Gráficos e métricas', img: dashboardImage, color: 'from-cyan-900/20 to-cyan-950/40', border: 'hover:border-cyan-500/40', roles: ['all'] },
   { to: '/pagamentos', icon: CreditCard, label: 'Pagamentos', desc: 'Parcelas e cobranças', img: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=600&q=80', color: 'from-indigo-900/10 to-indigo-950/10', border: 'hover:border-indigo-500/40', roles: ['adminAccess'] },
   { to: '/vales', icon: Banknote, label: 'Vales', desc: 'Vales de funcionários', img: 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=600&q=80', color: 'from-amber-900/10 to-amber-950/10', border: 'hover:border-amber-500/40', roles: ['adminAccess'] },
-  { to: '/rotas', icon: Navigation, label: 'Rotas', desc: 'Rastreamento GPS', img: 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=600&q=80', color: 'from-teal-900/10 to-teal-950/10', border: 'hover:border-teal-500/40', roles: ['adminAccess'] },
-  { to: '/historico', icon: History, label: 'Histórico', desc: 'Log de atividades', img: 'https://images.unsplash.com/photo-1504868584819-f8e8b4b6d7e3?w=600&q=80', color: 'from-slate-800/10 to-slate-900/10', border: 'hover:border-slate-400/40', roles: ['admin'] },
+  { to: '/rotas', icon: Navigation, label: 'Rotas', desc: 'Rastreamento GPS', img: rotasImage, color: 'from-teal-900/10 to-teal-950/10', border: 'hover:border-teal-500/40', roles: ['adminAccess'] },
+  { to: '/historico', icon: Bell, label: 'Notificações', desc: 'Alertas e eventos recentes', img: 'https://images.unsplash.com/photo-1504868584819-f8e8b4b6d7e3?w=600&q=80', color: 'from-slate-800/10 to-slate-900/10', border: 'hover:border-slate-400/40', roles: ['admin'] },
   { to: '/analytics', icon: Activity, label: 'Analytics', desc: 'Análises avançadas', img: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&q=80', color: 'from-fuchsia-900/10 to-fuchsia-950/10', border: 'hover:border-fuchsia-500/40', roles: ['dev'] },
 ];
 
@@ -178,10 +183,10 @@ export default function PainelPage() {
   }, [vendas]);
 
   const slides: any[] = [
-    { key: 'vendas-chart', label: 'Dashboard de Vendas', sub: `${formatCurrency(totalVendas30)} nos últimos 30 dias · ${last30.length} vendas`, chart: vendasChart, cssBg: true, to: '/dashboard' },
+    { key: 'vendas-chart', label: 'Dashboard de Vendas', sub: `${formatCurrency(totalVendas30)} nos últimos 30 dias · ${last30.length} vendas`, chart: vendasChart, img: dashboardImage, to: '/dashboard' },
     { key: 'modelos', label: 'Ranking de Modelos', sub: 'Modelos mais vendidos nos últimos 30 dias', chart: modelosChart, img: 'https://images.unsplash.com/photo-1603487742131-4160ec999306?w=800&q=80', to: '/dashboard' },
     { key: 'vendas-info', label: 'Vendas', sub: `${last30.length} vendas realizadas`, chart: null, stat: formatCurrency(totalVendas30), statLabel: 'nos últimos 30 dias', img: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&q=80', to: '/vendas' },
-    { key: 'clientes', label: 'Clientes', sub: `${totalClientes} cadastrados · Últimas vendas`, customClientes: true, cssBg: true, to: '/clientes' },
+    { key: 'clientes', label: 'Clientes', sub: `${totalClientes} cadastrados · Últimas vendas`, customClientes: true, img: clientesBannerImage, to: '/clientes' },
     { key: 'ciclos', label: 'Ciclos', sub: `${ciclosAtivosData.length} ativo${ciclosAtivosData.length !== 1 ? 's' : ''} · ${ciclosFechadosData.length} fechado${ciclosFechadosData.length !== 1 ? 's' : ''}`, custom: true, img: 'https://images.unsplash.com/photo-1519003722824-194d4455a60c?w=800&q=80', to: '/ciclos' },
     { key: 'pagamento', label: 'Condições de Pagamento', sub: `À vista ${formatCurrency(pagamentoChart?.avista || 0)} · Prazo ${formatCurrency(pagamentoChart?.prazo || 0)}`, customPagamento: true, img: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=800&q=80', to: '/dashboard' },
   ];
@@ -384,7 +389,7 @@ export default function PainelPage() {
 
       {/* Modal ciclo dashboard */}
       {modalCiclo && (
-        <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={() => setModalCiclo(null)}>
+        <div className="fixed inset-0 app-modal-overlay z-[100] flex items-center justify-center p-4" onClick={() => setModalCiclo(null)}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">

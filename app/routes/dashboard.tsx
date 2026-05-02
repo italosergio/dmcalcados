@@ -142,38 +142,18 @@ export default function DashboardPage() {
               className={`rounded-lg border bg-elevated px-2 py-1.5 text-xs focus:outline-none focus:border-border-medium w-[7.5rem] transition-colors ${customFim ? 'border-green-600/30 text-content' : 'border-border-subtle text-content-muted'}`} />
           </div>
 
-          {/* Timelines lado a lado */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Seção de Gráficos em Grid Responsivo */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 mt-4">
             <VendasTimeline vendas={vendas} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />
             <DespesasTimeline despesas={despesas} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />
-          </div>
-
-          {/* Saldo + Comparativo mensal */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
             {isAdmin && <SaldoTimeline vendas={vendas} despesas={despesas} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />}
             <ComparativoMensal vendas={vendas} despesas={despesas} />
-          </div>
-
-          {/* Rankings: vendedores + clientes */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
             {isAdmin && <VendasPorVendedor vendas={vendas} resolveNome={resolveNome} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />}
             <TopClientes vendas={vendas} resolveCliente={resolveCliente} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />
-          </div>
-
-          {/* Despesas: por tipo + por usuário */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
             <DespesasPorTipo despesas={despesas} resolveNome={resolveNome} vendedores={vendedoresNomes} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />
             {isAdmin && <DespesasPorUsuario despesas={despesas} resolveNome={resolveNome} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />}
-          </div>
-
-          {/* Modelos + Ticket médio */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
             <TopModelos vendas={vendas} resolveNome={resolveNome} vendedores={vendedoresNomes} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />
             {isAdmin && <TicketMedioPorVendedor vendas={vendas} resolveNome={resolveNome} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />}
-          </div>
-
-          {/* Padrões: condição de pagamento + sazonalidade */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
             <CondicaoPagamentoTimeline vendas={vendas} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />
             <SazonalidadeSemanal vendas={vendas} globalPeriodo={periodoGlobal} globalCustomInicio={customInicio} globalCustomFim={customFim} />
           </div>
