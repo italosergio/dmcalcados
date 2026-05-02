@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, ChevronDown, ChevronRight, Tag } from 'lucide-react';
 
-export const APP_VERSION = 'v0.12.5';
+export const APP_VERSION = 'v0.12.6';
 
 interface VersionEntry {
   version: string;
@@ -10,12 +10,13 @@ interface VersionEntry {
 
 const changelog: VersionEntry[] = [
   {
-    version: 'v0.12.5',
+    version: 'v0.12.6',
     items: [
-      'Remoção completa da página Analytics (substituída por Notificações)',
-      'Arquivos e referências removidos: analytics.service.ts, rota, sidebar, layout, landing, auth',
+      'Cards do painel com opacidade aumentada para 77% (cores mais intensas)',
     ],
   },
+  {
+    version: 'v0.12.5',
   {
     version: 'v0.12.4',
   {
