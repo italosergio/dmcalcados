@@ -77,7 +77,7 @@ export function ImageLightbox({ src, alt = 'Imagem', onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 lg:left-64 z-[110] flex items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 app-modal-overlay z-[110] flex items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
 
       <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5" onClick={e => e.stopPropagation()}>

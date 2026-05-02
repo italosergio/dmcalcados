@@ -731,7 +731,7 @@ export default function CiclosPage() {
 
       {/* Modal ciclo */}
       {modalCiclo && (
-        <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={() => { setModalCiclo(null); setMenuOpen(false); }}>
+        <div className="fixed inset-0 app-modal-overlay z-[100] flex items-center justify-center p-4" onClick={() => { setModalCiclo(null); setMenuOpen(false); }}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div className="relative w-full max-w-2xl rounded-xl border border-border-subtle bg-surface p-5 space-y-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
@@ -791,7 +791,7 @@ export default function CiclosPage() {
 
       {/* Modal confirmar exclusão */}
       {confirmDeleteOpen && modalCiclo && (
-        <div className="fixed inset-0 lg:left-64 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => { setConfirmDeleteOpen(false); setDeleteClicks(0); }}>
+        <div className="fixed inset-0 app-modal-overlay z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => { setConfirmDeleteOpen(false); setDeleteClicks(0); }}>
           <div className="w-full max-w-sm rounded-xl border border-border-subtle bg-surface p-5 space-y-4" onClick={e => e.stopPropagation()}>
             <div className="text-center space-y-2">
               <div className="mx-auto w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center"><Trash2 size={20} className="text-red-400" /></div>
@@ -812,7 +812,7 @@ export default function CiclosPage() {
 
       {/* Modal editar ciclo meta */}
       {editMetaOpen && modalCiclo && (
-        <div className="fixed inset-0 lg:left-64 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => setEditMetaOpen(false)}>
+        <div className="fixed inset-0 app-modal-overlay z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => setEditMetaOpen(false)}>
           <div className="w-full max-w-md rounded-xl border border-border-subtle bg-surface p-5 space-y-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold">Editar Ciclo — {modalCiclo.vendedorNome}</span>

@@ -677,7 +677,7 @@ export default function VendasPage() {
         const condicao = v.condicaoPagamento;
         const temEntrada = condicao?.includes('_entrada');
         return (
-          <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={() => { setVendaSelecionada(null); setEditandoData(false); setMenuOpen(false); }}>
+          <div className="fixed inset-0 app-modal-overlay z-[100] flex items-center justify-center p-4" onClick={() => { setVendaSelecionada(null); setEditandoData(false); setMenuOpen(false); }}>
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
             <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">
@@ -876,7 +876,7 @@ export default function VendasPage() {
         />
       )}
       {criandoVenda && (
-        <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={fecharCriandoVenda}>
+        <div className="fixed inset-0 app-modal-overlay z-[100] flex items-center justify-center p-4" onClick={fecharCriandoVenda}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div ref={modalRef} className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">

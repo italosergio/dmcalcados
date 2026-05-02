@@ -144,7 +144,7 @@ export function VendaEditModal({ venda, clientes, users, produtos, onClose, onSa
     : [];
 
   return (
-    <div className="fixed inset-0 lg:left-64 z-[110] flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 app-modal-overlay z-[110] flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">

@@ -164,3 +164,13 @@ body {
   fill: #232328 !important;
   stroke: #2e2e36 !important;
 }
+
+@media (min-width: 1024px) {
+  [data-sidebar-collapsed="false"] .app-modal-overlay {
+    left: 16rem;
+  }
+
+  [data-sidebar-collapsed="true"] .app-modal-overlay {
+    left: 4rem;
+  }
+}

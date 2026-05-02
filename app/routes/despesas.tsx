@@ -489,7 +489,7 @@ export default function DespesasPage() {
         const externoDia = totalDia - internoDia;
         const label = new Date(diaSelecionado + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
         return (
-          <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={() => setDiaSelecionado(null)}>
+          <div className="fixed inset-0 app-modal-overlay z-[100] flex items-center justify-center p-4" onClick={() => setDiaSelecionado(null)}>
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
             <div className="relative w-full max-w-md max-h-[80vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={e => e.stopPropagation()}>
               <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">
@@ -538,7 +538,7 @@ export default function DespesasPage() {
       {despesaSelecionada && (() => {
         const d = despesaSelecionada;
         return (
-          <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={() => { setDespesaSelecionada(null); setMenuOpen(false); }}>
+          <div className="fixed inset-0 app-modal-overlay z-[100] flex items-center justify-center p-4" onClick={() => { setDespesaSelecionada(null); setMenuOpen(false); }}>
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
             <div className="relative w-full max-w-sm rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between px-5 py-3 border-b border-border-subtle">
@@ -647,7 +647,7 @@ export default function DespesasPage() {
         );
       })()}
       {criandoDespesa && (
-        <div className="fixed inset-0 lg:left-64 z-[100] flex items-center justify-center p-4" onClick={fecharCriandoDespesa}>
+        <div className="fixed inset-0 app-modal-overlay z-[100] flex items-center justify-center p-4" onClick={fecharCriandoDespesa}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div ref={despesaModalRef} className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">
@@ -663,7 +663,7 @@ export default function DespesasPage() {
 
       {/* Modal editar despesa */}
       {editando && despesaSelecionada && (
-        <div className="fixed inset-0 lg:left-64 z-[110] flex items-center justify-center p-4" onClick={() => setEditando(false)}>
+        <div className="fixed inset-0 app-modal-overlay z-[110] flex items-center justify-center p-4" onClick={() => setEditando(false)}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">

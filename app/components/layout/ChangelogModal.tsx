@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, ChevronDown, ChevronRight, Tag } from 'lucide-react';
 
-export const APP_VERSION = 'v0.12.2';
+export const APP_VERSION = 'v0.12.3';
 
 interface VersionEntry {
   version: string;
@@ -9,6 +9,13 @@ interface VersionEntry {
 }
 
 const changelog: VersionEntry[] = [
+  {
+    version: 'v0.12.3',
+    items: [
+      'Modais adaptam posição dinamicamente conforme estado da sidebar (expandida/colapsada)',
+      'Substituição de lg:left-64 hardcoded por classe app-modal-overlay em todos os modais',
+    ],
+  },
   {
     version: 'v0.12.2',
     items: [

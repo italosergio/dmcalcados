@@ -417,7 +417,7 @@ export function CicloDashboard({ ciclo, vendas, despesas, depositos, valeCards =
 
       {/* Modal caixa interno */}
       {caixaModal && (
-        <div className="fixed inset-0 lg:left-64 z-[120] flex items-center justify-center p-4" onClick={() => setCaixaModal(false)}>
+        <div className="fixed inset-0 app-modal-overlay z-[120] flex items-center justify-center p-4" onClick={() => setCaixaModal(false)}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div className="relative w-full max-w-sm rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-border-subtle px-5 py-3">
@@ -455,7 +455,7 @@ export function CicloDashboard({ ciclo, vendas, despesas, depositos, valeCards =
 
       {/* Modal cobranças */}
       {cobrancasModal && (
-        <div className="fixed inset-0 lg:left-64 z-[120] flex items-center justify-center p-4" onClick={() => setCobrancasModal(false)}>
+        <div className="fixed inset-0 app-modal-overlay z-[120] flex items-center justify-center p-4" onClick={() => setCobrancasModal(false)}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div className="relative w-full max-w-md max-h-[80vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">
@@ -551,7 +551,7 @@ export function CicloDashboard({ ciclo, vendas, despesas, depositos, valeCards =
 
       {/* Modal depósitos */}
       {depositosModal && (
-        <div className="fixed inset-0 lg:left-64 z-[120] flex items-center justify-center p-4" onClick={() => setDepositosModal(false)}>
+        <div className="fixed inset-0 app-modal-overlay z-[120] flex items-center justify-center p-4" onClick={() => setDepositosModal(false)}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div className="relative w-full max-w-md max-h-[80vh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 z-10 flex items-center justify-between bg-surface border-b border-border-subtle px-5 py-3 rounded-t-2xl">
