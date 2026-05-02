@@ -1,16 +1,13 @@
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { ref, get, set, update, query, orderByChild, equalTo } from 'firebase/database';
 import { auth, app, db } from './firebase';
-import { trackEvent } from './analytics.service';
 import type { User, UserRole } from '~/models';
 
 export async function login(username: string, password: string) {
   const email = `${username.toLowerCase()}@dmcalcados.local`;
   const userCredential = await signInWithEmailAndPassword(auth, email, password);
   if (typeof window !== 'undefined') localStorage.setItem('loginTime', Date.now().toString());
-  // Track login
-  const userData = await getUserData(userCredential.user.uid);
-  trackEvent('login', userCredential.user.uid, userData?.nome || username, undefined, userData?.foto).catch(() => {});
+  // Analytics removido - página substituída por notificações
   return userCredential.user;
 }
 
@@ -54,12 +51,7 @@ export async function register(username: string, password: string, nome: string,
 }
 
 export async function logout(removeFromSaved = false, username?: string) {
-  // Track logout antes de deslogar
-  const uid = auth.currentUser?.uid;
-  if (uid) {
-    const userData = await getUserData(uid).catch(() => null);
-    await trackEvent('logout', uid, userData?.nome || username || 'desconhecido', undefined, userData?.foto).catch(() => {});
-  }
+  // Analytics removido - página substituída por notificações
   await signOut(auth);
   if (typeof window !== 'undefined') {
     localStorage.removeItem('loginTime');

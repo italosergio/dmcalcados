@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router';
-import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, LogOut, X, UserCircle, Home, Package, RefreshCw, Plus, ArrowRightLeft, Loader2, Activity, CreditCard, Navigation, Banknote, Tag } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Warehouse, Users, DollarSign, UserCog, LogOut, X, UserCircle, Home, Package, RefreshCw, Plus, ArrowRightLeft, Loader2, CreditCard, Navigation, Banknote, Tag } from 'lucide-react';
 import { APP_VERSION, ChangelogModal } from './ChangelogModal';
 import { logout } from '~/services/auth.service';
 import { useNavigate } from 'react-router';

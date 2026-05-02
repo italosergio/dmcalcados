@@ -2,7 +2,6 @@ import { ArrowRight } from 'lucide-react';
 import { useAuth } from '~/contexts/AuthContext';
 import { useNavigate } from 'react-router';
 import { useState, useRef, useEffect } from 'react';
-import { trackEvent } from '~/services/analytics.service';
 import { APP_VERSION, ChangelogModal } from '~/components/layout/ChangelogModal';
 
 function shortName(nome?: string) {
@@ -41,11 +40,7 @@ export default function LandingPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const timer = setTimeout(() => {
-      if (user) {
-        trackEvent('navegacao', user.id, user.nome, 'Página Inicial', user.foto).catch(console.error);
-      } else {
-        trackEvent('navegacao', 'anonimo', 'Anônimo', 'Página Inicial').catch(console.error);
-      }
+      // Analytics removido - página substituída por notificações
     }, 100);
     return () => clearTimeout(timer);
   }, [user]);

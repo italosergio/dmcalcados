@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, ChevronDown, ChevronRight, Tag } from 'lucide-react';
 
-export const APP_VERSION = 'v0.12.4';
+export const APP_VERSION = 'v0.12.5';
 
 interface VersionEntry {
   version: string;
@@ -10,12 +10,14 @@ interface VersionEntry {
 
 const changelog: VersionEntry[] = [
   {
-    version: 'v0.12.4',
+    version: 'v0.12.5',
     items: [
-      'Gráficos do dashboard com altura reduzida para caber no grid compacto',
-      'Gráficos de barra com muitos itens ganham scroll vertical limitado a 220px',
+      'Remoção completa da página Analytics (substituída por Notificações)',
+      'Arquivos e referências removidos: analytics.service.ts, rota, sidebar, layout, landing, auth',
     ],
   },
+  {
+    version: 'v0.12.4',
   {
     version: 'v0.12.3',
     items: [
@@ -219,20 +221,6 @@ const changelog: VersionEntry[] = [
   {
     version: 'v0.7.2',
     items: ['Backlog: marca itens #1, #2, #11, #12, #13 como concluídos'],
-  },
-  {
-    version: 'v0.7.1',
-    items: [
-      'Melhora UX de edição e validação de clientes',
-      'Padroniza proteção de rotas admin',
-      'Rastreamento de login/logout e landing',
-      'Filtros de tempo, foto do usuário e eventos anônimos no analytics',
-      'Cards quadrados e compartilhamento colapsável em clientes',
-    ],
-  },
-  {
-    version: 'v0.7.0',
-    items: ['Página de analytics e rastreamento de eventos'],
   },
   {
     version: 'v0.6.5',
