@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, ChevronDown, ChevronRight, Tag } from 'lucide-react';
 
-export const APP_VERSION = 'v0.11.2';
+export const APP_VERSION = 'v0.12.0';
 
 interface VersionEntry {
   version: string;
@@ -9,6 +9,25 @@ interface VersionEntry {
 }
 
 const changelog: VersionEntry[] = [
+  {
+    version: 'v0.12.0',
+    items: [
+      'Sistema de notificações: sino no header com badge pulsante para admins',
+      'Página Histórico reformulada com filtros por categoria, busca e agrupamento por data',
+      'Notificações marcadas como lidas automaticamente ao acessar a página',
+    ],
+  },
+  {
+    version: 'v0.11.3',
+    items: [
+      'Card e destaque do Dashboard no painel usam nova imagem gratuita',
+      'Card de Rotas usa nova imagem gratuita de estrada',
+      'Banner de Clientes usa nova imagem gratuita close-up de aperto de mão',
+      'Página Histórico redesenhada como central de Notificações',
+      'Sino de notificações no header com indicador de novas leituras',
+      'Controle de minimizar movido para o header e overlays adaptados à sidebar',
+    ],
+  },
   {
     version: 'v0.11.2',
     items: [

@@ -38,17 +38,18 @@
 
 ---
 
-## Histórico de Atividades
+## Notificações
 
 **Rota:** `/historico` · **Acesso:** Admin / Super Admin
 
 ### Funcionalidades
 
-#### Timeline
-- Lista cronológica reversa (mais recente primeiro) de todas as atividades do sistema
-- Cada item exibe: ícone, tipo, ação, detalhes, responsável, data/hora
+#### Central de Notificações
+- Lista cronológica reversa (mais recente primeiro) de eventos importantes do sistema
+- Agrupamento por data, filtros por categoria, busca e resumo de eventos recentes
+- Cada item exibe: ícone, categoria, título, contexto, responsável, data/hora
 
-#### Tipos de Atividade
+#### Tipos de Notificação
 | Tipo | Ícone | Ações |
 |---|---|---|
 | Venda | 🛒 verde | Criada, Deletada |

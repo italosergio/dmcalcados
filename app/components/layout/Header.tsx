@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '~/contexts/AuthContext';
-import { Menu, UserCircle, LogOut, Plus, Loader2 } from 'lucide-react';
+import { Bell, Menu, UserCircle, LogOut, Plus, Loader2, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Link, useNavigate } from 'react-router';
 import { HeaderTicker } from './HeaderTicker';
-import { getUserRoles, isVendedor } from '~/models';
+import { getUserRoles, isVendedor, userIsAdmin } from '~/models';
 import { logout } from '~/services/auth.service';
 import { getSavedAccounts, hasStoredCredential, type SavedAccount } from '~/utils/accounts';
 import { RoleBadge } from '~/utils/roles';
+import { db } from '~/services/firebase';
+import { onValue, ref, type Unsubscribe } from 'firebase/database';
+import { getNotificationsReadAt, subscribeNotificationsReadAt } from '~/utils/notifications';
 
 function getPainelLabel(user: ReturnType<typeof useAuth>['user']) {
   if (!user) return 'Painel';
@@ -24,13 +27,17 @@ function shortName(nome?: string) {
 
 interface HeaderProps {
   onMenuClick: () => void;
+  sidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
 }
 
-export function Header({ onMenuClick }: HeaderProps) {
+export function Header({ onMenuClick, sidebarCollapsed, onToggleSidebar }: HeaderProps) {
   const { user, switching, switchAccount } = useAuth();
   const navigate = useNavigate();
   const [showMenu, setShowMenu] = useState(false);
   const [accounts, setAccounts] = useState<SavedAccount[]>([]);
+  const [latestNotificationAt, setLatestNotificationAt] = useState(0);
+  const [notificationsReadAt, setNotificationsReadAt] = useState(getNotificationsReadAt);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -45,6 +52,42 @@ export function Header({ onMenuClick }: HeaderProps) {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showMenu]);
+
+  useEffect(() => subscribeNotificationsReadAt(setNotificationsReadAt), []);
+
+  useEffect(() => {
+    if (!user || !userIsAdmin(user)) {
+      setLatestNotificationAt(0);
+      return;
+    }
+
+    const paths = ['vendas', 'despesas', 'produtos', 'users', 'clientes'];
+    const latestByPath: Record<string, number> = {};
+    const getTime = (value?: string) => {
+      if (!value) return 0;
+      const time = new Date(value).getTime();
+      return Number.isNaN(time) ? 0 : time;
+    };
+    const getLatestFromData = (data: any) => {
+      if (!data) return 0;
+      return Object.values(data).reduce((max: number, item: any) => {
+        const itemMax = Math.max(
+          getTime(item?.createdAt),
+          getTime(item?.deletedAt),
+          getTime(item?.roleUpdatedAt)
+        );
+        return Math.max(max, itemMax);
+      }, 0);
+    };
+    const updateLatest = () => setLatestNotificationAt(Math.max(0, ...Object.values(latestByPath)));
+
+    const unsubscribers: Unsubscribe[] = paths.map(path => onValue(ref(db, path), snap => {
+      latestByPath[path] = snap.exists() ? getLatestFromData(snap.val()) : 0;
+      updateLatest();
+    }));
+
+    return () => unsubscribers.forEach(unsub => unsub());
+  }, [user]);
 
   const handleLogout = async () => {
     setShowMenu(false);
@@ -70,6 +113,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   };
 
   const otherAccounts = accounts.filter(a => a.username !== user?.username);
+  const hasNewNotifications = latestNotificationAt > notificationsReadAt;
 
   if (switching) {
     return (
@@ -85,18 +129,34 @@ export function Header({ onMenuClick }: HeaderProps) {
   return (
     <div className="border-b border-border-subtle bg-surface">
       <header className="flex items-center justify-between px-4 py-3">
-        <Link to="/" className="flex items-center gap-3 lg:hidden">
-          <img src="/logo-dmcalcados.png" alt="DM Calçados" className="h-8 w-8 object-contain logo-glow" />
-          <div className="flex flex-col">
-            <span style={{ fontFamily: '"Playfair Display", serif' }} className="text-base font-semibold leading-tight uppercase tracking-wide">DM Calçados</span>
-            {user && <div className="flex flex-wrap gap-0.5">{getUserRoles(user).map(r => <RoleBadge key={r} role={r} size="sm" />)}</div>}
-          </div>
-        </Link>
+        <div className="hidden lg:flex items-center gap-2 min-w-[40px]">
+          {onToggleSidebar && (
+            <button
+              onClick={onToggleSidebar}
+              className="rounded-xl p-2 text-content-secondary transition-colors hover:bg-surface-hover hover:text-content"
+              title={sidebarCollapsed ? 'Expandir menu' : 'Minimizar menu'}
+              aria-label={sidebarCollapsed ? 'Expandir menu' : 'Minimizar menu'}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+            </button>
+          )}
+        </div>
         <div className="hidden lg:block flex-1 min-w-0 overflow-hidden">
           <HeaderTicker />
         </div>
 
-        <div className="hidden lg:block relative ml-4" ref={menuRef}>
+        <div className="hidden lg:flex items-center gap-2 relative ml-4" ref={menuRef}>
+          {user && userIsAdmin(user) && (
+            <Link
+              to="/historico"
+              className="relative rounded-xl p-2 text-content-secondary transition-colors hover:bg-surface-hover hover:text-content"
+              title="Notificações"
+              aria-label="Notificações"
+            >
+              <Bell size={18} />
+              {hasNewNotifications && <span className="absolute right-1.5 top-1.5 h-2 w-2 animate-pulse rounded-full bg-cyan-300 ring-2 ring-surface" />}
+            </Link>
+          )}
           <button onClick={() => setShowMenu(!showMenu)}
             className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             {user?.foto ? (
@@ -154,6 +214,16 @@ export function Header({ onMenuClick }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-1.5 lg:hidden">
+          {user && userIsAdmin(user) && (
+            <Link
+              to="/historico"
+              className="relative rounded-lg p-2 text-content-secondary transition-colors hover:bg-surface-hover hover:text-content"
+              aria-label="Notificações"
+            >
+              <Bell size={20} />
+              {hasNewNotifications && <span className="absolute right-1.5 top-1.5 h-2 w-2 animate-pulse rounded-full bg-cyan-300 ring-2 ring-surface" />}
+            </Link>
+          )}
           <Link to="/conta">
             {user?.foto ? (
               <img src={user.foto} alt={user.nome} className="h-6 w-6 rounded-full object-cover" />
